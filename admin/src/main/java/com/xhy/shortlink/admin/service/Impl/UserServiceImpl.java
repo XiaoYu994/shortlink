@@ -13,8 +13,12 @@ import com.xhy.shortlink.admin.dto.resp.UserRespDTO;
 import com.xhy.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+
+import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 
 
 /*
@@ -25,6 +29,9 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements UserService {
 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
+
+    // redisson  分布式锁更安全 有看门狗机制
+    private  final RedissonClient redissonClient;
     @Override
     public UserRespDTO getUserByUsername(String username) {
 
@@ -49,11 +56,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
         if(!hasUsername(requestParam.getUsername())) {
             throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
         }
-        final int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-        if (insert < 1) {
-            throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
-        }
-        // 添加布隆过滤器
-        userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+        // 分布式锁 将用户名条件做为锁
+         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getUsername());
+       try {
+           if (lock.tryLock()) {
+               final int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+               if (insert < 1) {
+                   throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+               }
+               // 添加布隆过滤器
+               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+               return;
+           }
+           throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+       } finally {
+           lock.unlock();
+       }
+
     }
 }
