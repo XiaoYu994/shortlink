@@ -7,6 +7,12 @@
     <groupId>com.xhy.shortlink</groupId>
     <artifactId>shortlink-all</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <modules>
+        <module>admin</module>
+        <module>project</module>
+        <module>gateway</module>
+    </modules>
 
     <properties>
         <java.version>17</java.version>
@@ -24,6 +30,16 @@
         <guava.version>30.0-jre</guava.version>
     </properties>
 
+    <!-- dependencies 在父类或在类中去定义默认是下载这个依赖的 然后把这个依赖传递到这个项目中的依赖-->
+    <!-- 在本类中有，并且有子类继承了它，他会把这个依赖传递下去-->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+    </dependencies>
+
+    <!-- 不会下载依赖，只会去对依赖进行一个规约，只有在子类去引用这里面的类才会真实的去下载这个依赖-->
     <dependencyManagement>
         <dependencies>
             <dependency>
