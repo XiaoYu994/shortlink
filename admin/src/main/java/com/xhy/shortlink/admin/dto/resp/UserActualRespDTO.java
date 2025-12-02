@@ -1,19 +1,13 @@
 package com.xhy.shortlink.admin.dto.resp;
 
-
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.xhy.shortlink.admin.common.serialize.PhoneDesensitizationSerializer;
 import lombok.Data;
 
 import java.util.Date;
 
-/*
-* 用户返回响应
-* */
 @Data
-public class UserRespDTO {
-
-
+public class UserActualRespDTO {
     /**
      * ID
      */
@@ -33,7 +27,6 @@ public class UserRespDTO {
     /**
      * 手机号
      */
-    @JsonSerialize(using = PhoneDesensitizationSerializer.class)
     private String phone;
 
     /**
