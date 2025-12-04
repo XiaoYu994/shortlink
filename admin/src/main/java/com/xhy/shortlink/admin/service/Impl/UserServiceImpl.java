@@ -2,6 +2,7 @@ package com.xhy.shortlink.admin.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.admin.common.convention.exception.ClientException;
@@ -9,6 +10,7 @@ import com.xhy.shortlink.admin.common.enums.UserErrorCodeEnum;
 import com.xhy.shortlink.admin.dao.entity.UserDO;
 import com.xhy.shortlink.admin.dao.mapper.UserMapper;
 import com.xhy.shortlink.admin.dto.req.UserRegisterReqDTO;
+import com.xhy.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.UserRespDTO;
 import com.xhy.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -73,5 +75,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
            lock.unlock();
        }
 
+    }
+
+    @Override
+    public void update(UserUpdateReqDTO requestParam) {
+        // TODO 判断用户是否登录 登录之后才能去修改用户信息
+        // 根据用户名更新用户消息
+        // 分片表是根据username去做分片的所以使用 username作为查询条件
+        final LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class).eq(UserDO::getUsername, requestParam.getUsername());
+        final int update = baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), updateWrapper);
+        if (update < 1) {
+            throw new ClientException(UserErrorCodeEnum.USER_UPDATE_ERROR);
+        }
     }
 }

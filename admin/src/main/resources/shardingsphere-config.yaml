@@ -49,9 +49,9 @@ rules:
             cipherColumn: mail
             encryptorName: common_encryptor
           # 密码字段
-          password:
-            cipherColumn: password
-            encryptorName: common_encryptor
+#          password:
+#            cipherColumn: password
+#            encryptorName: common_encryptor
         # 是否按照密文字段查询
         queryWithCipherColumn: true
     # 加密算法
