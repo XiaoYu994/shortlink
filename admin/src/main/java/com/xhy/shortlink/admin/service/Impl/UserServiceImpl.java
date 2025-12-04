@@ -114,6 +114,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
         }
         // 不能重复登录
         final Boolean hasLogin = stringRedisTemplate.hasKey(LOGIN_USER_KEY + requestParam.getUsername());
+        // 装箱类型会有空指针问题
         if (hasLogin != null && hasLogin) {
             throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIT);
         }
@@ -142,6 +143,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
 
     @Override
     public Boolean logout(String username, String token) {
+        // 1.登录状态下才可以删除
+        if (!checkLogin(username, token)) {
+            throw new ClientException(UserErrorCodeEnum.USER_NOT_LOGIN);
+        }
        return stringRedisTemplate.opsForHash().delete(LOGIN_USER_KEY + username, token) > 0;
     }
 }
