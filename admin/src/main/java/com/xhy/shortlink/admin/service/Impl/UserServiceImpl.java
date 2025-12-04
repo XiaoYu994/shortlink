@@ -113,7 +113,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
             throw new ClientException(UserErrorCodeEnum.USER_PASSWORD_ERROR);
         }
         // 不能重复登录
-        if (stringRedisTemplate.hasKey(LOGIN_USER_KEY + requestParam.getUsername())) {
+        final Boolean hasLogin = stringRedisTemplate.hasKey(LOGIN_USER_KEY + requestParam.getUsername());
+        if (hasLogin != null && hasLogin) {
             throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIT);
         }
 
