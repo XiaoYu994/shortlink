@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.Date;
 
 /*
-* 用户返回响应
+* 查询用户接口返回响应 脱敏展示
 * */
 @Data
 public class UserRespDTO {

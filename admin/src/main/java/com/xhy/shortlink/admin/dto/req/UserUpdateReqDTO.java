@@ -2,6 +2,9 @@ package com.xhy.shortlink.admin.dto.req;
 
 import lombok.Data;
 
+/*
+* 用户修改请求参数
+* */
 @Data
 public class UserUpdateReqDTO {
     /**

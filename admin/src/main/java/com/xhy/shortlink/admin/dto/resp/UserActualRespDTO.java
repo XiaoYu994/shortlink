@@ -1,11 +1,12 @@
 package com.xhy.shortlink.admin.dto.resp;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.xhy.shortlink.admin.common.serialize.PhoneDesensitizationSerializer;
 import lombok.Data;
 
 import java.util.Date;
 
+/*
+* 用户不脱敏信息接口返回响应
+* */
 @Data
 public class UserActualRespDTO {
     /**
