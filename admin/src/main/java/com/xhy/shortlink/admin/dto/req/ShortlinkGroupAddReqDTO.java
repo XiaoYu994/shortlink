@@ -6,7 +6,7 @@ import lombok.Data;
 * 创建短链接分组请求参数
 * */
 @Data
-public class ShortlinKGroupAddRespDTO {
+public class ShortlinkGroupAddReqDTO {
     /*
     * 分组名称
     * */
