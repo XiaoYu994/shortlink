@@ -80,17 +80,17 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     @Override
-    public void sortGroup(List<ShortlinkGroupSortReqDTO> requestParam) {
-        requestParam.forEach(item -> {
-            final GroupDO groupDO = GroupDO.builder()
-                    .sortOrder(item.getSortOrder())
-                    .build();
-            final int update = baseMapper.update(groupDO, Wrappers.lambdaUpdate(GroupDO.class)
-                    .eq(GroupDO::getGid, item.getGid())
-                    .eq(GroupDO::getUsername, UserContext.getUsername()));
-            if(update <= 0){
-                throw new ClientException(SERVICE_UPDATE_ERROR);
-            }
-        });
-    }
+        public void sortGroup(List<ShortlinkGroupSortReqDTO> requestParam) {
+            requestParam.forEach(item -> {
+                final GroupDO groupDO = GroupDO.builder()
+                        .sortOrder(item.getSortOrder())
+                        .build();
+                final int update = baseMapper.update(groupDO, Wrappers.lambdaUpdate(GroupDO.class)
+                        .eq(GroupDO::getGid, item.getGid())
+                        .eq(GroupDO::getUsername, UserContext.getUsername()));
+                if(update <= 0){
+                    throw new ClientException(SERVICE_UPDATE_ERROR);
+                }
+            });
+        }
 }

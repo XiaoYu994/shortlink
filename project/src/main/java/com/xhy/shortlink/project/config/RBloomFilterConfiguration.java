@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class RBloomFilterConfiguration {
 
     /**
-     * 防止用户注册查询数据库的布隆过滤器
+     * 防止短链接生成重复的布隆过滤器
      */
     @Bean
     public RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter(RedissonClient redissonClient) {
