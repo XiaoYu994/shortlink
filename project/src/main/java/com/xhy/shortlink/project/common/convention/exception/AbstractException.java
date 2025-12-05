@@ -1,7 +1,6 @@
 package com.xhy.shortlink.project.common.convention.exception;
 
-import com.xhy.shortlink.admin.common.convention.errorcode.IErrorCode;
-import com.xhy.shortlink.admin.common.convention.exception.RemoteException;
+import com.xhy.shortlink.project.common.convention.errorcode.IErrorCode;
 import lombok.Getter;
 import org.springframework.util.StringUtils;
 

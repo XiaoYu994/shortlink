@@ -1,9 +1,8 @@
 package com.xhy.shortlink.project.common.convention.exception;
 
 
-import com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode;
-import com.xhy.shortlink.admin.common.convention.errorcode.IErrorCode;
-import com.xhy.shortlink.admin.common.convention.exception.AbstractException;
+import com.xhy.shortlink.project.common.convention.errorcode.BaseErrorCode;
+import com.xhy.shortlink.project.common.convention.errorcode.IErrorCode;
 
 /**
  * 客户端异常

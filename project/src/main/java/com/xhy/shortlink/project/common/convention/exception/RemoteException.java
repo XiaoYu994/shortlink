@@ -1,8 +1,6 @@
 package com.xhy.shortlink.project.common.convention.exception;
 
 
-import com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode;
-import com.xhy.shortlink.admin.common.convention.errorcode.IErrorCode;
 
 /**
  * 远程服务调用异常
