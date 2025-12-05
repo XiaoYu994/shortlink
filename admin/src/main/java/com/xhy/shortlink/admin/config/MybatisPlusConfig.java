@@ -34,6 +34,6 @@ public class MybatisPlusConfig implements MetaObjectHandler {
         log.debug("更新时自动填充更新时间");
         
         // 填充更新时间
-        this.strictUpdateFill(metaObject, "updatedTime",Date::new, Date.class);
+        this.strictUpdateFill(metaObject, "updateTime",Date::new, Date.class);
     }
 } 
