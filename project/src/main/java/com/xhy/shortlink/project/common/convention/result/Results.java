@@ -1,8 +1,8 @@
 package com.xhy.shortlink.project.common.convention.result;
 
 
-import com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode;
-import com.xhy.shortlink.admin.common.convention.exception.AbstractException;
+import com.xhy.shortlink.project.common.convention.errorcode.BaseErrorCode;
+import com.xhy.shortlink.project.common.convention.exception.AbstractException;
 
 import java.util.Optional;
 
