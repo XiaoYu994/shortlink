@@ -68,4 +68,13 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             throw new ClientException(SERVICE_UPDATE_ERROR);
         }
     }
+
+    @Override
+    public void deleteGroup(String gid) {
+        final int delete = baseMapper.delete(Wrappers.lambdaQuery(GroupDO.class).eq(GroupDO::getGid, gid).
+                eq(GroupDO::getUsername, UserContext.getUsername()));
+        if (delete <= 0) {
+            throw new ClientException(SERVICE_UPDATE_ERROR);
+        }
+    }
 }

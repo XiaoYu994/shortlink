@@ -29,4 +29,10 @@ public interface GroupService extends IService<GroupDO> {
      * @param requestParam 修改分组参数
      */
     void updateGroup(ShortlinkGroupUpdateReqDTO requestParam);
+
+    /**
+     * 删除短链接分组
+     * @param gid 分组标识
+     */
+    void deleteGroup(String gid);
 }
