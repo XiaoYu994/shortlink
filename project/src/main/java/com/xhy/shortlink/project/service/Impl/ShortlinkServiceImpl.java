@@ -35,6 +35,7 @@ public class ShortlinkServiceImpl extends ServiceImpl<ShortlinkMapper, Shortlink
                 .validDateType(requestParam.getValidDateType())
                 .validDate(requestParam.getValidDate())
                 .fullShortUrl(fullShortUrl)
+                .originUrl(requestParam.getOriginUrl())
                 .shortUri(generateSuffix(requestParam))
                 .build();
         // 如果发生布隆冲突，就说明短链接重复了，这个时候数据库就会报key冲突 之前设置了 唯一索引 full_short_url
