@@ -10,6 +10,7 @@ import com.xhy.shortlink.admin.common.convention.exception.ClientException;
 import com.xhy.shortlink.admin.dao.entity.GroupDO;
 import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
+import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
@@ -76,5 +77,20 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         if (delete <= 0) {
             throw new ClientException(SERVICE_UPDATE_ERROR);
         }
+    }
+
+    @Override
+    public void sortGroup(List<ShortlinkGroupSortReqDTO> requestParam) {
+        requestParam.forEach(item -> {
+            final GroupDO groupDO = GroupDO.builder()
+                    .sortOrder(item.getSortOrder())
+                    .build();
+            final int update = baseMapper.update(groupDO, Wrappers.lambdaUpdate(GroupDO.class)
+                    .eq(GroupDO::getGid, item.getGid())
+                    .eq(GroupDO::getUsername, UserContext.getUsername()));
+            if(update <= 0){
+                throw new ClientException(SERVICE_UPDATE_ERROR);
+            }
+        });
     }
 }
