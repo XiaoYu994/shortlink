@@ -143,7 +143,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
 
     @Override
     public Boolean logout(String username, String token) {
-        // 1.登录状态下才可以删除
         if (!checkLogin(username, token)) {
             throw new ClientException(UserErrorCodeEnum.USER_NOT_LOGIN);
         }

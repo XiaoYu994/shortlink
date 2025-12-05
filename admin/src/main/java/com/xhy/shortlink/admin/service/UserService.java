@@ -8,10 +8,8 @@ import com.xhy.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.xhy.shortlink.admin.dto.resp.UserRespDTO;
 
-/**
- * @Description:用户接口层
- * @Author: XiaoYu
- * @date: 2025/12/2$ 16:36$
+/*
+ * 用户接口层
  */
 public interface UserService extends IService<UserDO> {
 
