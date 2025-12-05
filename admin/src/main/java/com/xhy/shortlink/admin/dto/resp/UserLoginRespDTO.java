@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserLoginRespDTO {
-    /**
+    /*
      * 用户token
      */
     private String token;
