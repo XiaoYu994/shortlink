@@ -3,6 +3,7 @@ package com.xhy.shortlink.admin.controller;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.common.convention.result.Results;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
+import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,15 @@ public class GroupController {
     @GetMapping("/api/short-link/admin/v1/group")
     public Result<List<ShortlinkGroupRespDTO>> listGroup() {
         return Results.success(groupService.listGroup());
+    }
+
+    /*
+    * 修改短链接分组
+    * */
+    @PutMapping("/api/short-link/admin/v1/group")
+    public Result<Void> updateGroup(@RequestBody ShortlinkGroupUpdateReqDTO requestParam) {
+        groupService.updateGroup(requestParam);
+        return Results.success();
     }
 
 }

@@ -2,6 +2,7 @@ package com.xhy.shortlink.admin.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.admin.common.biz.user.UserContext;
@@ -9,6 +10,7 @@ import com.xhy.shortlink.admin.common.convention.exception.ClientException;
 import com.xhy.shortlink.admin.dao.entity.GroupDO;
 import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
+import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
@@ -16,6 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_SAVE_ERROR;
+import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_UPDATE_ERROR;
 
 @Slf4j
 @Service
@@ -37,7 +42,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .build();
         final int insert = baseMapper.insert(group);
         if (insert <= 0) {
-            throw new ClientException("添加分组失败");
+            throw new ClientException(SERVICE_SAVE_ERROR);
         }
     }
 
@@ -49,5 +54,18 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getCreateTime);
         final List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, ShortlinkGroupRespDTO.class);
+    }
+
+    @Override
+    public void updateGroup(ShortlinkGroupUpdateReqDTO requestParam) {
+        final LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getGid, requestParam.getGid());
+        final GroupDO groupDO = GroupDO.builder().name(requestParam.getName())
+                .build();
+        final int update = baseMapper.update(groupDO, updateWrapper);
+        if (update <= 0) {
+            throw new ClientException(SERVICE_UPDATE_ERROR);
+        }
     }
 }
