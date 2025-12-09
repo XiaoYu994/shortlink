@@ -55,6 +55,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
         // 设置溢出总页数后是否进行处理(默认不处理)
         paginationInterceptor.setOverflow(false);
 
+
         interceptor.addInnerInterceptor(paginationInterceptor);
         return interceptor;
     }
