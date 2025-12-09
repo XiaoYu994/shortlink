@@ -1,5 +1,6 @@
 package com.xhy.shortlink.project.dto.req;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
@@ -45,5 +46,6 @@ public class ShortlinkCreateReqDTO {
     /*
     * 短链接描述
     * */
+    @TableField("`describe`")
     private String describe;
 }
