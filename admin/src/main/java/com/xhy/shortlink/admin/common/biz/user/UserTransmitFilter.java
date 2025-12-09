@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
 
 import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOGIN_USER_KEY;
 
@@ -22,10 +23,19 @@ import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOGIN_U
 public class UserTransmitFilter implements Filter {
     private final StringRedisTemplate stringRedisTemplate;
 
+    private static final List<String> IGNORE_URL = List.of("/api/short-link/admin/v1/user/login",
+            "/api/short-link/admin/v1/user/check-login","/api/short-link/admin/v1/user/has-username");
+
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest = (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
+        final String requestURI = httpServletRequest.getRequestURI();
+        // 忽略的URL
+        if(IGNORE_URL.contains(requestURI)) {
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
         String token = httpServletRequest.getHeader("token");
         String username = httpServletRequest.getHeader("username");
         final Object userInfoJsonStr = stringRedisTemplate.opsForHash().get(LOGIN_USER_KEY + username, token);
