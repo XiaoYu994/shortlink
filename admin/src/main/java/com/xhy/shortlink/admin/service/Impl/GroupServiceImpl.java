@@ -15,6 +15,7 @@ import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -25,16 +26,18 @@ import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
+    private final GroupMapper groupMapper;
     @Override
     public void addGroup(ShortlinkGroupAddReqDTO requestParam) {
         //gid 使用随机生成的6位数
         String gid = RandomCodeGenerator.generateSixDigitCode();
-        // 插入之前要查询gid是否已经存在
-        GroupDO groupDO = baseMapper.selectOne(Wrappers.lambdaQuery(GroupDO.class).eq(GroupDO::getGid,gid));
+        // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
+        GroupDO groupDO = groupMapper.selectByGidIgnoreLogicDelete( gid);
         while (groupDO != null) {
             gid = RandomCodeGenerator.generateSixDigitCode();
-            groupDO = baseMapper.selectOne(Wrappers.lambdaQuery(GroupDO.class).eq(GroupDO::getGid,gid));
+            groupDO = groupMapper.selectByGidIgnoreLogicDelete( gid);
         }
         final GroupDO group = GroupDO.builder()
                 .gid(gid)
