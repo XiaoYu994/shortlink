@@ -1,0 +1,47 @@
+package com.xhy.shortlink.admin.remote;
+
+import cn.hutool.http.HttpUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.xhy.shortlink.admin.remote.dto.req.ShortlinkCreateReqDTO;
+import com.xhy.shortlink.admin.remote.dto.req.ShortlinkPageReqDTO;
+import com.xhy.shortlink.admin.remote.dto.resp.ShortlinkCreateRespDTO;
+import com.xhy.shortlink.admin.remote.dto.resp.ShortlinkPageRespDTO;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/*
+* 短链接服务接口
+ */
+public interface ShortlinkRemoteService {
+
+
+    /**
+     * 创建短链接
+     * @param requestParam 请求参数
+     * @return 创建结果
+     * */
+    default ShortlinkCreateRespDTO createShortlink(ShortlinkCreateReqDTO requestParam) {
+        final String resultBodyStr = HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/create", JSON.toJSONString(requestParam));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
+    }
+    /**
+     * 分页查询短连接
+     * @param requestParam 请求参数
+     * @return 分页结果
+     * */
+    default IPage<ShortlinkPageRespDTO> pageShortlink(ShortlinkPageReqDTO requestParam) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("gid", requestParam.getGid());
+        result.put("current",requestParam.getCurrent());
+        result.put("size",requestParam.getSize());
+        final String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/page", result);
+        return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
+    }
+
+
+}
