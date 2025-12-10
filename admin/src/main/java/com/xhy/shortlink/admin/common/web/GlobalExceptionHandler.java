@@ -6,7 +6,6 @@ import com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode;
 import com.xhy.shortlink.admin.common.convention.exception.AbstractException;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.common.convention.result.Results;
-import com.xhy.shortlink.admin.common.enums.UserErrorCodeEnum;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Optional;
 
 /**
@@ -45,20 +43,6 @@ public class GlobalExceptionHandler {
         return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), exceptionStr);
     }
 
-    /*
-     * 处理SQL异常 主要用于用户名已存在的情况
-     * */
-    @ExceptionHandler
-    public Result<Void> exceptionHandler(SQLIntegrityConstraintViolationException ex){
-        final String message = ex.getMessage();
-        if(message.contains("Duplicate entry")){
-            final String[] s = message.split(" ");
-            final String username = s[2];
-            return Results.failure(UserErrorCodeEnum.USER_NAME_EXIST.code(), username + "已存在");
-        }else{
-            return Results.failure(BaseErrorCode.SERVICE_ERROR.code(),BaseErrorCode.SERVICE_ERROR.message());
-        }
-    }
 
     /**
      * 拦截应用内抛出的异常
