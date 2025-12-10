@@ -25,6 +25,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +67,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void register(UserRegisterReqDTO requestParam) {
         if(!hasUsername(requestParam.getUsername())) {
             throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
