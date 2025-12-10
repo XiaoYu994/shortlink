@@ -5,6 +5,7 @@ import com.xhy.shortlink.project.common.convention.result.Result;
 import com.xhy.shortlink.project.common.convention.result.Results;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
@@ -25,6 +26,15 @@ public class ShortLinkController {
     @PostMapping("/api/short-link/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortlink(@RequestBody ShortLinkCreateReqDTO requestParam) {
         return Results.success(shortlinkService.createShortlink(requestParam));
+    }
+
+    /*
+    * 修改短链接
+    * */
+    @PostMapping("/api/short-link/v1/update")
+    public Result<Void> updateShortlink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
+        shortlinkService.updateShortlink(requestParam);
+        return Results.success();
     }
 
     /*
