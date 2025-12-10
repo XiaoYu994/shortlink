@@ -7,7 +7,7 @@ import lombok.Data;
 * 查询分组信息返回对象
 * */
 @Data
-public class ShortlinkGroupRespDTO {
+public class ShortLinkGroupRespDTO {
     /**
      * 分组标识
      */

@@ -6,13 +6,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
-import com.xhy.shortlink.project.dao.entity.ShortlinkDO;
-import com.xhy.shortlink.project.dao.mapper.ShortlinkMapper;
-import com.xhy.shortlink.project.dto.req.ShortlinkCreateReqDTO;
-import com.xhy.shortlink.project.dto.req.ShortlinkPageReqDTO;
-import com.xhy.shortlink.project.dto.resp.ShortlinkCreateRespDTO;
-import com.xhy.shortlink.project.dto.resp.ShortlinkPageRespDTO;
-import com.xhy.shortlink.project.service.ShortlinkService;
+import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
+import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +28,12 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ShortlinkServiceImpl extends ServiceImpl<ShortlinkMapper, ShortlinkDO> implements ShortlinkService {
+public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements ShortLinkService {
     private final RBloomFilter<String> shortlinkCachePenetrationBloomFilter;
     @Override
-    public ShortlinkCreateRespDTO createShortlink(ShortlinkCreateReqDTO requestParam) {
+    public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
         String fullShortUrl = requestParam.getDomain() + "/" + generateSuffix(requestParam);
-        final ShortlinkDO shortlinkDO = ShortlinkDO.builder()
+        final ShortLinkDO shortlinkDO = ShortLinkDO.builder()
                 .gid(requestParam.getGid())
                 .createdType(requestParam.getCreateType())
                 .domain(requestParam.getDomain())
@@ -53,7 +53,7 @@ public class ShortlinkServiceImpl extends ServiceImpl<ShortlinkMapper, Shortlink
         }
         // 短链接没有问题就将这个短链接加入布隆过滤器
         shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getShortUri());
-        return ShortlinkCreateRespDTO.builder()
+        return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl(shortlinkDO.getFullShortUrl())
                 .gid(shortlinkDO.getGid())
                 .originUrl(requestParam.getOriginUrl())
@@ -61,19 +61,19 @@ public class ShortlinkServiceImpl extends ServiceImpl<ShortlinkMapper, Shortlink
     }
 
     @Override
-    public IPage<ShortlinkPageRespDTO> pageShortlink(ShortlinkPageReqDTO requestParam) {
-        final LambdaQueryWrapper<ShortlinkDO> queryWrapper = Wrappers.lambdaQuery(ShortlinkDO.class)
-                .eq(ShortlinkDO::getGid, requestParam.getGid())
-                .eq(ShortlinkDO::getEnableStatus,0)
-                .orderByDesc(ShortlinkDO::getCreateTime);
-        final IPage<ShortlinkDO>  resultPage = baseMapper.selectPage(requestParam, queryWrapper);
-        return resultPage.convert(each -> BeanUtil.toBean(each, ShortlinkPageRespDTO.class));
+    public IPage<ShortLinkPageRespDTO> pageShortlink(ShortLinkPageReqDTO requestParam) {
+        final LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getEnableStatus,0)
+                .orderByDesc(ShortLinkDO::getCreateTime);
+        final IPage<ShortLinkDO>  resultPage = baseMapper.selectPage(requestParam, queryWrapper);
+        return resultPage.convert(each -> BeanUtil.toBean(each, ShortLinkPageRespDTO.class));
     }
 
     /*
     * 生成短链接后缀
     * */
-    private String generateSuffix(ShortlinkCreateReqDTO requestParam) {
+    private String generateSuffix(ShortLinkCreateReqDTO requestParam) {
         int customGenerateCount = 0;
         String shortUri;
         while (true) {

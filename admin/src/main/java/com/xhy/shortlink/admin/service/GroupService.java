@@ -5,7 +5,7 @@ import com.xhy.shortlink.admin.dao.entity.GroupDO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
-import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
+import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ public interface GroupService extends IService<GroupDO> {
      * 查询短链接分组集合
      * @return 分组集合
      */
-    List<ShortlinkGroupRespDTO> listGroup();
+    List<ShortLinkGroupRespDTO> listGroup();
 
     /**
      * 修改短链接分组

@@ -1,10 +1,10 @@
 package com.xhy.shortlink.project.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.xhy.shortlink.project.dao.entity.ShortlinkDO;
+import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 
 /*
 * 短链接持久层
 * */
-public interface ShortlinkMapper extends BaseMapper<ShortlinkDO> {
+public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
 }

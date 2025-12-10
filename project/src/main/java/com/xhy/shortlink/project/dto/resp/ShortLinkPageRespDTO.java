@@ -10,7 +10,7 @@ import java.util.Date;
 * 短链接分页相应参数
 * */
 @Data
-public class ShortlinkPageRespDTO{
+public class ShortLinkPageRespDTO {
 
 
     /*

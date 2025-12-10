@@ -1,13 +1,14 @@
-package com.xhy.shortlink.admin.remote.dto.req;
+package com.xhy.shortlink.project.dto.req;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import lombok.Data;
 
 /*
 * 短链接分页请求参数
 * */
 @Data
-public class ShortlinkPageReqDTO extends Page {
+public class ShortLinkPageReqDTO extends Page <ShortLinkDO> {
 
     /*
     * 分组id

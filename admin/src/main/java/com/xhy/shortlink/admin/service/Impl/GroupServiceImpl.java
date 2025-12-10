@@ -12,7 +12,7 @@ import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
-import com.xhy.shortlink.admin.dto.resp.ShortlinkGroupRespDTO;
+import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.RequiredArgsConstructor;
@@ -51,13 +51,13 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     @Override
-    public List<ShortlinkGroupRespDTO> listGroup() {
+    public List<ShortLinkGroupRespDTO> listGroup() {
         // 1. 根据用户名进行查询
         final LambdaQueryWrapper<GroupDO>  queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getCreateTime);
         final List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        return BeanUtil.copyToList(groupDOList, ShortlinkGroupRespDTO.class);
+        return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
     }
 
     @Override
