@@ -22,6 +22,7 @@ import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.ShortLinkService;
+import com.xhy.shortlink.project.toolkit.FaviconUtil;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import com.xhy.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
@@ -139,6 +140,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .fullShortUrl(fullShortUrl)
                 .originUrl(requestParam.getOriginUrl())
                 .shortUri(generateSuffix(requestParam))
+                .favicon(FaviconUtil.getFaviconUrl(requestParam.getOriginUrl()))
                 .build();
         // 通时加入路由表
         final ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
