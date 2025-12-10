@@ -106,7 +106,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
             if(shortLinkDO != null) {
                 // 将原始连接加入缓存 设置缓存有效期
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl), shortLinkDO.getOriginUrl(),LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl),
+                        shortLinkDO.getOriginUrl(),
+                        LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
                 ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
             }
         } finally {
@@ -143,7 +145,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
         // 缓存预热
-        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(), LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,
+                shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
+                LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
         // 短链接没有问题就将这个短链接加入布隆过滤器
         shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
         return ShortLinkCreateRespDTO.builder()
