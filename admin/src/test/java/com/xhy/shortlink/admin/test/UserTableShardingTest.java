@@ -1,24 +1,12 @@
 package com.xhy.shortlink.admin.test;
 
 public class UserTableShardingTest {
-    public static final String SQL ="create table t_user_%d\n" +
-            "(\n" +
-            "    id            bigint auto_increment comment 'ID'\n" +
-            "        primary key,\n" +
-            "    username      varchar(256)         null comment '用户名',\n" +
-            "    password      varchar(512)         null comment '密码',\n" +
-            "    real_name     varchar(256)         null comment '真实姓名',\n" +
-            "    phone         varchar(128)         null comment '手机号',\n" +
-            "    mail          varchar(512)         null comment '邮箱',\n" +
-            "    deletion_time bigint               null comment '注销时间戳',\n" +
-            "    create_time   datetime             null comment '创建时间',\n" +
-            "    update_time   datetime             null comment '修改时间',\n" +
-            "    del_flag      tinyint(1) default 0 null comment '删除标识 0：未删除 1：已删除',\n" +
-            "    constraint idx_unique_username\n" +
-            "        unique (username)\n" +
-            ")\n" +
-            "    charset = utf8mb4;\n" +
-            "\n";
+    public static final String SQL ="CREATE TABLE `t_link_goto_%d`(\n" +
+            "      `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',\n" +
+            "      `gid` varchar(32) DEFAULT 'default' COMMENT  '分组标识',\n" +
+            "      `full_short_url` varchar(128) DEFAULT NULL COMMENT '完整短链接',\n" +
+            "      PRIMARY KEY (`id`))\n" +
+            "      ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
     public static void main(String[] args) {
         for (int i = 0; i < 16; i++) {
