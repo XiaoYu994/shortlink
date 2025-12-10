@@ -98,8 +98,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         } else {
             // === 情况 2.1：分组改变，先删后插 ===
-            // 2.1.1 删除旧数据
-            baseMapper.delete(queryWrapper);
+            // 2.1.1 删除旧数据 物理删除
+            baseMapper.deletePhysical(requestParam.getOriginGid(),requestParam.getFullShortUrl());
             // 2.2.2 准备新数据 (直接修改查出来的对象，保留了 clickNum 等历史数据)
             shortLinkDO.setGid(requestParam.getGid()); // 设置新分组
             shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
