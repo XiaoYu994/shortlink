@@ -136,17 +136,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         } else {
             // === 情况 2.1：分组改变，先删后插 ===
-            // 2.1.1 删除旧数据 物理删除
-            baseMapper.deletePhysical(requestParam.getOriginGid(),requestParam.getFullShortUrl());
-            // 2.1.2 准备新数据 (直接修改查出来的对象，保留了 clickNum 等历史数据)
-            shortLinkDO.setGid(requestParam.getGid()); // 设置新分组
-            shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
-            shortLinkDO.setDescribe(requestParam.getDescribe());
-            shortLinkDO.setValidDateType(requestParam.getValidDateType());
-            // 处理有效期逻辑
-            shortLinkDO.setValidDate( Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
-            shortLinkDO.setId(null); // ID置空，让数据库重新生成
-            baseMapper.insert(shortLinkDO);
             // 2.1.3 还需要跟新路由表中的数据  先删除后插入
             final LambdaQueryWrapper<ShortLinkGoToDO> lambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, requestParam.getFullShortUrl())
@@ -158,6 +147,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 更新路由表中的数据，修改短链接分组的时候
             shortLinkGoToMapper.delete(lambdaQueryWrapper);
             shortLinkGoToMapper.insert(shortLinkGoToDO);
+            // 2.1.1 删除旧数据 物理删除
+            baseMapper.deletePhysical(requestParam.getOriginGid(),requestParam.getFullShortUrl());
+            // 2.1.2 准备新数据 (直接修改查出来的对象，保留了 clickNum 等历史数据)
+            shortLinkDO.setGid(requestParam.getGid()); // 设置新分组
+            shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
+            shortLinkDO.setDescribe(requestParam.getDescribe());
+            shortLinkDO.setValidDateType(requestParam.getValidDateType());
+            // 处理有效期逻辑
+            shortLinkDO.setValidDate( Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
+            shortLinkDO.setId(null); // ID置空，让数据库重新生成
+            baseMapper.insert(shortLinkDO);
         }
 
     }
