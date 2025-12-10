@@ -2,7 +2,6 @@ package com.xhy.shortlink.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.admin.common.convention.result.Result;
-import com.xhy.shortlink.admin.common.convention.result.Results;
 import com.xhy.shortlink.admin.remote.ShortLinkRemoteService;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
@@ -29,7 +28,7 @@ public class ShortLinkController {
      * */
     @GetMapping("/api/short-link/admin/v1/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortlink(ShortLinkPageReqDTO requestParam) {
-        return Results.success(shortlinkRemoteService.pageShortlink(requestParam));
+        return shortlinkRemoteService.pageShortlink(requestParam);
     }
 
     /*
@@ -37,6 +36,6 @@ public class ShortLinkController {
      * */
     @PostMapping("/api/short-link/admin/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortlink(@RequestBody ShortLinkCreateReqDTO requestParam) {
-        return Results.success(shortlinkRemoteService.createShortlink(requestParam));
+        return shortlinkRemoteService.createShortlink(requestParam);
     }
 }
