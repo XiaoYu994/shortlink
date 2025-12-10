@@ -1,6 +1,5 @@
 package com.xhy.shortlink.admin.remote.dto.resp;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
@@ -65,7 +64,6 @@ public class ShortLinkPageRespDTO {
     /*
      * 描述
      */
-    @TableField("`describe`")
     private String describe;
 
 }
