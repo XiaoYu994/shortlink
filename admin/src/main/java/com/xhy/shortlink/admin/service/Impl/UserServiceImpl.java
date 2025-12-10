@@ -15,6 +15,7 @@ import com.xhy.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.xhy.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.xhy.shortlink.admin.dto.resp.UserRespDTO;
+import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
@@ -43,6 +44,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
     private final StringRedisTemplate stringRedisTemplate;
     // redisson  分布式锁更安全 有看门狗机制
     private  final RedissonClient redissonClient;
+    private final GroupService groupService;
     @Override
     public UserRespDTO getUserByUsername(String username) {
 
@@ -82,6 +84,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
                }
                // 添加布隆过滤器
                userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+               // 添加默认分组
+               groupService.addGroup(requestParam.getUsername(),"默认分组");
                return;
            }
            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
