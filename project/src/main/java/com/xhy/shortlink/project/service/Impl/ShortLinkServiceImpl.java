@@ -23,6 +23,7 @@ import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
+import com.xhy.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -63,20 +64,38 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         String fullShortUrl =serverName + "/" + shortUri;
         // 优先从缓存中查询
          String originalink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
-        // 缓存中查不到
+        // 缓存中查到了
         if(StrUtil.isNotBlank(originalink)) {
             ((HttpServletResponse) response).sendRedirect(originalink);
+            return;
+        }
+        // 在从布隆过滤器中查询
+        final boolean contains = shortlinkCachePenetrationBloomFilter.contains(fullShortUrl);
+        // 布隆过滤器中存在可能不存在 不存在一定不存在  就是短链接不存在
+        if(!contains) {
+            return;
+        }
+        // 查询缓存是否过期
+        final String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+        if(StrUtil.isNotBlank(gotoIsNullShortLink)) {
+            return;
         }
         final RLock lock = redissonClient.getLock(String.format(RedisKeyConstant.LOOK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
             // 在判定一次
             originalink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+            if(StrUtil.isNotBlank(originalink)) {
+                ((HttpServletResponse) response).sendRedirect(originalink);
+                return;
+            }
             // 1.根据gid在路由表中找到原始连接 路由表中的是有https和https的
             final LambdaQueryWrapper<ShortLinkGoToDO> lambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGoToDO = shortLinkGoToMapper.selectOne(lambdaQueryWrapper);
             if(shortLinkGoToDO == null) {
+                // 缓存中加入一个空值
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
                 return;
             }
             // 2. 重定向到原始连接
@@ -86,8 +105,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .eq(ShortLinkDO::getEnableStatus, 0);
             ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
             if(shortLinkDO != null) {
-                // 将原始连接加入缓存
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl), shortLinkDO.getOriginUrl(),30, TimeUnit.MINUTES);
+                // 将原始连接加入缓存 设置缓存有效期
+                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl), shortLinkDO.getOriginUrl(),LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
                 ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
             }
         } finally {
@@ -123,6 +142,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         } catch (DuplicateKeyException e) {
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
+        // 缓存预热
+        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(), LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
         // 短链接没有问题就将这个短链接加入布隆过滤器
         shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
         return ShortLinkCreateRespDTO.builder()
