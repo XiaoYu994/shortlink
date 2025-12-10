@@ -29,6 +29,7 @@
         <hutool-all.version>5.8.20</hutool-all.version>
         <redisson.version>3.21.3</redisson.version>
         <guava.version>30.0-jre</guava.version>
+        <jsoup.version>1.17.2</jsoup.version>
     </properties>
 
     <!-- dependencies 在父类或在类中去定义默认是下载这个依赖的 然后把这个依赖传递到这个项目中的依赖-->
@@ -71,6 +72,12 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-boot-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
             </dependency>
 
             <dependency>
