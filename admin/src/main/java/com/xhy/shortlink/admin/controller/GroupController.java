@@ -22,7 +22,7 @@ public class GroupController {
     * */
     @PostMapping("/api/short-link/admin/v1/group")
     public Result<Void> addGroup(@RequestBody ShortlinkGroupAddReqDTO requestParam) {
-        groupService.addGroup(requestParam);
+        groupService.addGroup(requestParam.getName());
         return Results.success();
     }
 

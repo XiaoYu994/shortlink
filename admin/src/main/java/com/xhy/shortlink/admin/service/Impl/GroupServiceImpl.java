@@ -11,7 +11,6 @@ import com.xhy.shortlink.admin.common.convention.exception.ClientException;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.dao.entity.GroupDO;
 import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
-import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
@@ -43,7 +42,11 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     ShortLinkRemoteService shortlinkRemoteService = new ShortLinkRemoteService(){
     };
     @Override
-    public void addGroup(ShortlinkGroupAddReqDTO requestParam) {
+    public void addGroup(String groupName) {
+        addGroup(UserContext.getUsername(), groupName);
+    }
+    @Override
+    public void addGroup(String username,String groupName) {
         //gid 使用随机生成的6位数
         String gid = RandomCodeGenerator.generateSixDigitCode();
         // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
@@ -54,8 +57,8 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         }
         final GroupDO group = GroupDO.builder()
                 .gid(gid)
-                .name(requestParam.getName())
-                .username(UserContext.getUsername())
+                .name(groupName)
+                .username(username)
                 .build();
         final int insert = baseMapper.insert(group);
         if (insert <= 0) {

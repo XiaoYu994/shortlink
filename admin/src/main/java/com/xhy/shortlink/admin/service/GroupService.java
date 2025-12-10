@@ -2,7 +2,6 @@ package com.xhy.shortlink.admin.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xhy.shortlink.admin.dao.entity.GroupDO;
-import com.xhy.shortlink.admin.dto.req.ShortlinkGroupAddReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
@@ -15,9 +14,16 @@ import java.util.List;
 public interface GroupService extends IService<GroupDO> {
    /**
    * 新增短链接分组
-   * @param requestParam 新增分组参数
+   * @param groupName 创建分组名称
    * */
-    void addGroup(ShortlinkGroupAddReqDTO requestParam);
+    void addGroup(String groupName);
+
+    /**
+     * 新增短链接分组
+     * @param groupName 创建分组名称
+     * @param Username 创建分组用户
+     * */
+    void addGroup(String Username,String groupName);
 
     /**
      * 查询短链接分组集合
