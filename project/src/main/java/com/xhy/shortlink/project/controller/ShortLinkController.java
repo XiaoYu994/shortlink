@@ -6,13 +6,13 @@ import com.xhy.shortlink.project.common.convention.result.Results;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
+import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,5 +33,13 @@ public class ShortLinkController {
     @GetMapping("/api/short-link/v1/page")
     public Result<IPage<ShortLinkPageRespDTO> > pageShortlink(ShortLinkPageReqDTO requestParam) {
         return Results.success(shortlinkService.pageShortlink(requestParam));
+    }
+
+    /*
+    * 查询gid下的短链接数量
+    * */
+    @GetMapping("api/short-link/v1/count")
+    public Result<List<ShortLinkGroupCountRespDTO>> listGroupShortlinkCount(@RequestParam("requestParam")List<String> requestParam) {
+        return Results.success(shortlinkService.listGroupShortlinkCount(requestParam));
     }
 }

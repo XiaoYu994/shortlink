@@ -11,6 +11,7 @@ import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
+import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
@@ -20,6 +21,7 @@ import org.redisson.api.RBloomFilter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 /*
@@ -30,6 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements ShortLinkService {
     private final RBloomFilter<String> shortlinkCachePenetrationBloomFilter;
+    private final ShortLinkMapper shortLinkMapper;
     @Override
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
         String fullShortUrl = requestParam.getDomain() + "/" + generateSuffix(requestParam);
@@ -68,6 +71,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .orderByDesc(ShortLinkDO::getCreateTime);
         final IPage<ShortLinkDO>  resultPage = baseMapper.selectPage(requestParam, queryWrapper);
         return resultPage.convert(each -> BeanUtil.toBean(each, ShortLinkPageRespDTO.class));
+    }
+
+    @Override
+    public List<ShortLinkGroupCountRespDTO> listGroupShortlinkCount(List<String> requestParam) {
+        // 构造条件 (只写 Where 和 GroupBy 部分)
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getEnableStatus, 0)
+                .in(ShortLinkDO::getGid, requestParam)
+                .groupBy(ShortLinkDO::getGid);
+        return shortLinkMapper.selectGroupCount(queryWrapper);
     }
 
     /*
