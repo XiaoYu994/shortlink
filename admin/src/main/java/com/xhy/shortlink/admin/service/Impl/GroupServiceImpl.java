@@ -21,6 +21,7 @@ import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
@@ -104,6 +105,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateGroup(ShortlinkGroupUpdateReqDTO requestParam) {
         final LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
