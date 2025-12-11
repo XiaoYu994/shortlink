@@ -1,6 +1,8 @@
 package com.xhy.shortlink.project.toolkit;
 
 
+import com.xhy.shortlink.project.common.convention.exception.ClientException;
+
 import java.util.Date;
 
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAULT_CACHE_VALID_TIME;
@@ -24,7 +26,8 @@ public class LinkUtil {
         long timeToLive = validDate.getTime() - System.currentTimeMillis();
         // 3. 如果已经过期了（负数），返回 0 或抛异常，由调用方处理
         if (timeToLive <= 0) {
-            return 0;
+            // 已经过期了不能返回0，抛异常，由调用方处理
+            throw new ClientException("短链接已过期");
         }
         // 4. 【核心逻辑】取最小值
         // 如果剩余时间(比如3年) > 默认时间(1天)，就只存1天
