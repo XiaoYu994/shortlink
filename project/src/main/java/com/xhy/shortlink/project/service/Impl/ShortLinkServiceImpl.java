@@ -7,7 +7,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xhy.shortlink.project.common.constant.RedisKeyConstant;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
@@ -46,7 +45,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
+import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
 
 /*
 * 短链接接口实现层
@@ -84,12 +83,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             return;
         }
         // 查询缓存是否过期
-        final String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+         String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
         if(StrUtil.isNotBlank(gotoIsNullShortLink)) {
             ((HttpServletResponse) response).sendRedirect("/page/notfound");
             return;
         }
-        final RLock lock = redissonClient.getLock(String.format(RedisKeyConstant.LOOK_GOTO_SHORT_LINK_KEY, fullShortUrl));
+        final RLock lock = redissonClient.getLock(String.format(LOOK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
             // 在判定一次
@@ -98,13 +97,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 ((HttpServletResponse) response).sendRedirect(originalink);
                 return;
             }
+            // 在查一遍缓存是否过期
+            gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+            if (StrUtil.isNotBlank(gotoIsNullShortLink)) {
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
+                return;
+            }
             // 1.根据gid在路由表中找到原始连接 路由表中的是有https和https的
             final LambdaQueryWrapper<ShortLinkGoToDO> lambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGoToDO = shortLinkGoToMapper.selectOne(lambdaQueryWrapper);
             if(shortLinkGoToDO == null) {
                 // 缓存中加入一个空值
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
@@ -116,7 +121,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
             if(shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
                 // 如果查出来的是空链接或者过期的链接 缓存空值
-                stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
