@@ -49,7 +49,7 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
     IPage<ShortLinkPageRespDTO> pageShortlink(ShortLinkPageReqDTO requestParam);
 
     /**
-     * 查询短连接分组数量
+     * 查询分组下短链接数量
      * @param requestParam 请求参数
      * @return 查询结果
      * */
