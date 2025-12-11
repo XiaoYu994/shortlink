@@ -168,6 +168,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
                 shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
                 LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+        // 创建成功后，一定要把“空值缓存”删掉
+        // 场景 用户输入了一个不存在的短链接，系统缓存空值，但是用户立刻去创建这个短链接，
+        // 创建成功后访问 还没有过缓存时间，系统就会返回404页面，用户就会觉得是bug
+        stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
         // 短链接没有问题就将这个短链接加入布隆过滤器
         shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
 
