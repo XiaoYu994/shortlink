@@ -71,7 +71,11 @@ public interface ShortLinkRemoteService {
         });
     }
 
-
+    /**
+     * 获取目标网站标题
+     * @param url 目标网站
+     * @return 标题
+     * */
    default Result<String> getPageTitle(String url){
        final String resultStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/title?url=" + url);
        return JSON.parseObject(resultStr, new TypeReference<>() {

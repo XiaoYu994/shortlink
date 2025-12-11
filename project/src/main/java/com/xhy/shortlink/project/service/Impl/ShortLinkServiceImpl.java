@@ -179,6 +179,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (shortLinkDO == null) {
             throw new ClientException("短链接记录不存在");
         }
+        // 如果原始链接改变了，网站的图标也需要改变
+        // TODO 如果 getFaviconUrl 很慢（比如目标网站响应慢），会阻塞整个事务
+        if(!Objects.equals(shortLinkDO.getOriginUrl(), requestParam.getOriginUrl())) {
+            shortLinkDO.setFavicon(FaviconUtil.getFaviconUrl(requestParam.getOriginUrl()));
+        }
 
         // 2. 判断分组是否改变
         if (Objects.equals(shortLinkDO.getGid(), requestParam.getGid())) {
@@ -189,6 +194,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .set(ShortLinkDO::getOriginUrl, requestParam.getOriginUrl())
                     .set(ShortLinkDO::getDescribe, requestParam.getDescribe())
                     .set(ShortLinkDO::getValidDateType, requestParam.getValidDateType())
+                    .set(ShortLinkDO::getFavicon, shortLinkDO.getFavicon())
                     .set(ShortLinkDO::getValidDate,
                             Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
             baseMapper.update(null, updateWrapper); // 记得执行！

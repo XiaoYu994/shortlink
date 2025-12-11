@@ -92,7 +92,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .collect(Collectors.toMap(
                         ShortLinkGroupCountRespDTO::getGid,
                         item -> item.getShortLinkCount() == null ? 0 : item.getShortLinkCount(),
-                        (existing, replacement) -> existing
+                        (existing, replacement) -> existing // 如果一个gid出现两次，保留第一次的值
                 ));
         // 4. 转换并填充数据
         List<ShortLinkGroupRespDTO> shortLinkGroupRespDTOS = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
