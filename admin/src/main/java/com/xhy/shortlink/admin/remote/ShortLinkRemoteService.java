@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.xhy.shortlink.admin.remote.dto.req.ShortLinkRecycleBinSaveReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkGroupCountRespDTO;
@@ -81,4 +82,12 @@ public interface ShortLinkRemoteService {
        return JSON.parseObject(resultStr, new TypeReference<>() {
        });
    }
+
+    /**
+     * 移动到回收站
+     * @param requestParam 回收站请求参数
+     */
+    default void RecycleBinSave(ShortLinkRecycleBinSaveReqDTO requestParam){
+        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/save", JSON.toJSONString(requestParam));
+    }
 }

@@ -269,10 +269,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 2. 记录一下原始链接是否发生了变化 (用于后续判断是否需要更新图标)
         boolean isOriginUrlChanged = !Objects.equals(shortLinkDO.getOriginUrl(), requestParam.getOriginUrl());
 
-        // ==========================================
-        // 核心修改：这里不要去获取 Favicon，直接跳过
-        // ==========================================
-
         // 3. 判断分组是否改变
         if (Objects.equals(shortLinkDO.getGid(), requestParam.getGid())) {
             // === 情况 A：分组没变，原地更新 ===
