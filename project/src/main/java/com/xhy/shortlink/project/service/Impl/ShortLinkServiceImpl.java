@@ -46,6 +46,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
+
 /*
 * 短链接接口实现层
 * */
@@ -68,7 +70,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // /得到原始连接 这里是不加http和https的
         String fullShortUrl =serverName + "/" + shortUri;
         // 优先从缓存中查询
-         String originalink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+         String originalink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
         // 缓存中查到了
         if(StrUtil.isNotBlank(originalink)) {
             ((HttpServletResponse) response).sendRedirect(originalink);
@@ -91,7 +93,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         lock.lock();
         try {
             // 在判定一次
-            originalink = stringRedisTemplate.opsForValue().get(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl));
+            originalink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
             if(StrUtil.isNotBlank(originalink)) {
                 ((HttpServletResponse) response).sendRedirect(originalink);
                 return;
@@ -119,7 +121,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 return;
             }
             // 将原始连接加入缓存 设置缓存有效期
-            stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY, fullShortUrl),
+            stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
                     shortLinkDO.getOriginUrl(),
                     LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
@@ -158,7 +160,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
         // 缓存预热
-        stringRedisTemplate.opsForValue().set(String.format(RedisKeyConstant.GOTO_SHORT_LINK_KEY,
+        stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
                 shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
                 LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
         // 短链接没有问题就将这个短链接加入布隆过滤器
@@ -251,6 +253,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     requestParam.getOriginUrl()
             ));
         }
+        // 删除之前的缓存
+        stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
     }
 
     @Override
