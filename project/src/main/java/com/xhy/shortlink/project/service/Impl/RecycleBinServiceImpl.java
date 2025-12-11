@@ -10,6 +10,7 @@ import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRecoverReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRemoveReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinSaveReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkRecycleBinPageRespDTO;
 import com.xhy.shortlink.project.service.RecycleBinService;
@@ -62,5 +63,14 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
         baseMapper.update(ShortLinkDO.builder().enableStatus(0).build(), updateWrapper);
         // 删除对应的缓存 空值
         stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+    }
+
+    @Override
+    public void removeShortlink(ShortLinkRecycleBinRemoveReqDTO requestParam) {
+        final LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getEnableStatus, 1);
+        baseMapper.delete(queryWrapper);
     }
 }
