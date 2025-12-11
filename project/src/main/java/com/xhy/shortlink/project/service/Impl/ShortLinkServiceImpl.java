@@ -113,6 +113,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     ((HttpServletResponse) response).sendRedirect(redirectUrl);
                     return;
                 }
+                // 如果返回 null，说明逻辑已过期或数据异常，视为缓存未命中
+                stringRedisTemplate.delete(key);
             }
 
             // 再次查空值缓存（严谨的双重检查）
@@ -226,7 +228,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         } catch (DuplicateKeyException e) {
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
-        // 缓存预热
+        // 缓存预热 创建短链接的时间大于一天存1天，永久短链接也存1天的过期时间
         stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
                 shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
                 LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
