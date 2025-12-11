@@ -1,11 +1,7 @@
 package com.xhy.shortlink.project.toolkit;
 
 
-import cn.hutool.core.date.DateUnit;
-import cn.hutool.core.date.DateUtil;
-
 import java.util.Date;
-import java.util.Optional;
 
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAULT_CACHE_VALID_TIME;
 
@@ -14,13 +10,25 @@ import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAUL
 * 短链接工具类
 * */
 public class LinkUtil {
-    /*
-    * 如果当前用户传递的永久有效期就是一个月的缓存
-    * 如果设置了有效期就从当前时间往后推
-    * */
+    /**
+     * 获取缓存有效期
+     * @param validDate 短链接的数据库截止日期
+     * @return Redis 的 TTL (毫秒)
+     */
     public static long getLinkCacheValidTime(Date validDate) {
-        return Optional.ofNullable(validDate)
-                .map(each -> DateUtil.between(new Date(), each, DateUnit.MS))
-                .orElse(DEFAULT_CACHE_VALID_TIME);
+        // 1. 如果是永久有效 (validDate == null)，直接返回默认的 1 天
+        if (validDate == null) {
+            return DEFAULT_CACHE_VALID_TIME;
+        }
+        // 2. 计算距离过期的剩余时间
+        long timeToLive = validDate.getTime() - System.currentTimeMillis();
+        // 3. 如果已经过期了（负数），返回 0 或抛异常，由调用方处理
+        if (timeToLive <= 0) {
+            return 0;
+        }
+        // 4. 【核心逻辑】取最小值
+        // 如果剩余时间(比如3年) > 默认时间(1天)，就只存1天
+        // 如果剩余时间(比如5分钟) < 默认时间(1天)，就存5分钟，防止缓存超期
+        return Math.min(timeToLive, DEFAULT_CACHE_VALID_TIME);
     }
 }

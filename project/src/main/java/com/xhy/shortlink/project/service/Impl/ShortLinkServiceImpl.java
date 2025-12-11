@@ -65,75 +65,137 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @SneakyThrows
     @Override
     public void redirect(String shortUri, ServletRequest request, ServletResponse response) {
-        final String serverName = request.getServerName();
-        // /得到原始连接 这里是不加http和https的
-        String fullShortUrl =serverName + "/" + shortUri;
-        // 优先从缓存中查询
-         String originalink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
-        // 缓存中查到了
-        if(StrUtil.isNotBlank(originalink)) {
-            ((HttpServletResponse) response).sendRedirect(originalink);
-            return;
-        }
-        // 在从布隆过滤器中查询
-        final boolean contains = shortlinkCachePenetrationBloomFilter.contains(fullShortUrl);
-        // 布隆过滤器中存在可能不存在 不存在一定不存在  就是短链接不存在
-        if(!contains) {
-            ((HttpServletResponse) response).sendRedirect("/page/notfound");
-            return;
-        }
-        // 查询缓存是否过期
-         String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
-        if(StrUtil.isNotBlank(gotoIsNullShortLink)) {
-            ((HttpServletResponse) response).sendRedirect("/page/notfound");
-            return;
-        }
-        final RLock lock = redissonClient.getLock(String.format(LOOK_GOTO_SHORT_LINK_KEY, fullShortUrl));
-        lock.lock();
-        try {
-            // 在判定一次
-            originalink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
-            if(StrUtil.isNotBlank(originalink)) {
-                ((HttpServletResponse) response).sendRedirect(originalink);
+        // 不带http
+        String fullShortUrl = request.getServerName() + "/" + shortUri;
+        // 缓存 key
+        String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
+        // 缓存空值key
+        String keyIsNull = String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
+
+        // 1. 优先从缓存中查询
+        String originalLinkComposite = stringRedisTemplate.opsForValue().get(key);
+
+        // 【修正点1】如果缓存中有值，必须先解析，再判断是否过期/续期，最后跳转
+        if (StrUtil.isNotBlank(originalLinkComposite)) {
+            String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
+            if (redirectUrl != null) {
+                ((HttpServletResponse) response).sendRedirect(redirectUrl);
                 return;
             }
-            // 在查一遍缓存是否过期
-            gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+            // 如果返回 null，说明逻辑已过期或数据异常，视为缓存未命中，继续往下走（或者直接走回源逻辑）
+            // 这里为了稳健，如果数据异常通常应该删缓存并重新查库，继续往下执行
+            stringRedisTemplate.delete(key);
+        }
+
+        // 2. 布隆过滤器拦截 (解决缓存穿透)
+        if (!shortlinkCachePenetrationBloomFilter.contains(fullShortUrl)) {
+            ((HttpServletResponse) response).sendRedirect("/page/notfound");
+            return;
+        }
+
+        // 3. 查询空值缓存 (解决缓存穿透)
+        String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(keyIsNull);
+        if (StrUtil.isNotBlank(gotoIsNullShortLink)) {
+            ((HttpServletResponse) response).sendRedirect("/page/notfound");
+            return;
+        }
+
+        // 4. 加锁 (解决缓存击穿)
+        final RLock lock = redissonClient.getLock(LOOK_GOTO_SHORT_LINK_KEY);
+        lock.lock();
+        try {
+            // 5. 双重检查 (Double Check)
+            originalLinkComposite = stringRedisTemplate.opsForValue().get(key);
+            if (StrUtil.isNotBlank(originalLinkComposite)) {
+                // 锁内的解析和续期（防止在等待锁的过程中别人已经查好放入缓存了）
+                String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
+                if (redirectUrl != null) {
+                    ((HttpServletResponse) response).sendRedirect(redirectUrl);
+                    return;
+                }
+            }
+
+            // 再次查空值缓存（严谨的双重检查）
+            gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(keyIsNull);
             if (StrUtil.isNotBlank(gotoIsNullShortLink)) {
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
-            // 1.根据gid在路由表中找到原始连接 路由表中的是有https和https的
-            final LambdaQueryWrapper<ShortLinkGoToDO> lambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
+
+            // 6. 查询数据库 (回源)
+            // 6.1 查路由表
+            LambdaQueryWrapper<ShortLinkGoToDO> linkGoToWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
-            ShortLinkGoToDO shortLinkGoToDO = shortLinkGoToMapper.selectOne(lambdaQueryWrapper);
-            if(shortLinkGoToDO == null) {
-                // 缓存中加入一个空值
-                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
+            ShortLinkGoToDO shortLinkGoToDO = shortLinkGoToMapper.selectOne(linkGoToWrapper);
+
+            if (shortLinkGoToDO == null) {
+                stringRedisTemplate.opsForValue().set(keyIsNull, "-", 30, TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
-            // 2. 重定向到原始连接
-            final LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+
+            // 6.2 查详情表
+            LambdaQueryWrapper<ShortLinkDO> linkWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
                     .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
                     .eq(ShortLinkDO::getGid, shortLinkGoToDO.getGid())
                     .eq(ShortLinkDO::getEnableStatus, 0);
-            ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
-            if(shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
-                // 如果查出来的是空链接或者过期的链接 缓存空值
-                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30,TimeUnit.SECONDS);
+            ShortLinkDO shortLinkDO = baseMapper.selectOne(linkWrapper);
+
+            if (shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
+                stringRedisTemplate.opsForValue().set(keyIsNull, "-", 30, TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
-            // 将原始连接加入缓存 设置缓存有效期
-            stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
-                    shortLinkDO.getOriginUrl(),
-                    LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+
+            // 7. 重建缓存
+            long validTimeStamp = (shortLinkDO.getValidDate() != null) ? shortLinkDO.getValidDate().getTime() : -1;
+            String cacheValue = validTimeStamp + "|" + shortLinkDO.getOriginUrl();
+            // 计算初始 TTL (例如：过期时间 - 当前时间，或者默认 1 天)
+            long initialTTL = LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
+            stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
         } finally {
             lock.unlock();
         }
+    }
 
+    /**
+     * 提取 URL 并进行智能续期
+     * @return 有效的 URL，如果过期或格式错误返回 null
+     */
+    private String extractUrlAndRenew(String originalLinkComposite, String key) {
+        String[] split = originalLinkComposite.split("\\|");
+        if (split.length < 2) {
+            return null;
+        }
+
+        long validTime = Long.parseLong(split[0]);
+        String originalLink = split[1];
+
+        // 1. 校验业务逻辑是否已过期
+        // validTime = -1 表示永久有效
+        if (validTime != -1 && System.currentTimeMillis() > validTime) {
+            return null; // 已过期
+        }
+
+        // 2. 智能续期 (Redis TTL 续期)
+        // 这里的逻辑是：只要有人访问，且在有效期内，就重置 Redis 的物理过期时间，防止热点数据被 Redis 清除
+        long expireTime;
+        if (validTime == -1) {
+            // 永久有效的链接：重置为 1 天 (或其他默认时长，保持热点在缓存中)
+            expireTime = TimeUnit.DAYS.toMillis(1);
+        } else {
+            // 有有效期的链接：续期 min(1天, 剩余业务有效期)
+            long remainingTime = validTime - System.currentTimeMillis();
+            expireTime = Math.min(remainingTime, TimeUnit.DAYS.toMillis(1));
+        }
+
+        // 只有当计算出的过期时间大于0时才设置，避免设置错误的 TTL
+        if(expireTime > 0) {
+            stringRedisTemplate.expire(key, expireTime, TimeUnit.MILLISECONDS);
+        }
+
+        return originalLink;
     }
 
     @Override
@@ -152,7 +214,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .originUrl(requestParam.getOriginUrl())
                 .shortUri(suffix)
                 .build();
-        // 通时加入路由表
+        // 同时加入路由表
         final ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
                 .gid(shortlinkDO.getGid())
                 .fullShortUrl(shortlinkDO.getFullShortUrl())
@@ -262,7 +324,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     requestParam.getOriginUrl()
             ));
         }
-        // 删除之前的缓存
+        // 删除之前的缓存 TODO 这里的删除逻辑还需要优化
         stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
     }
 
