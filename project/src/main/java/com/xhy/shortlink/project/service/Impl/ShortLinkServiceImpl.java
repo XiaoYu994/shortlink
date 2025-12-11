@@ -13,6 +13,7 @@ import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dao.entity.ShortLinkGoToDO;
+import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
@@ -22,7 +23,6 @@ import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.ShortLinkService;
-import com.xhy.shortlink.project.toolkit.FaviconUtil;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import com.xhy.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
@@ -34,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
+    // 1. 注入事件发布器
+    private final ApplicationEventPublisher eventPublisher;
 
     @SneakyThrows
     @Override
@@ -129,7 +132,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
-        String fullShortUrl = requestParam.getDomain() + "/" + generateSuffix(requestParam);
+        String suffix = generateSuffix(requestParam);
+        String fullShortUrl = requestParam.getDomain() + "/" + suffix;
         final ShortLinkDO shortlinkDO = ShortLinkDO.builder()
                 .gid(requestParam.getGid())
                 .createdType(requestParam.getCreateType())
@@ -139,8 +143,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .validDate(requestParam.getValidDate())
                 .fullShortUrl(fullShortUrl)
                 .originUrl(requestParam.getOriginUrl())
-                .shortUri(generateSuffix(requestParam))
-                .favicon(FaviconUtil.getFaviconUrl(requestParam.getOriginUrl()))
+                .shortUri(suffix)
                 .build();
         // 通时加入路由表
         final ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
@@ -160,6 +163,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
         // 短链接没有问题就将这个短链接加入布隆过滤器
         shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
+
+        // 【修改点 2】：所有核心业务完成后，发布异步事件去抓取图标
+        // 这里可以直接复用更新时的那个 Event 类
+        eventPublisher.publishEvent(new UpdateFaviconEvent(
+                shortlinkDO.getFullShortUrl(),
+                shortlinkDO.getGid(),
+                requestParam.getOriginUrl()
+        ));
         return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
                 .gid(shortlinkDO.getGid())
@@ -170,61 +181,76 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateShortlink(ShortLinkUpdateReqDTO requestParam) {
-        // 使用 originGid (旧分组ID) 去查
-        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+        // 1. 查出旧数据
+        ShortLinkDO shortLinkDO = baseMapper.selectOne(Wrappers.lambdaQuery(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, requestParam.getOriginGid())
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getEnableStatus, 0);
-        ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
+                .eq(ShortLinkDO::getEnableStatus, 0));
+
         if (shortLinkDO == null) {
             throw new ClientException("短链接记录不存在");
         }
-        // 如果原始链接改变了，网站的图标也需要改变
-        // TODO 如果 getFaviconUrl 很慢（比如目标网站响应慢），会阻塞整个事务
-        if(!Objects.equals(shortLinkDO.getOriginUrl(), requestParam.getOriginUrl())) {
-            shortLinkDO.setFavicon(FaviconUtil.getFaviconUrl(requestParam.getOriginUrl()));
-        }
 
-        // 2. 判断分组是否改变
+        // 2. 记录一下原始链接是否发生了变化 (用于后续判断是否需要更新图标)
+        boolean isOriginUrlChanged = !Objects.equals(shortLinkDO.getOriginUrl(), requestParam.getOriginUrl());
+
+        // ==========================================
+        // 核心修改：这里不要去获取 Favicon，直接跳过
+        // ==========================================
+
+        // 3. 判断分组是否改变
         if (Objects.equals(shortLinkDO.getGid(), requestParam.getGid())) {
-            // === 2.1：分组没变，原地更新 ===
+            // === 情况 A：分组没变，原地更新 ===
             LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
                     .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                     .eq(ShortLinkDO::getGid, requestParam.getGid())
                     .set(ShortLinkDO::getOriginUrl, requestParam.getOriginUrl())
                     .set(ShortLinkDO::getDescribe, requestParam.getDescribe())
                     .set(ShortLinkDO::getValidDateType, requestParam.getValidDateType())
-                    .set(ShortLinkDO::getFavicon, shortLinkDO.getFavicon())
                     .set(ShortLinkDO::getValidDate,
                             Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
-            baseMapper.update(null, updateWrapper); // 记得执行！
+            baseMapper.update(null, updateWrapper);
 
         } else {
-            // === 情况 2.1：分组改变，先删后插 ===
-            // 2.1.3 还需要跟新路由表中的数据  先删除后插入
-            final LambdaQueryWrapper<ShortLinkGoToDO> lambdaQueryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
+            // === 情况 B：分组改变，先删后插 ===
+
+            // 3.1 更新路由表 (ShortLinkGoTo)
+            // 先删旧路由
+            shortLinkGoToMapper.delete(Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, requestParam.getFullShortUrl())
-                    .eq(ShortLinkGoToDO::getGid, shortLinkDO.getGid()); // 这里就是不相等 这是旧分组ID
-            final ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
+                    .eq(ShortLinkGoToDO::getGid, shortLinkDO.getGid())); //旧GID
+
+            // 插新路由
+            ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
                     .gid(requestParam.getGid())
                     .fullShortUrl(requestParam.getFullShortUrl())
                     .build();
-            // 更新路由表中的数据，修改短链接分组的时候
-            shortLinkGoToMapper.delete(lambdaQueryWrapper);
             shortLinkGoToMapper.insert(shortLinkGoToDO);
-            // 2.1.1 删除旧数据 物理删除
-            baseMapper.deletePhysical(requestParam.getOriginGid(),requestParam.getFullShortUrl());
-            // 2.1.2 准备新数据 (直接修改查出来的对象，保留了 clickNum 等历史数据)
-            shortLinkDO.setGid(requestParam.getGid()); // 设置新分组
+
+            // 3.2 处理主表 (ShortLink)
+            // 物理删除旧数据
+            baseMapper.deletePhysical(requestParam.getOriginGid(), requestParam.getFullShortUrl());
+
+            // 准备新数据 (复用查出来的对象，修改属性)
+            shortLinkDO.setGid(requestParam.getGid());
             shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
             shortLinkDO.setDescribe(requestParam.getDescribe());
             shortLinkDO.setValidDateType(requestParam.getValidDateType());
-            // 处理有效期逻辑
-            shortLinkDO.setValidDate( Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
-            shortLinkDO.setId(null); // ID置空，让数据库重新生成
+            shortLinkDO.setValidDate(Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
+            shortLinkDO.setId(null); // ID置空，重新生成
+            // 注意：这里插入的 shortLinkDO 里 favicon 还是旧的，没关系，异步线程一会儿会改它
             baseMapper.insert(shortLinkDO);
         }
 
+        // 4. 【关键步骤】如果在事务提交前发布事件，需要确保监听器逻辑正确
+        // 如果原始链接变了，发布事件通知异步线程去下载图标
+        if (isOriginUrlChanged) {
+            eventPublisher.publishEvent(new UpdateFaviconEvent(
+                    requestParam.getFullShortUrl(),
+                    requestParam.getGid(), // 传入最新的 GID
+                    requestParam.getOriginUrl()
+            ));
+        }
     }
 
     @Override
