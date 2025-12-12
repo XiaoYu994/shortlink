@@ -72,6 +72,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkOsStatsMapper linkOsStatsMapper;
+    private final LinkBrowserStatsMapper linkBrowserStatsMapper;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -191,6 +192,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 uvFirstFlag.set(true);
                 stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, uv); // set去重
             };
+            // 判断用户是否已存在 Cookie 是否首次访问
             if(ArrayUtil.isNotEmpty(cookies)) {
                 Arrays.stream(cookies)
                         .filter(cookie -> cookie.getName().equals("uv"))
@@ -214,6 +216,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             int hour = DateUtil.hour(currentDate, true);
             Week week = DateUtil.dayOfWeekEnum(currentDate);
             int weekday = week.getIso8601Value();
+            // 构造基础访问统计数据
             final LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                     .hour(hour)
                     .weekday(weekday)
@@ -225,6 +228,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .uip(uipFirstFlag ? 1:0)
                     .build();
             linkAccessStatsMapper.shortLinkStats(List.of(linkAccessStatsDO));
+            // 构造区域访问统计数据
             Map<String,Object> localeParamMap = new HashMap<>();
             localeParamMap.put("key",statsLocaleAmapKey);
             localeParamMap.put("ip",uip);
@@ -248,6 +252,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .date(currentDate)
                         .build();
                 linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
+                // 构造操作系统访问统计数据
                 final LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
                         .fullShortUrl(fullShortUrl)
                         .gid(gid)
@@ -256,6 +261,15 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .cnt(1)
                         .build();
                 linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
+                // 构造浏览器访问统计数据
+                final LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
+                        .browser(LinkUtil.getBrowser((HttpServletRequest) request))
+                        .date(currentDate)
+                        .fullShortUrl(fullShortUrl)
+                        .gid(gid)
+                        .cnt(1)
+                        .build();
+                linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
             }
         } catch (Exception e) {
             throw new ClientException("短链接访问统计异常");

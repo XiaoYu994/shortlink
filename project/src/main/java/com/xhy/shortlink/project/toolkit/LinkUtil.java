@@ -1,6 +1,8 @@
 package com.xhy.shortlink.project.toolkit;
 
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.useragent.UserAgentUtil;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -83,5 +85,19 @@ public class LinkUtil {
         } else {
             return "Unknown";
         }
+    }
+
+    /**
+     * 获取用户访问浏览器
+     *
+     * @param request 请求
+     * @return 访问浏览器
+     */
+    public static String getBrowser(HttpServletRequest request) {
+        final String browser = UserAgentUtil.parse(request.getHeader("User-Agent")).getBrowser().toString();
+        if(StrUtil.isEmpty( browser)) {
+            return "未知";
+        }
+        return browser ;
     }
 }
