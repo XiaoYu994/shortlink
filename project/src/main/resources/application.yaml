@@ -18,6 +18,11 @@ spring:
       port: 6379
       password: xhy_redis
 
+short-link:
+  stats:
+    locale:
+      amap-key: 23ea4562d80a83d1dd47922b4913d5e0
+
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
