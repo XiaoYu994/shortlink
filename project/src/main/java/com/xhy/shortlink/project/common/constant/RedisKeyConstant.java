@@ -20,4 +20,9 @@ public class RedisKeyConstant {
     * 短链接跳转锁 前缀key
     * */
     public static final String LOOK_GOTO_SHORT_LINK_KEY = "short_link_goto_lock_%s:";
+
+    /*
+     * 短链接统计判断是否新用户缓存标识
+     */
+    public static final String SHORT_LINK_STATS_UV_KEY = "short-link:stats:uv:";
 }
