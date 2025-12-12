@@ -1,6 +1,8 @@
 package com.xhy.shortlink.project.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.Week;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -10,9 +12,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
+import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
+import com.xhy.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
@@ -61,6 +65,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RedissonClient redissonClient;
     // 1. 注入事件发布器
     private final ApplicationEventPublisher eventPublisher;
+    // 监空统计有关mapper
+    private final LinkAccessStatsMapper linkAccessStatsMapper;
 
     @SneakyThrows
     @Override
@@ -79,6 +85,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (StrUtil.isNotBlank(originalLinkComposite)) {
             String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
             if (redirectUrl != null) {
+                stats(fullShortUrl, request,response);
                 ((HttpServletResponse) response).sendRedirect(redirectUrl);
                 return;
             }
@@ -110,6 +117,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 // 锁内的解析和续期（防止在等待锁的过程中别人已经查好放入缓存了）
                 String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
                 if (redirectUrl != null) {
+                    stats(fullShortUrl, request,response);
+
                     ((HttpServletResponse) response).sendRedirect(redirectUrl);
                     return;
                 }
@@ -155,10 +164,38 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 计算初始 TTL (例如：过期时间 - 当前时间，或者默认 1 天)
             long initialTTL = LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
             stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
+            stats(fullShortUrl, request,response);
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
         } finally {
             lock.unlock();
         }
+    }
+
+    private void stats(String fullShortUrl,ServletRequest request, ServletResponse response) {
+        try {
+            LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
+                    .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
+            ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
+            String gid = shortLinkGotoDO.getGid();
+            Date currentDate = new Date();
+            int hour = DateUtil.hour(currentDate, true);
+            Week week = DateUtil.dayOfWeekEnum(currentDate);
+            int weekday = week.getIso8601Value();
+            final LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
+                    .hour(hour)
+                    .weekday(weekday)
+                    .fullShortUrl(fullShortUrl)
+                    .gid(gid)
+                    .date(currentDate)
+                    .pv(1)
+                    .uv(1)
+                    .uip(1)
+                    .build();
+            linkAccessStatsMapper.shortLinkStats(List.of(linkAccessStatsDO));
+        } catch (Exception e) {
+            throw new ClientException("短链接访问统计异常");
+        }
+
     }
 
     /**
