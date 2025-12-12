@@ -114,4 +114,29 @@ public class LinkUtil {
         }
         return "PC";
     }
+
+    /**
+     * 获取用户访问网络
+     *
+     * @param request 请求
+     * @return 访问设备
+     */
+    public static String getNetwork(HttpServletRequest request) {
+        String ua = request.getHeader("User-Agent");
+        if (ua == null) return "Unknown";
+        // 转大写，方便匹配
+        String uaUpper = ua.toUpperCase();
+        // 1. 先抓“铁证如山”的 WIFI (微信、支付宝、钉钉等)
+        if (uaUpper.contains("WIFI")) {
+            return "WIFI";
+        }
+        // 2. 开始“盲猜”：
+        // 如果是移动设备 (手机/平板)，但上面没匹配到 WIFI，就默认它是 Mobile
+        // (误差来源：手机用 Chrome 连 WIFI 也会掉进这个分支，被误判为 Mobile)
+        if (uaUpper.contains("MOBILE") || uaUpper.contains("ANDROID") || uaUpper.contains("IPHONE")) {
+            return "Mobile";
+        }
+        // 3. 剩下的通常是电脑
+        return "WIFI";
+    }
 }
