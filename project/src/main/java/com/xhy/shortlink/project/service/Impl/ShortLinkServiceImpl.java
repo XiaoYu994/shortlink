@@ -194,12 +194,15 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .findFirst() // 找到第一个匹配的 Cookie
                         .map(Cookie::getValue)
                         .ifPresentOrElse(each -> {
-                            final Long added = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, each);
-                            uvFirstFlag.set(added != null && added > 0L);
+                            final Long uvAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, each);
+                            uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
                         }, addResponseCookieTask);
             } else {
                 addResponseCookieTask.run();
             }
+            final String uip = LinkUtil.getActualIp((HttpServletRequest) request);
+            final Long uipAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UIP_KEY + fullShortUrl, uip);
+            boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
             LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
@@ -216,7 +219,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .date(currentDate)
                     .pv(1)
                     .uv(uvFirstFlag.get() ? 1:0)
-                    .uip(1)
+                    .uip(uipFirstFlag ? 1:0)
                     .build();
             linkAccessStatsMapper.shortLinkStats(List.of(linkAccessStatsDO));
         } catch (Exception e) {

@@ -2,6 +2,7 @@ package com.xhy.shortlink.project.toolkit;
 
 
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Date;
 
@@ -33,5 +34,31 @@ public class LinkUtil {
         // 如果剩余时间(比如3年) > 默认时间(1天)，就只存1天
         // 如果剩余时间(比如5分钟) < 默认时间(1天)，就存5分钟，防止缓存超期
         return Math.min(timeToLive, DEFAULT_CACHE_VALID_TIME);
+    }
+
+    /**
+     * 获取用户真实IP
+     *
+     * @param request 请求
+     * @return 用户真实IP
+     */
+    public static String getActualIp(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+        return ipAddress;
     }
 }
