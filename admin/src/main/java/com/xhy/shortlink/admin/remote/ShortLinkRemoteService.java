@@ -1,15 +1,13 @@
 package com.xhy.shortlink.admin.remote;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.remote.dto.req.*;
-import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
-import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkGroupCountRespDTO;
-import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
-import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkRecycleBinPageRespDTO;
+import com.xhy.shortlink.admin.remote.dto.resp.*;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.HashMap;
@@ -118,5 +116,17 @@ public interface ShortLinkRemoteService {
      */
     default void removeShortlink(ShortLinkRecycleBinRemoveReqDTO requestParam) {
         HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/remove", JSON.toJSONString(requestParam));
+    }
+
+    /**
+     * 获取单个短链接监控数据
+     *
+     * @param requestParam 获取短链接监控数据入参
+     * @return 短链接监控数据
+     */
+    default Result<ShortLinkStatsRespDTO> oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
+        final String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats", BeanUtil.beanToMap(requestParam));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
     }
 }
