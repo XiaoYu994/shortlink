@@ -10,6 +10,8 @@ import java.util.Date;
 * */
 @Data
 public class ShortLinkRecycleBinPageRespDTO {
+
+
     /*
      * 域名
      */
@@ -40,6 +42,11 @@ public class ShortLinkRecycleBinPageRespDTO {
      */
     private String favicon;
 
+    /**
+     * 启用标识 0：启用 1：未启用
+     */
+    private Integer enableStatus;
+
 
     /*
      * 有效期类型 0：永久有效 1：用户自定义
@@ -63,4 +70,36 @@ public class ShortLinkRecycleBinPageRespDTO {
      * 描述
      */
     private String describe;
+
+    /*
+     * 历史PV
+     * */
+    private Integer totalPv;
+
+    /*
+     * 今日PV
+     * */
+    private Integer todayPv;
+
+    /*
+     * 历史UV
+     * */
+    private Integer totalUv;
+
+    /*
+     * 今日UV
+     * */
+    private Integer todayUv;
+
+    /*
+     * 历史UIP
+     * */
+    private Integer totalUip;
+
+    /*
+     * 今日UIP
+     * */
+    private Integer todayUip;
+
+
 }

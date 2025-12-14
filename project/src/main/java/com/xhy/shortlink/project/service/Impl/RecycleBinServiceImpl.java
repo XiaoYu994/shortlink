@@ -42,14 +42,10 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
 
     @Override
     public IPage<ShortLinkRecycleBinPageRespDTO> pageShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
-        final LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .in(ShortLinkDO::getGid, requestParam.getGidList())
-                .eq(ShortLinkDO::getEnableStatus, 1)
-                .orderByDesc(ShortLinkDO::getUpdateTime);
-        final ShortLinkRecycleBinPageReqDTO resultPage = baseMapper.selectPage(requestParam, queryWrapper);
+        IPage<ShortLinkDO>  resultPage = baseMapper.pageRecycleBinLink(requestParam);
         return resultPage.convert(each -> {
             final ShortLinkRecycleBinPageRespDTO result = BeanUtil.toBean(each, ShortLinkRecycleBinPageRespDTO.class);
-            result.setFullShortUrl("http://" + each.getFullShortUrl());
+            result.setDomain("http://" + each.getDomain());
             return result;
         });
     }
