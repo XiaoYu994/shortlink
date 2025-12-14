@@ -2,8 +2,10 @@ package com.xhy.shortlink.project.dao.mapper;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
@@ -43,4 +45,10 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
                         @Param("pv") int pv,
                         @Param("uv") int uv,
                         @Param("uip") int uip);
+
+
+    /*
+     * 分页统计短链接
+     */
+    IPage<ShortLinkDO> pageLink(ShortLinkPageReqDTO shortLinkPageReqDTO);
 }
