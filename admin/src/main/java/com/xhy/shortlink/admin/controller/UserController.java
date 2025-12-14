@@ -52,7 +52,7 @@ public class UserController {
     /*
     * 用户注册
     * */
-    @PostMapping("/api/short-link/admin/v1/user/register")
+    @PostMapping("/api/short-link/admin/v1/user")
     public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam) {
         userService.register(requestParam);
         return Results.success();
@@ -61,7 +61,7 @@ public class UserController {
     /*
     * 修改用户
     * */
-    @PutMapping("/api/short-link/admin/admin/v1/user")
+    @PutMapping("/api/short-link/admin/v1/user")
     public Result<Void> update(@RequestBody UserUpdateReqDTO requestParam) {
         userService.update(requestParam);
         return Results.success();
