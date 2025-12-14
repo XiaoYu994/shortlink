@@ -15,6 +15,7 @@ import com.xhy.shortlink.project.dto.resp.*;
 import com.xhy.shortlink.project.service.ShortLinkStatsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,7 +33,9 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final ShortLinkMapper shortLinkMapper;
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ShortLinkStatsRespDTO oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
         // 查询基础数据统计
         final List<LinkAccessStatsDO> linkAccessStatsDOList = linkAccessStatsMapper.listStatsByShortLink(requestParam);
@@ -167,6 +170,9 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
             networkStats.add(networkRespDTO);
         });
         return ShortLinkStatsRespDTO.builder()
+                .uip(pvUvUidStatsByShortLink.getUip())
+                .pv(pvUvUidStatsByShortLink.getPv())
+                .uv(pvUvUidStatsByShortLink.getUv())
                 .daily(BeanUtil.copyToList(linkAccessStatsDOList, ShortLinkStatsAccessDailyRespDTO.class))
                 .localeCnStats(localeCnStats)
                 .hourStats(hourStats)

@@ -8,6 +8,7 @@ import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -26,4 +27,20 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
      */
     @Delete("DELETE FROM t_link WHERE gid = #{gid} AND full_short_url = #{fullShortUrl}")
     void deletePhysical(@Param("gid") String gid, @Param("fullShortUrl") String fullShortUrl);
+
+
+    /*
+    * 短链接访问统计数据自增
+    * */
+    @Update("UPDATE t_link " +
+            "SET total_pv = total_pv + #{pv}, " +
+            "    total_uv = total_uv + #{uv}, " +
+            "    total_uip = total_uip + #{uip} " +
+            "WHERE gid = #{gid} " +
+            "  AND full_short_url = #{fullShortUrl}")
+    void incrementStats(@Param("gid") String gid,
+                        @Param("fullShortUrl") String fullShortUrl,
+                        @Param("pv") int pv,
+                        @Param("uv") int uv,
+                        @Param("uip") int uip);
 }
