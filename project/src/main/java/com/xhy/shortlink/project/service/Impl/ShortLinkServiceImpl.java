@@ -243,13 +243,15 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             final JSONObject localeResultObj = JSON.parseObject(localeResultStr);
             // 根据高德接口返回结果
             final String infocode = localeResultObj.getString("infocode");
+            String actualProvince;
+            String actualCity;
             if(StrUtil.isNotBlank(infocode) && infocode.equals("10000")) {
                 final String province = localeResultObj.getString("province");
                 // 没有值返回的是[]
                 boolean unknownFlag = StrUtil.equals(province, "[]");
                 final LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                        .province(unknownFlag ? "未知" : province)
-                        .city(unknownFlag ? "未知" : localeResultObj.getString("city"))
+                        .province(actualProvince = unknownFlag ? "未知" : province)
+                        .city(actualCity = unknownFlag ? "未知" : localeResultObj.getString("city"))
                         .adcode(unknownFlag ? "未知" : localeResultObj.getString("adcode"))
                         .cnt(1)
                         .gid(gid)
@@ -278,16 +280,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .cnt(1)
                         .build();
                 linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
-                // 构造短链接日志统计数据
-                final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
-                        .ip(uip)
-                        .user(uv.get())
-                        .os(os)
-                        .browser(browser)
-                        .fullShortUrl(fullShortUrl)
-                        .gid(gid)
-                        .build();
-                linkAccessLogsMapper.insert(linkAccessLogsDO);
                 // 设备访问数据统计
                 final String device = LinkUtil.getDevice((HttpServletRequest) request);
                 final LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
@@ -308,6 +300,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .cnt(1)
                         .build();
                 linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
+                // 构造短链接日志统计数据
+                final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                        .ip(uip)
+                        .user(uv.get())
+                        .os(os)
+                        .browser(browser)
+                        .fullShortUrl(fullShortUrl)
+                        .gid(gid)
+                        .device(device)
+                        .network(network)
+                        .locale(StrUtil.join("-", "中国", actualProvince, actualCity))
+                        .build();
+                linkAccessLogsMapper.insert(linkAccessLogsDO);
             }
         } catch (Exception e) {
             throw new ClientException("短链接访问统计异常");
