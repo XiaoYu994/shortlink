@@ -177,4 +177,29 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "</script>")
     List<Map<String, Object>> selectUvTypeByUser(@Param("param") ShortLinkUvTypeReqDTO requestParam);
 
+    /*
+     * 获取用户信息是否新老访客 分组
+     */
+    @Select("<script> " +
+            "SELECT " +
+            "    tlal.user, " +
+            "    CASE " +
+            "        WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate} THEN '新访客' " +
+            "        ELSE '老访客' " +
+            "    END AS uvType " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlal.user IN " +
+            "    <foreach item='item' index='index' collection='param.userAccessLogsList' open='(' separator=',' close=')'> " +
+            "        #{item} " +
+            "    </foreach> " +
+            "GROUP BY " +
+            "    tlal.user;" +
+            "</script>")
+    List<Map<String, Object>> selectUvTypeByUserGruop(@Param("param") ShortLinkUvTypeReqDTO requestParam);
 }

@@ -8,10 +8,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
-import com.xhy.shortlink.project.dto.req.ShortLinkStatsAccessRecordReqDTO;
-import com.xhy.shortlink.project.dto.req.ShortLinkStatsGroupReqDTO;
-import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
-import com.xhy.shortlink.project.dto.req.ShortLinkUvTypeReqDTO;
+import com.xhy.shortlink.project.dto.req.*;
 import com.xhy.shortlink.project.dto.resp.*;
 import com.xhy.shortlink.project.service.ShortLinkStatsService;
 import lombok.RequiredArgsConstructor;
@@ -361,6 +358,39 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                         .startDate(requestParam.getStartDate())
                         .endDate(requestParam.getEndDate())
                         .userAccessLogsList(usetAccessLogsList)
+                .build());
+
+        // 填充uvType到返回结果
+        actualResult.getRecords().forEach(each -> {
+            each.setUvType(uvTypeList.stream()
+                    .filter(uv -> Objects.equals(each.getUser(), uv.get("user")))
+                    .findFirst()
+                    .map(uv -> uv.get("uvType").toString())
+                    .orElse("旧访客"));
+        });
+        return actualResult;
+    }
+
+    @Override
+    public IPage<ShortLinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(ShortLinkStatsAccessRecordGroupReqDTO requestParam) {
+        // 查询访问记录
+        final LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
+                .eq(LinkAccessLogsDO::getGid, requestParam.getGid())
+                .between(LinkAccessLogsDO::getCreateTime, requestParam.getStartDate(), requestParam.getEndDate())
+                .orderByDesc(LinkAccessLogsDO::getCreateTime);
+        IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
+        if(CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
+            return new Page<>();
+        }
+        // 转换为响应参数
+        final IPage<ShortLinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage.convert(each -> BeanUtil.toBean(each, ShortLinkStatsAccessRecordRespDTO.class));
+        final List<String> usetAccessLogsList = actualResult.getRecords().stream().map(ShortLinkStatsAccessRecordRespDTO::getUser).toList();
+        // 获取访客访问类型
+        List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectUvTypeByUserGruop(ShortLinkUvTypeReqDTO.builder()
+                .gid(requestParam.getGid())
+                .startDate(requestParam.getStartDate())
+                .endDate(requestParam.getEndDate())
+                .userAccessLogsList(usetAccessLogsList)
                 .build());
 
         // 填充uvType到返回结果

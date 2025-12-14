@@ -93,7 +93,7 @@ public interface ShortLinkRemoteService {
      * @param requestParam 请求参数
      * @return 分页结果
      */
-   default Result<IPage<ShortLinkRecycleBinPageRespDTO>> pageRecycleShortlink(ShortLinkRecycleBinPageReqDTO requestParam){
+   default Result<IPage<ShortLinkRecycleBinPageRespDTO>> pageRecycleShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
        Map<String, Object> result = new HashMap<>();
        result.put("gidList", requestParam.getGidList());
        result.put("current",requestParam.getCurrent());
@@ -154,6 +154,20 @@ public interface ShortLinkRemoteService {
        stringObjectMap.remove("orders");
        stringObjectMap.remove("records");
        final String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/access-record", stringObjectMap);
+       return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+       });
+   }
+    /**
+     * 获取分组短链接日志监控数据
+     *
+     * @param requestParam 获取短链接监控日志数据入参
+     * @return 短链接监控日志数据
+     */
+   default Result<IPage<ShortLinkStatsAccessRecordRespDTO>> groupShortLinkStatsAccessRecord(ShortLinkStatsAccessRecordGroupReqDTO requestParam){
+       Map<String, Object> stringObjectMap = BeanUtil.beanToMap(requestParam);
+       stringObjectMap.remove("orders");
+       stringObjectMap.remove("records");
+       final String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/access-record/group", stringObjectMap);
        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
        });
    }
