@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.Week;
 import cn.hutool.core.lang.UUID;
+import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
@@ -81,11 +82,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
 
+    @Value("${short-link.domain.default}")
+    private String defaultDomain;
+
     @SneakyThrows
     @Override
     public void redirect(String shortUri, ServletRequest request, ServletResponse response) {
+        // 获取请求的端口号 80不显示
+       String serverPort = Optional.of(request.getServerPort())
+               .filter(each -> !Objects.equals(each,80))
+               .map(String::valueOf)
+               .map(each -> ":" + each)
+               .orElse("");
         // 不带http
-        String fullShortUrl = request.getServerName() + "/" + shortUri;
+        String fullShortUrl = request.getServerName() + serverPort + "/" + shortUri;
         // 缓存 key
         String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
         // 缓存空值key
@@ -365,11 +375,13 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
         String suffix = generateSuffix(requestParam);
-        String fullShortUrl = requestParam.getDomain() + "/" + suffix;
+        String fullShortUrl = StrBuilder.create(defaultDomain)
+                .append("/")
+                .append(suffix).toString();
         final ShortLinkDO shortlinkDO = ShortLinkDO.builder()
                 .gid(requestParam.getGid())
                 .createdType(requestParam.getCreateType())
-                .domain(requestParam.getDomain())
+                .domain(defaultDomain)
                 .describe(requestParam.getDescribe())
                 .validDateType(requestParam.getValidDateType())
                 .validDate(requestParam.getValidDate())
@@ -496,7 +508,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         final IPage<ShortLinkDO> resultPage = shortLinkMapper.pageLink(requestParam);
         return resultPage.convert(each -> {
             final ShortLinkPageRespDTO respDTO = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
-            respDTO.setFullShortUrl("http://" + each.getFullShortUrl());
+            respDTO.setFullShortUrl(each.getFullShortUrl());
             return respDTO;
         });
     }
@@ -525,7 +537,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 使用UUID避免返回的短链接重复，降低这个重复的概率
             originUrl += UUID.randomUUID().toString();
             shortUri = HashUtil.hashToBase62(originUrl);
-            if(!shortlinkCachePenetrationBloomFilter.contains(requestParam.getDomain() + "/" + shortUri)){
+            if(!shortlinkCachePenetrationBloomFilter.contains(defaultDomain + "/" + shortUri)){
                 break;
             }
                 customGenerateCount++;

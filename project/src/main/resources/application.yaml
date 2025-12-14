@@ -19,6 +19,8 @@ spring:
       password: xhy_redis
 
 short-link:
+  domain:
+    default: nurl.ink:8001
   stats:
     locale:
       amap-key: 23ea4562d80a83d1dd47922b4913d5e0
