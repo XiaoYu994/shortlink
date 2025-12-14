@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xhy.shortlink.project.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkUvTypeReqDTO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /*
 * 短链接访问日志持久层
@@ -79,4 +81,32 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "        tlal.user " +
             ") AS user_counts;")
     HashMap<String, Object> findUvTypeCntByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
+
+
+    /*
+     * 获取用户信息是否新老访客
+     */
+    @Select("<script> " +
+            "SELECT " +
+            "    tlal.user, " +
+            "    CASE " +
+            "        WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate} THEN '新访客' " +
+            "        ELSE '老访客' " +
+            "    END AS uvType " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tlal.full_short_url = #{param.fullShortUrl} " +
+            "    AND tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = #{param.enableStatus} " +
+            "    AND tlal.user IN " +
+            "    <foreach item='item' index='index' collection='param.userAccessLogsList' open='(' separator=',' close=')'> " +
+            "        #{item} " +
+            "    </foreach> " +
+            "GROUP BY " +
+            "    tlal.user;" +
+            "</script>")
+    List<Map<String, Object>> selectUvTypeByUser(@Param("param") ShortLinkUvTypeReqDTO requestParam);
 }

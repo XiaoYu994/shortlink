@@ -2,21 +2,21 @@ package com.xhy.shortlink.project.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
-import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
-import com.xhy.shortlink.project.dao.entity.LinkDeviceStatsDO;
-import com.xhy.shortlink.project.dao.entity.LinkLocaleStatsDO;
-import com.xhy.shortlink.project.dao.entity.LinkNetworkStatsDO;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
+import com.xhy.shortlink.project.dto.req.ShortLinkStatsAccessRecordReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkUvTypeReqDTO;
 import com.xhy.shortlink.project.dto.resp.*;
 import com.xhy.shortlink.project.service.ShortLinkStatsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /*
@@ -179,5 +179,41 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .networkStats(networkStats)
                 .build();
 
+    }
+
+    @Override
+    public IPage<ShortLinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(ShortLinkStatsAccessRecordReqDTO requestParam) {
+        // 查询访问记录
+        final LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
+                .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(LinkAccessLogsDO::getGid, requestParam.getGid())
+                .between(LinkAccessLogsDO::getCreateTime, requestParam.getStartDate(), requestParam.getEndDate())
+                .orderByDesc(LinkAccessLogsDO::getCreateTime);
+         IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
+         if(CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
+                return new Page<>();
+         }
+         // 转换为响应参数
+        final IPage<ShortLinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage.convert(each -> BeanUtil.toBean(each, ShortLinkStatsAccessRecordRespDTO.class));
+        final List<String> usetAccessLogsList = actualResult.getRecords().stream().map(ShortLinkStatsAccessRecordRespDTO::getUser).toList();
+        // 获取访客访问类型
+        List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectUvTypeByUser(ShortLinkUvTypeReqDTO.builder()
+                        .fullShortUrl(requestParam.getFullShortUrl())
+                        .gid(requestParam.getGid())
+                        .enableStatus(requestParam.getEnableStatus())
+                        .startDate(requestParam.getStartDate())
+                        .endDate(requestParam.getEndDate())
+                        .userAccessLogsList(usetAccessLogsList)
+                .build());
+
+        // 填充uvType到返回结果
+        actualResult.getRecords().forEach(each -> {
+            each.setUvType(uvTypeList.stream()
+                    .filter(uv -> Objects.equals(each.getUser(), uv.get("user")))
+                    .findFirst()
+                    .map(uv -> uv.get("uvType").toString())
+                    .orElse("旧访客"));
+        });
+        return actualResult;
     }
 }
