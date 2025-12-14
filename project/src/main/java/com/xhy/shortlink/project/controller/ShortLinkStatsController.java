@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.project.common.convention.result.Result;
 import com.xhy.shortlink.project.common.convention.result.Results;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsAccessRecordReqDTO;
+import com.xhy.shortlink.project.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkStatsRespDTO;
@@ -26,6 +27,14 @@ public class ShortLinkStatsController {
     @GetMapping("/api/short-link/v1/stats")
     public Result<ShortLinkStatsRespDTO> shortLinkStats(ShortLinkStatsReqDTO requestParam) {
         return Results.success(shortLinkStatsService.oneShortLinkStats(requestParam));
+    }
+
+    /*
+     * 分组短链接监控统计
+     * */
+    @GetMapping("/api/short-link/v1/stats/group")
+    public Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkStatsGroupReqDTO requestParam) {
+        return Results.success(shortLinkStatsService.groupShortLinkStats(requestParam));
     }
 
     /*

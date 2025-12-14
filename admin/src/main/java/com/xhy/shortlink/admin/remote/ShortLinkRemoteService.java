@@ -132,6 +132,18 @@ public interface ShortLinkRemoteService {
     }
 
     /**
+     * 获取分组短链接监控数据
+     *
+     * @param requestParam 获取短链接监控数据分组入参
+     * @return 短链接监控数据
+     */
+    default Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkStatsGroupReqDTO requestParam) {
+        final String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/group", BeanUtil.beanToMap(requestParam));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
+    }
+
+    /**
      * 获取单个短链接日志监控数据
      *
      * @param requestParam 获取短链接监控日志数据入参

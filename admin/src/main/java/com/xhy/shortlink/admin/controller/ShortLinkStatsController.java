@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.remote.ShortLinkRemoteService;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkStatsAccessRecordReqDTO;
+import com.xhy.shortlink.admin.remote.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkStatsAccessRecordRespDTO;
 import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
@@ -28,6 +29,15 @@ public class ShortLinkStatsController {
     @GetMapping("/api/short-link/admin/v1/stats")
     public Result<ShortLinkStatsRespDTO> shortLinkStats(ShortLinkStatsReqDTO requestParam) {
         return shortlinkRemoteService.oneShortLinkStats(requestParam);
+    }
+
+
+    /*
+     * 分组短链接监控统计
+     * */
+    @GetMapping("/api/short-link/admin/v1/stats/group")
+    public Result<ShortLinkStatsRespDTO> groupShortLinkStats(ShortLinkStatsGroupReqDTO requestParam) {
+        return shortlinkRemoteService.groupShortLinkStats(requestParam);
     }
 
     /*

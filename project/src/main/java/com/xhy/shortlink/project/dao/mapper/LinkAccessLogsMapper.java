@@ -3,6 +3,7 @@ package com.xhy.shortlink.project.dao.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xhy.shortlink.project.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
+import com.xhy.shortlink.project.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUvTypeReqDTO;
 import org.apache.ibatis.annotations.Param;
@@ -40,6 +41,28 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
     List<HashMap<String,Object>> listTopIpByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
 
     /*
+     * 根据短链接获取指定日期内高频访问IP数据
+     * */
+    @Select("SELECT " +
+            "    tlal.ip, " +
+            "    COUNT(tlal.ip) AS count " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlal.create_time BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tl.gid, tlal.ip " +
+            "ORDER BY " +
+            "    count DESC " +
+            "LIMIT 5;")
+    List<HashMap<String, Object>> listTopIpByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
+    
+
+    /*
      * 根据短链接获取指定日期内PV、UV、UIP数据
      */
     @Select("SELECT " +
@@ -58,6 +81,27 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "GROUP BY " +
             "    tlal.full_short_url, tl.gid;")
     LinkAccessStatsDO findPvUvUidStatsByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
+
+
+    /*
+     * 根据分组获取指定日期内PV、UV、UIP数据
+     */
+    @Select("SELECT " +
+            "    COUNT(tlal.user) AS pv, " +
+            "    COUNT(DISTINCT tlal.user) AS uv, " +
+            "    COUNT(DISTINCT tlal.ip) AS uip " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlal.create_time BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tl.gid;")
+    LinkAccessStatsDO findPvUvUidStatsByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
+
 
     /*
      * 根据短链接获取指定日期内新旧访客数据
@@ -81,6 +125,29 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "        tlal.user " +
             ") AS user_counts;")
     HashMap<String, Object> findUvTypeCntByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
+
+    /*
+     * 根据分组获取指定日期内新旧访客数据
+     */
+    @Select("SELECT " +
+            "    SUM(old_user) AS oldUserCnt, " +
+            "    SUM(new_user) AS newUserCnt " +
+            "FROM ( " +
+            "    SELECT " +
+            "        CASE WHEN COUNT(DISTINCT DATE(tlal.create_time)) > 1 THEN 1 ELSE 0 END AS old_user, " +
+            "        CASE WHEN COUNT(DISTINCT DATE(tlal.create_time)) = 1 AND MAX(tlal.create_time) >= #{param.startDate} AND MAX(tlal.create_time) <= #{param.endDate} THEN 1 ELSE 0 END AS new_user " +
+            "    FROM " +
+            "        t_link tl INNER JOIN " +
+            "        t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "    WHERE " +
+            "        tl.gid = #{param.gid} " +
+            "        AND tl.enable_status = '0' " +
+            "        AND tl.del_flag = '0' " +
+            "    GROUP BY " +
+            "        tlal.user " +
+            ") AS user_counts;")
+    HashMap<String, Object> findUvTypeCntByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
+
 
 
     /*
@@ -109,4 +176,5 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "    tlal.user;" +
             "</script>")
     List<Map<String, Object>> selectUvTypeByUser(@Param("param") ShortLinkUvTypeReqDTO requestParam);
+
 }
