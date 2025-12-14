@@ -10,7 +10,7 @@ dataSources:
 rules:
   - !SHARDING
     tables:
-      t_link:
+      t_link: # 短链接表
         # 真实数据节点，比如数据库源以及数据库在数据库中真实存在的
         actualDataNodes: ds_0.t_link_${0..15}
         # 分表策略
@@ -21,31 +21,38 @@ rules:
             shardingColumn: gid
             # 分片算法，对应 rules[0].shardingAlgorithms
             shardingAlgorithmName: link_table_hash_mod
-      t_link_goto:
-        # 真实数据节点，比如数据库源以及数据库在数据库中真实存在的
+      t_link_goto: # 路由表
         actualDataNodes: ds_0.t_link_goto_${0..15}
-        # 分表策略
         tableStrategy:
-          # 用于单分片键的标准分片场景
           standard:
-            # 分片键
             shardingColumn: full_short_url
-            # 分片算法，对应 rules[0].shardingAlgorithms
             shardingAlgorithmName: linkGoto_table_hash_mod
+      t_link_access_stats: # 基本统计表
+        actualDataNodes: ds_0.t_link_access_stats_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: gid
+            shardingAlgorithmName: linkAccessStats_table_hash_mod
+      # 绑定表 解决连表查询出现笛卡尔积 分片键要一致
+    bindingTables:
+      - t_link, t_link_access_stats
     # 分片算法
     shardingAlgorithms:
-      # 数据表分片算法
+      # 短链接表分片算法
       link_table_hash_mod:
         # 根据分片键 Hash 分片
         type: HASH_MOD
         # 分片数量
         props:
           sharding-count: 16
-      # 数据表分片算法
+      # 路由表分片算法
       linkGoto_table_hash_mod:
-        # 根据分片键 Hash 分片
         type: HASH_MOD
-        # 分片数量
+        props:
+          sharding-count: 16
+      # 基本数据统计表分片算法
+      linkAccessStats_table_hash_mod:
+        type: HASH_MOD
         props:
           sharding-count: 16
 # 展现逻辑 SQL & 真实 SQL
