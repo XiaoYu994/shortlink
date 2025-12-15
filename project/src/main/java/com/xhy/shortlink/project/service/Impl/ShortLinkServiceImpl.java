@@ -21,12 +21,11 @@ import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
 import com.xhy.shortlink.project.dao.mapper.*;
+import com.xhy.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
-import com.xhy.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
-import com.xhy.shortlink.project.dto.resp.ShortLinkGroupCountRespDTO;
-import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import com.xhy.shortlink.project.dto.resp.*;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import com.xhy.shortlink.project.toolkit.LinkUtil;
@@ -215,6 +214,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         .map(Cookie::getValue)
                         .ifPresentOrElse(each -> {
                             uv.set(each);
+                            // 添加到 Set，如果集合中不存在则返回 1（新用户），存在则返回 0（老用户）
                             final Long uvAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, each);
                             uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
                         }, addResponseCookieTask);
@@ -251,7 +251,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 远程调用百度接口
             final String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
             final JSONObject localeResultObj = JSON.parseObject(localeResultStr);
-            // 根据高德接口返回结果
+            // 根据高德接口返回结果 TODO 有问题目前
             final String infocode = localeResultObj.getString("infocode");
             String actualProvince;
             String actualCity;
@@ -423,6 +423,33 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
                 .gid(shortlinkDO.getGid())
                 .originUrl(requestParam.getOriginUrl())
+                .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam) {
+        final List<String> originUrlList = requestParam.getOriginUrls();
+        final List<String> describeList = requestParam.getDescribes();
+        List<ShortLinkBaseInfoRespDTO> resultList = new ArrayList<>();
+        for(int i = 0; i < originUrlList.size(); i++) {
+            ShortLinkCreateReqDTO shortLinkCreateReqDTO = BeanUtil.toBean(requestParam, ShortLinkCreateReqDTO.class);
+            shortLinkCreateReqDTO.setOriginUrl(originUrlList.get(i));
+            shortLinkCreateReqDTO.setDescribe(describeList.get(i));
+            try {
+                ShortLinkCreateRespDTO shortlink = createShortlink(shortLinkCreateReqDTO);
+                resultList.add(ShortLinkBaseInfoRespDTO.builder()
+                        .fullShortUrl(shortlink.getFullShortUrl())
+                        .originUrl(shortlink.getOriginUrl())
+                        .describe(describeList.get(i))
+                        .build());
+            } catch (Throwable e) {
+                log.error("批量创建短链接失败，原始参数：{}", originUrlList.get(i), e);
+            }
+        }
+        return ShortLinkBatchCreateRespDTO.builder()
+                .total(resultList.size())
+                .baseLinkInfos(resultList)
                 .build();
     }
 
