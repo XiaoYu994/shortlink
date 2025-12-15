@@ -523,8 +523,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     requestParam.getOriginUrl()
             ));
         }
-        // 删除之前的缓存 TODO 这里的删除逻辑还需要优化
-        stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+        //直接删除之前的缓存和过期的空缓存 TODO 这里的删除会不会有什么问题 源码中采用的是判断
+        stringRedisTemplate.delete(Arrays.asList(
+                String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()),
+                String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl())
+        ));
     }
 
     @Override
