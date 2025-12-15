@@ -130,7 +130,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
 
         // 4. 加锁 (解决缓存击穿)
-        final RLock lock = redissonClient.getLock(LOOK_GOTO_SHORT_LINK_KEY);
+        final RLock lock = redissonClient.getLock(String.format(LOOK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
             // 5. 双重检查 (Double Check)
