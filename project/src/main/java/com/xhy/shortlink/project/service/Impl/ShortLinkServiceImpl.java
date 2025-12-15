@@ -54,6 +54,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
+import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAULT_COOKIE_VALID_TIME;
 
 /*
 * 短链接接口实现层
@@ -162,7 +163,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkGoToDO shortLinkGoToDO = shortLinkGoToMapper.selectOne(linkGoToWrapper);
 
             if (shortLinkGoToDO == null) {
-                stringRedisTemplate.opsForValue().set(keyIsNull, "-", 30, TimeUnit.SECONDS);
+                stringRedisTemplate.opsForValue().set(keyIsNull, "-", DEFAULT_CACHE_VALID_TIME_FOR_GOTO, TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
@@ -175,7 +176,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkDO shortLinkDO = baseMapper.selectOne(linkWrapper);
 
             if (shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
-                stringRedisTemplate.opsForValue().set(keyIsNull, "-", 30, TimeUnit.SECONDS);
+                stringRedisTemplate.opsForValue().set(keyIsNull, "-", DEFAULT_CACHE_VALID_TIME_FOR_GOTO, TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
@@ -201,7 +202,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             Runnable addResponseCookieTask = () -> {
                 uv.set(UUID.fastUUID().toString());
                 final Cookie cookie = new Cookie("uv", uv.get());
-                cookie.setMaxAge(60 * 60 * 24 * 30); // 设置一个月的有效期
+                cookie.setMaxAge(DEFAULT_COOKIE_VALID_TIME); // 设置一个月的有效期
                 ((HttpServletResponse) response).addCookie(cookie);
                 uvFirstFlag.set(true);
                 stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, uv.get()); // set去重

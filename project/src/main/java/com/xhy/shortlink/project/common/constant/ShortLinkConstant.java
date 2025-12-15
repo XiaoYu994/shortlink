@@ -7,6 +7,12 @@ public class ShortLinkConstant {
     * */
     public static long DEFAULT_CACHE_VALID_TIME = 86400000L;
 
+
+    /*
+    * cookie 默认有效期
+    * */
+    public static int DEFAULT_COOKIE_VALID_TIME = 60 * 60 * 24 * 30;
+
     /*
      * 高德获取地区接口地址
      */
