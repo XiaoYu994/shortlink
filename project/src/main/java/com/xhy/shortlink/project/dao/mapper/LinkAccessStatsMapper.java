@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -14,6 +15,18 @@ import java.util.List;
 * 短链接访问统计持久层
 * */
 public interface LinkAccessStatsMapper extends BaseMapper<LinkAccessStatsDO> {
+
+    /*
+    * 修改短链接分组的时候，物理删除之前的记录
+    * */
+    @Delete("<script>" +
+            "DELETE FROM t_link_access_stats " +
+            "WHERE id IN " +
+            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            "</script>")
+    void physicalDeleteBatchIds(@Param("ids") List<Long> ids);
 
     /*
     * 记录基础访问统计
