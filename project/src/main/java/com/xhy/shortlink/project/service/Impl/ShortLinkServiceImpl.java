@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
+import com.xhy.shortlink.project.config.GotoDomainWhiteListConfiguration;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
 import com.xhy.shortlink.project.dao.mapper.*;
@@ -86,6 +87,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkAccessStatsService linkAccessStatsService;
     // mq
     private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
+    // 验证白名单
+    private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -416,6 +419,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
+        // 验证短链接是否是白名单中的链接
+        verificationWhitelist(requestParam.getOriginUrl());
         String suffix = generateSuffix(requestParam);
         String fullShortUrl = StrBuilder.create(defaultDomain)
                 .append("/")
@@ -498,6 +503,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateShortlink(ShortLinkUpdateReqDTO requestParam) {
+        // 验证短链接是否是白名单中的链接
+        verificationWhitelist(requestParam.getOriginUrl());
         // 1. 查出旧数据
         ShortLinkDO shortLinkDO = baseMapper.selectOne(Wrappers.lambdaQuery(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, requestParam.getOriginGid())
@@ -681,5 +688,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 customGenerateCount++;
         }
         return shortUri;
+    }
+
+    private void verificationWhitelist(String originUrl) {
+        final Boolean enable = gotoDomainWhiteListConfiguration.getEnable();
+        if(enable == null || !enable)  {
+            return;
+        }
+        final String domain = LinkUtil.extractDomain(originUrl);
+        if(StrUtil.isBlank(domain)) {
+            throw new ClientException("跳转链接填写错误");
+        }
+        final List<String> details = gotoDomainWhiteListConfiguration.getDetails();
+        if(!details.contains(domain)) {
+            throw new ClientException("请生成以下网站跳转链接：" + gotoDomainWhiteListConfiguration.getNames());
+        }
     }
 }
