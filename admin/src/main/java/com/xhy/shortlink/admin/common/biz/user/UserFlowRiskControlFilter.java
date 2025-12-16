@@ -37,6 +37,7 @@ public class UserFlowRiskControlFilter implements Filter {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
         redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource(USER_FLOW_RISK_CONTROL_LUA_SCRIPT_PATH)));
         redisScript.setResultType(Long.class);
+        // TODO 可以在系统初始化的时候创建 other 这个用户
         String username = Optional.ofNullable(UserContext.getUsername()).orElse("other");
         Long result = null;
         try {
