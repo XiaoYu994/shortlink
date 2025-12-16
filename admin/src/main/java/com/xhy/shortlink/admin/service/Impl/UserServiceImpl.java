@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
-import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOGIN_USER_KEY;
+import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 
 
 /*
@@ -115,6 +115,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
 
     @Override
     public UserLoginRespDTO login(UserLoginReqDTO requestParam) {
+        // 用户缓存key
+        String userKey = USER_LOGIN_KEY +  requestParam.getUsername();
         if (hasUsername(requestParam.getUsername())) {
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
@@ -127,7 +129,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
             throw new ClientException(UserErrorCodeEnum.USER_PASSWORD_ERROR);
         }
         // 如果用户的token存在在redis中，返回用户的token
-        final Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries((LOGIN_USER_KEY + requestParam.getUsername()));
+        final Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries(userKey);
         if(CollUtil.isNotEmpty(hasLoginMap)) {
             final String token = hasLoginMap.keySet().stream()
                     .findFirst()
@@ -146,15 +148,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
         // 1.生成uuid
         String uuid = UUID.randomUUID().toString();
         // 2.保存用户信息
-        stringRedisTemplate.opsForHash().put(LOGIN_USER_KEY + requestParam.getUsername(), uuid, JSON.toJSONString(userDO));
+        stringRedisTemplate.opsForHash().put(userKey, uuid, JSON.toJSONString(userDO));
         // 3.设置过期时间 30分钟
-        stringRedisTemplate.expire(LOGIN_USER_KEY + requestParam.getUsername(), 30, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(userKey, 30, TimeUnit.MINUTES);
         return new UserLoginRespDTO(uuid);
     }
 
     @Override
     public Boolean checkLogin(String username, String token) {
-        return stringRedisTemplate.opsForHash().hasKey(LOGIN_USER_KEY + username, token);
+        return stringRedisTemplate.opsForHash().hasKey(USER_LOGIN_KEY + username, token);
     }
 
     @Override
@@ -162,6 +164,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
         if (!checkLogin(username, token)) {
             throw new ClientException(UserErrorCodeEnum.USER_NOT_LOGIN);
         }
-       return stringRedisTemplate.opsForHash().delete(LOGIN_USER_KEY + username, token) > 0;
+       return stringRedisTemplate.opsForHash().delete(USER_LOGIN_KEY + username, token) > 0;
     }
 }

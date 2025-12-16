@@ -15,7 +15,7 @@ public class RedisCacheConstant {
     /*
     * 用户登录缓存 key
     * */
-    public static final String LOGIN_USER_KEY = "short-link:login_user:";
+    public static final String USER_LOGIN_KEY = "short-link:login:";
 
 
     /*

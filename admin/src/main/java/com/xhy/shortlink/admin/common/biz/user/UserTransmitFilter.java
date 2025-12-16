@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
 
-import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOGIN_USER_KEY;
+import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 
 /*
  * 用户信息传输过滤器
@@ -49,7 +49,7 @@ public class UserTransmitFilter implements Filter {
         }
 
         // 2. 查询 Redis
-        String key = LOGIN_USER_KEY + username;
+        String key = USER_LOGIN_KEY + username;
         Object userJson = stringRedisTemplate.opsForHash().get(key, token);
 
         if (userJson == null) {
