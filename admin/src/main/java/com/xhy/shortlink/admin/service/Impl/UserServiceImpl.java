@@ -1,6 +1,7 @@
 package com.xhy.shortlink.admin.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -27,6 +28,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -123,13 +125,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
             // 用户名存在在布隆过滤器中，但是密码错误
             throw new ClientException(UserErrorCodeEnum.USER_PASSWORD_ERROR);
         }
-        // 不能重复登录
-        final Boolean hasLogin = stringRedisTemplate.hasKey(LOGIN_USER_KEY + requestParam.getUsername());
-        // 装箱类型会有空指针问题
-        if (hasLogin != null && hasLogin) {
-            throw new ClientException(UserErrorCodeEnum.USER_LOGIN_EXIT);
+        // 如果用户的token存在在redis中，返回用户的token
+        final Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries((LOGIN_USER_KEY + requestParam.getUsername()));
+        if(CollUtil.isNotEmpty(hasLoginMap)) {
+            final String token = hasLoginMap.keySet().stream()
+                    .findFirst()
+                    .map(Object::toString)
+                    .orElseThrow(() -> new ClientException("用户登录错误"));
+            return new UserLoginRespDTO(token);
         }
-
         // 登录成功后保存用户信息
         /*
          * 使用hasKey结果保存用户信息
