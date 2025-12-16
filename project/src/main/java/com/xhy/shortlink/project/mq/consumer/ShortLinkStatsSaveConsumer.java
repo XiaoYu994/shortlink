@@ -10,9 +10,11 @@ import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
+import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
 import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
+import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
 import com.xhy.shortlink.project.mq.producer.DelayShortLinkStatsProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,15 +52,24 @@ public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRec
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
     private final StringRedisTemplate stringRedisTemplate;
+    private final MessageQueueIdempotentHandler  messageQueueIdempotentHandler;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
 
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
+        final String stream = message.getStream();
+        final RecordId messageId = message.getId();
+        // 如果被消费
+        if(!messageQueueIdempotentHandler.isMessageBeingConsumed(messageId.toString())) {
+            // 消息执行完成
+            if(messageQueueIdempotentHandler.isAccomplish(messageId.toString())) {
+                return;
+            }
+            throw new ServiceException("消息未完成流程，需要消息队列重试");
+        }
         try {
-            final String stream = message.getStream();
-            final RecordId messageId = message.getId();
             final Map<String, String> proudcerMap = message.getValue();
             final String fullShortUrl = proudcerMap.get("fullShortUrl");
             if (StrUtil.isNotBlank(fullShortUrl)) {
@@ -68,8 +79,13 @@ public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRec
             }
             stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId.getValue());
         } catch (Throwable e){
+            // 某某某情况宕机了
+            messageQueueIdempotentHandler.delMessageProcessed(messageId.toString());
             log.error("消息消费失败", e);
+            throw e;
         }
+        // 设置消息流程执行完成
+        messageQueueIdempotentHandler.setAccomplish(messageId.toString());
 
     }
 
