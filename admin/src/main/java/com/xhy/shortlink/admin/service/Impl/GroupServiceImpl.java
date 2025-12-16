@@ -20,6 +20,9 @@ import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOCK_GROUP_CREATE_KEY;
 import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_SAVE_ERROR;
 import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_UPDATE_ERROR;
 
@@ -36,6 +40,11 @@ import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.
 @Service
 @RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
+    private final RedissonClient redissonClient;
+
+    @Value("${short-link.group.max-num}")
+    private Integer groupMaxNum;
+
     private final GroupMapper groupMapper;
     /*
      * TODO 后续重构为SpringCloud Feign调用
@@ -48,22 +57,34 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
     @Override
     public void addGroup(String username,String groupName) {
-        //gid 使用随机生成的6位数
-        String gid = RandomCodeGenerator.generateSixDigitCode();
-        // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
-        GroupDO groupDO = groupMapper.selectByGidIgnoreLogicDelete( gid);
-        while (groupDO != null) {
-            gid = RandomCodeGenerator.generateSixDigitCode();
-            groupDO = groupMapper.selectByGidIgnoreLogicDelete( gid);
-        }
-        final GroupDO group = GroupDO.builder()
-                .gid(gid)
-                .name(groupName)
-                .username(username)
-                .build();
-        final int insert = baseMapper.insert(group);
-        if (insert <= 0) {
-            throw new ClientException(SERVICE_SAVE_ERROR);
+        final RLock lock = redissonClient.getLock(String.format(LOCK_GROUP_CREATE_KEY, groupName));
+        lock.lock();
+        try {
+            final LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                    .eq(GroupDO::getUsername, username);
+            final List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+            if (CollUtil.isNotEmpty(groupDOList) && groupDOList.size() >= groupMaxNum) {
+                throw new ClientException(String.format("已超出最大分组数:%d",groupMaxNum));
+            }
+            //gid 使用随机生成的6位数
+            String gid = RandomCodeGenerator.generateSixDigitCode();
+            // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
+            GroupDO groupDO = groupMapper.selectByGidIgnoreLogicDelete(gid,username);
+            while (groupDO != null) {
+                gid = RandomCodeGenerator.generateSixDigitCode();
+                groupDO = groupMapper.selectByGidIgnoreLogicDelete(gid,username);
+            }
+            final GroupDO group = GroupDO.builder()
+                    .gid(gid)
+                    .name(groupName)
+                    .username(username)
+                    .build();
+            final int insert = baseMapper.insert(group);
+            if (insert <= 0) {
+                throw new ClientException(SERVICE_SAVE_ERROR);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
