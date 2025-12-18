@@ -302,6 +302,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
+        // TODO 网络抖动导致创建两个一模一样的短链接
         // 验证短链接是否是白名单中的链接
         verificationWhitelist(requestParam.getOriginUrl());
         String suffix = generateSuffix(requestParam);
