@@ -102,7 +102,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
 
     @Override
     public void update(UserUpdateReqDTO requestParam) {
-        // TODO 判断用户是否登录 登录之后才能去修改用户信息
         // 根据用户名更新用户消息
         // 分片表是根据username去做分片的所以使用 username作为查询条件
         final LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class).
