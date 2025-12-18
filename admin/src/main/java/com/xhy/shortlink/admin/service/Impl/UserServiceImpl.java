@@ -2,11 +2,13 @@ package com.xhy.shortlink.admin.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xhy.shortlink.admin.common.biz.user.UserContext;
 import com.xhy.shortlink.admin.common.convention.exception.ClientException;
 import com.xhy.shortlink.admin.common.convention.exception.ServiceException;
 import com.xhy.shortlink.admin.common.enums.UserErrorCodeEnum;
@@ -77,26 +79,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
         }
         // 分布式锁 将用户名条件做为锁
          RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getUsername());
-       try {
-           if (lock.tryLock()) {
-               try {
-                   final int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-                   if (insert < 1) {
-                       throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
-                   }
-               } catch (DuplicateKeyException e) {
-                   throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+        // 一个线程密钥获取到锁，就说明有其他线程在它之前就在注册这个用户名，直接快速返回失败
+        if (!lock.tryLock()) {
+            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+        }
+           try {
+               final int insert = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+               if (insert < 1) {
+                   throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
                }
                // 添加布隆过滤器
                userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
                // 添加默认分组
                groupService.addGroup(requestParam.getUsername(),"默认分组");
-               return;
+           } catch (DuplicateKeyException e) {
+               throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+           } finally {
+               lock.unlock();
            }
-           throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
-       } finally {
-           lock.unlock();
-       }
 
     }
 
