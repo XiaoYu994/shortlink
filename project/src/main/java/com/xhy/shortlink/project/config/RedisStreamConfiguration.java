@@ -36,9 +36,8 @@ public class RedisStreamConfiguration {
     @Bean
     public ExecutorService asyncStreamConsumer() {
         AtomicInteger index = new AtomicInteger();
-        int processors = Runtime.getRuntime().availableProcessors();
-        return new ThreadPoolExecutor(processors,
-                processors + processors >> 1,
+        return new ThreadPoolExecutor(1,
+                1,
                 60,
                 TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(),
@@ -47,7 +46,8 @@ public class RedisStreamConfiguration {
                     thread.setName("stream_consumer_short-link_stats_" + index.incrementAndGet());
                     thread.setDaemon(true);
                     return thread;
-                }
+                },
+                new ThreadPoolExecutor.DiscardOldestPolicy()
         );
     }
 

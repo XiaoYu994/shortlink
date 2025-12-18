@@ -60,6 +60,7 @@ public class ShortLinkController {
     * */
     @PostMapping("/api/short-link/v1/update")
     public Result<Void> updateShortlink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
+        // TODO 使用Void返回永远返回的是null,方法中抛出的错误无法被显示在响应中，前端无法捕获
         shortlinkService.updateShortlink(requestParam);
         return Results.success();
     }

@@ -14,7 +14,7 @@ import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
-import com.xhy.shortlink.admin.remote.ShortLinkRemoteService;
+import com.xhy.shortlink.admin.remote.ShortLinkActualRemoteService;
 import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
@@ -45,12 +45,9 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     @Value("${short-link.group.max-num}")
     private Integer groupMaxNum;
 
+    private final ShortLinkActualRemoteService shortLinkActualRemoteService;
     private final GroupMapper groupMapper;
-    /*
-     * TODO 后续重构为SpringCloud Feign调用
-     * */
-    ShortLinkRemoteService shortlinkRemoteService = new ShortLinkRemoteService(){
-    };
+
     @Override
     public void addGroup(String groupName) {
         addGroup(UserContext.getUsername(), groupName);
@@ -103,7 +100,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         // 2. 提取 GID 列表
         List<String> gidList = groupDOList.stream().map(GroupDO::getGid).toList();
         // 3. 远程调用获取统计数据
-       Result<List<ShortLinkGroupCountRespDTO>> listResult = shortlinkRemoteService.listGroupShortlinkCount(gidList);
+       Result<List<ShortLinkGroupCountRespDTO>> listResult = shortLinkActualRemoteService.listGroupShortlinkCount(gidList);
         // 【优化2】性能优化：将 List 转为 Map<Gid, Count>，方便后续 O(1) 查找
         // 逻辑：如果 result 为 null 或 result.getData() 为 null，则返回空列表，避免空指针
         Map<String, Integer> countMap = Optional.ofNullable(listResult)
