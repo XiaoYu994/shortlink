@@ -103,6 +103,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
     @Override
     public void update(UserUpdateReqDTO requestParam) {
         // 根据用户名更新用户消息
+        if (!StrUtil.equals(UserContext.getUsername(), requestParam.getUsername())) {
+            throw new ClientException("当前登录用户修改请求异常");
+        }
         // 分片表是根据username去做分片的所以使用 username作为查询条件
         final LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class).
                                                                     eq(UserDO::getUsername, requestParam.getUsername());
