@@ -9,7 +9,6 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
@@ -196,9 +195,7 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
                 // 短链接访问统计数据自增
                 shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
             }
-        } catch (Exception e) {
-            throw new ClientException("短链接访问统计异常");
-        } finally {
+        }  finally {
             rLock.unlock();
         }
 

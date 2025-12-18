@@ -17,7 +17,7 @@ import org.springframework.data.redis.stream.Subscription;
 
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,7 +44,7 @@ public class RedisStreamConfiguration {
                 1,
                 60,
                 TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(),
+                new SynchronousQueue<>(),
                 runnable -> {
                     Thread thread = new Thread(runnable);
                     thread.setName("stream_consumer_short-link_stats_" + index.incrementAndGet());
@@ -69,7 +69,7 @@ public class RedisStreamConfiguration {
                         .build();
         StreamMessageListenerContainer.StreamReadRequest<String> streamReadRequest =
                 StreamMessageListenerContainer.StreamReadRequest.builder(StreamOffset.create(SHORT_LINK_STATS_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()))
-                        .cancelOnError(throwable -> false)
+                        .cancelOnError(throwable -> false) // 为true,抛出异常就结束流程
                         .consumer(Consumer.from(SHORT_LINK_STATS_STREAM_GROUP_KEY, "stats-consumer"))
                         .autoAcknowledge(true)
                         .build();
