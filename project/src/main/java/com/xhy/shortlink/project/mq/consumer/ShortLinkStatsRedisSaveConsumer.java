@@ -15,13 +15,13 @@ import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
 import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
-import com.xhy.shortlink.project.mq.producer.DelayShortLinkStatsProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,12 +34,13 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.LOCK_GI
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
 
 /*
- * 短链接监控状态保存消息队列消费者
+ * 短链接监控状态保存消息队列消费者 Redis Stream实现
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRecord<String,String,String>> {
+@ConditionalOnProperty(name = "short-link.message-queue.implement", havingValue = "Redis")
+public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, MapRecord<String,String,String>> {
     private final RedissonClient redissonClient;
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkGoToMapper shortLinkGoToMapper;
@@ -50,7 +51,6 @@ public class ShortLinkStatsSaveConsumer implements StreamListener<String, MapRec
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
-    private final DelayShortLinkStatsProducer delayShortLinkStatsProducer;
     private final StringRedisTemplate stringRedisTemplate;
     private final MessageQueueIdempotentHandler  messageQueueIdempotentHandler;
 

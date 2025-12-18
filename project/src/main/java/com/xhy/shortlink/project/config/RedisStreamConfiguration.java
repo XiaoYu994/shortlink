@@ -1,8 +1,10 @@
 package com.xhy.shortlink.project.config;
 
 
-import com.xhy.shortlink.project.mq.consumer.ShortLinkStatsSaveConsumer;
+import com.xhy.shortlink.project.mq.consumer.ShortLinkStatsRedisSaveConsumer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -28,12 +30,14 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.SHORT_L
  */
 @Configuration
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "short-link.message-queue", name = "implement", havingValue = "Redis")
 public class RedisStreamConfiguration {
 
     private final RedisConnectionFactory redisConnectionFactory;
-    private final ShortLinkStatsSaveConsumer shortLinkStatsSaveConsumer;
+    private final ShortLinkStatsRedisSaveConsumer shortLinkStatsRedisSaveConsumer;
 
     @Bean
+    @ConditionalOnBean(ShortLinkStatsRedisSaveConsumer.class)
     public ExecutorService asyncStreamConsumer() {
         AtomicInteger index = new AtomicInteger();
         return new ThreadPoolExecutor(1,
@@ -70,7 +74,7 @@ public class RedisStreamConfiguration {
                         .autoAcknowledge(true)
                         .build();
         StreamMessageListenerContainer<String, MapRecord<String, String, String>> listenerContainer = StreamMessageListenerContainer.create(redisConnectionFactory, options);
-        Subscription subscription = listenerContainer.register(streamReadRequest, shortLinkStatsSaveConsumer);
+        Subscription subscription = listenerContainer.register(streamReadRequest, shortLinkStatsRedisSaveConsumer);
         listenerContainer.start();
         return subscription;
     }

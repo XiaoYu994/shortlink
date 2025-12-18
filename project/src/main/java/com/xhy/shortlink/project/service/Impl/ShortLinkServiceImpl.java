@@ -25,7 +25,7 @@ import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.project.dto.resp.*;
-import com.xhy.shortlink.project.mq.producer.ShortLinkStatsSaveProducer;
+import com.xhy.shortlink.project.mq.ShortLinkStatsMessageProducer;
 import com.xhy.shortlink.project.service.LinkAccessStatsService;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
@@ -81,7 +81,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkAccessStatsService linkAccessStatsService;
     // mq
-    private final ShortLinkStatsSaveProducer shortLinkStatsSaveProducer;
+    private final ShortLinkStatsMessageProducer ShortLinkStatsMessageProducer;
     // 验证白名单
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
 
@@ -257,7 +257,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         producerMap.put("fullShortUrl",fullShortUrl);
         // 序列化和反序列化要一致，不然会导致消息消费失败
         producerMap.put("statsRecord", JSON.toJSONString(statsRecord));
-        shortLinkStatsSaveProducer.send(producerMap);
+        ShortLinkStatsMessageProducer.send(producerMap);
     }
 
     /**

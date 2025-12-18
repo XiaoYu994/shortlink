@@ -32,6 +32,7 @@
         <redisson.version>3.27.2</redisson.version>
         <guava.version>30.0-jre</guava.version>
         <jsoup.version>1.17.2</jsoup.version>
+        <rocketmq-spring-boot-starter.version>2.2.3</rocketmq-spring-boot-starter.version>
     </properties>
 
     <!-- dependencies 在父类或在类中去定义默认是下载这个依赖的 然后把这个依赖传递到这个项目中的依赖-->
@@ -54,6 +55,12 @@
                 <scope>import</scope>
             </dependency>
 
+
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq-spring-boot-starter.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>

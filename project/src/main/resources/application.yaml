@@ -28,6 +28,9 @@ spring:
 short-link:
   domain:
     default: nurl.ink:8001
+  # 消息队列的实现方式，支持Redis、RocketMQ
+  message-queue:
+    implement: Redis
   stats:
     locale:
       amap-key: 23ea4562d80a83d1dd47922b4913d5e0
@@ -53,3 +56,14 @@ mybatis-plus:
       logic-delete-field: delFlag # 逻辑删除字段名
       logic-delete-value: 1 # 逻辑已删除值
       logic-not-delete-value: 0 # 逻辑未删除值 默认为0
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: short-link_project-service_stats-save_pg
+    topic: short-link_project-service_topic
+    send-message-timeout: 2000
+    retry-times-when-send-failed: 1
+    retry-times-when-send-async-failed: 1
+  consumer:
+    group: short-link_project-service_stats-save_cg
