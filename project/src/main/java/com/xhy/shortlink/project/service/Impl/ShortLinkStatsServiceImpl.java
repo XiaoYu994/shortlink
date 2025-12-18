@@ -340,7 +340,6 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         // 查询访问记录
         final LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
                 .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(LinkAccessLogsDO::getGid, requestParam.getGid())
                 .between(LinkAccessLogsDO::getCreateTime, requestParam.getStartDate(), requestParam.getEndDate())
                 .orderByDesc(LinkAccessLogsDO::getCreateTime);
          IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
@@ -374,17 +373,16 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
     @Override
     public IPage<ShortLinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(ShortLinkStatsAccessRecordGroupReqDTO requestParam) {
         // 查询访问记录
-        final LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
-                .eq(LinkAccessLogsDO::getGid, requestParam.getGid())
-                .between(LinkAccessLogsDO::getCreateTime, requestParam.getStartDate(), requestParam.getEndDate())
-                .orderByDesc(LinkAccessLogsDO::getCreateTime);
-        IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
+        final IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectGroupPage(requestParam);
         if(CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
             return new Page<>();
         }
         // 转换为响应参数
-        final IPage<ShortLinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage.convert(each -> BeanUtil.toBean(each, ShortLinkStatsAccessRecordRespDTO.class));
-        final List<String> usetAccessLogsList = actualResult.getRecords().stream().map(ShortLinkStatsAccessRecordRespDTO::getUser).toList();
+        final IPage<ShortLinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage
+                .convert(each -> BeanUtil.toBean(each, ShortLinkStatsAccessRecordRespDTO.class));
+        final List<String> usetAccessLogsList = actualResult.getRecords().stream()
+                .map(ShortLinkStatsAccessRecordRespDTO::getUser)
+                .toList();
         // 获取访客访问类型
         List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectUvTypeByUserGruop(ShortLinkUvTypeReqDTO.builder()
                 .gid(requestParam.getGid())

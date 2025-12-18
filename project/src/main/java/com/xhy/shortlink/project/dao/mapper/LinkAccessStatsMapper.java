@@ -34,10 +34,10 @@ public interface LinkAccessStatsMapper extends BaseMapper<LinkAccessStatsDO> {
     // 注解方式改为使用 <script> 标签包裹
     @Insert("<script>" +
             "INSERT INTO t_link_access_stats " +
-            "(full_short_url, gid,date, pv, uv, uip, hour, weekday, create_time, update_time, del_flag) " +
+            "(full_short_url,date, pv, uv, uip, hour, weekday, create_time, update_time, del_flag) " +
             "VALUES " +
             "<foreach collection='list' item='item' separator=','> " +
-            "(#{item.fullShortUrl},#{item.gid}, #{item.date}, #{item.pv}, #{item.uv}, #{item.uip}, " +
+            "(#{item.fullShortUrl}, #{item.date}, #{item.pv}, #{item.uv}, #{item.uip}, " +
             "#{item.hour}, #{item.weekday}, NOW(), NOW(), 0) " +
             "</foreach> " +
             "ON DUPLICATE KEY UPDATE " +
@@ -52,54 +52,80 @@ public interface LinkAccessStatsMapper extends BaseMapper<LinkAccessStatsDO> {
     /*
     * 获取单个短链接基本数据统计
     * */
-    @Select("select" +
-            "    date,sum(pv) as pv,sum(uv) as uv,sum(uip) as uip " +
-            "from" +
-            "    t_link_access_stats " +
-            "where" +
-            "    full_short_url = #{param.fullShortUrl} and gid = #{param.gid} and date between #{param.startDate} and #{param.endDate}" +
-            " group by" +
-            "    full_short_url,gid,date;")
+    @Select("SELECT " +
+            "    tlas.date, " +
+            "    SUM(tlas.pv) AS pv, " +
+            "    SUM(tlas.uv) AS uv, " +
+            "    SUM(tlas.uip) AS uip " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_stats tlas ON tl.full_short_url = tlas.full_short_url " +
+            "WHERE " +
+            "    tlas.full_short_url = #{param.fullShortUrl} " +
+            "    AND tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = #{param.enableStatus} " +
+            "    AND tlas.date BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tlas.full_short_url, tl.gid, tlas.date;")
     List<LinkAccessStatsDO>  listStatsByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
 
     /*
      * 获取分组短链接基本数据统计
      * */
-    @Select("select" +
-            "    date,sum(pv) as pv,sum(uv) as uv,sum(uip) as uip " +
-            "from" +
-            "    t_link_access_stats " +
-            "where" +
-            "    gid = #{param.gid} and date between #{param.startDate} and #{param.endDate}" +
-            " group by" +
-            "    gid,date;")
+    @Select("SELECT " +
+            "    tlas.date, " +
+            "    SUM(tlas.pv) AS pv, " +
+            "    SUM(tlas.uv) AS uv, " +
+            "    SUM(tlas.uip) AS uip " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_stats tlas ON tl.full_short_url = tlas.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlas.date BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tl.gid, tlas.date;")
     List<LinkAccessStatsDO> listStatsByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
 
 
     /*
     * 根据短链接获取指定日期内小时基础监控数据
     * */
-    @Select("select " +
-            "   hour,sum(pv) as pv " +
-            "from " +
-            "   t_link_access_stats " +
-            "where " +
-            "   full_short_url = #{param.fullShortUrl} and gid = #{param.gid} and date between #{param.startDate} and #{param.endDate}" +
-            "group by" +
-            "    full_short_url,gid,hour;")
+    @Select("SELECT " +
+            "    tlas.hour, " +
+            "    SUM(tlas.pv) AS pv " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_stats tlas ON tl.full_short_url = tlas.full_short_url " +
+            "WHERE " +
+            "    tlas.full_short_url = #{param.fullShortUrl} " +
+            "    AND tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = #{param.enableStatus} " +
+            "    AND tlas.date BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tlas.full_short_url, tl.gid, tlas.hour;")
     List<LinkAccessStatsDO> listHourStatsByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
 
     /*
      * 根据短链接获取指定日期内小时基础监控数据
      * */
-    @Select("select " +
-            "   hour,sum(pv) as pv " +
-            "from " +
-            "   t_link_access_stats " +
-            "where " +
-            "   gid = #{param.gid} and date between #{param.startDate} and #{param.endDate}" +
-            "group by" +
-            "   gid,hour;")
+    @Select("SELECT " +
+            "    tlas.hour, " +
+            "    SUM(tlas.pv) AS pv " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_stats tlas ON tl.full_short_url = tlas.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlas.date BETWEEN #{param.startDate} and #{param.endDate} " +
+            "GROUP BY " +
+            "    tl.gid, tlas.hour;")
     List<LinkAccessStatsDO> listHourStatsByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
 
 

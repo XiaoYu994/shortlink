@@ -34,14 +34,6 @@ rules:
           standard:
             shardingColumn: full_short_url
             shardingAlgorithmName: linkGoto_table_hash_mod
-      t_link_access_stats:
-        actualDataNodes: ds_0.t_link_access_stats_${0..15}
-        tableStrategy:
-          standard:
-            shardingColumn: gid
-            shardingAlgorithmName: linkAccessStats_table_hash_mod
-    bindingTables:
-      - t_link, t_link_access_stats
     shardingAlgorithms:
       user_table_hash_mod:
         type: HASH_MOD
@@ -56,10 +48,6 @@ rules:
         props:
           sharding-count: 16
       linkGoto_table_hash_mod:
-        type: HASH_MOD
-        props:
-          sharding-count: 16
-      linkAccessStats_table_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16

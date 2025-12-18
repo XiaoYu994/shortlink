@@ -1,8 +1,10 @@
 package com.xhy.shortlink.project.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.project.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.project.dao.entity.LinkAccessStatsDO;
+import com.xhy.shortlink.project.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUvTypeReqDTO;
@@ -193,7 +195,7 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "WHERE " +
             "    tl.gid = #{param.gid} " +
             "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = '0' " +
+            "    AND tl.enable_status =  #{param.enableStatus} " +
             "    AND tlal.user IN " +
             "    <foreach item='item' index='index' collection='param.userAccessLogsList' open='(' separator=',' close=')'> " +
             "        #{item} " +
@@ -202,4 +204,22 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "    tlal.user;" +
             "</script>")
     List<Map<String, Object>> selectUvTypeByUserGruop(@Param("param") ShortLinkUvTypeReqDTO requestParam);
+
+
+    /*
+    * 根据分组查询短链接日志
+    * */
+    @Select("SELECT " +
+            "    tlal.* " +
+            "FROM " +
+            "    t_link tl " +
+            "    INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tl.gid = #{param.gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = '0' " +
+            "    AND tlal.create_time BETWEEN #{param.startDate} and #{param.endDate} " +
+            "ORDER BY " +
+            "    tlal.create_time DESC")
+    IPage<LinkAccessLogsDO> selectGroupPage(@Param("param") ShortLinkStatsAccessRecordGroupReqDTO requestParam);
 }

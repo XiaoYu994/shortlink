@@ -1,7 +1,6 @@
 package com.xhy.shortlink.project.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
@@ -16,9 +15,11 @@ import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.project.config.GotoDomainWhiteListConfiguration;
-import com.xhy.shortlink.project.dao.entity.*;
+import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.project.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
-import com.xhy.shortlink.project.dao.mapper.*;
+import com.xhy.shortlink.project.dao.mapper.ShortLinkGoToMapper;
+import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
@@ -26,7 +27,6 @@ import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.project.dto.resp.*;
 import com.xhy.shortlink.project.mq.ShortLinkStatsMessageProducer;
-import com.xhy.shortlink.project.service.LinkAccessStatsService;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import com.xhy.shortlink.project.toolkit.LinkUtil;
@@ -71,15 +71,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RedissonClient redissonClient;
     // 1. 注入事件发布器
     private final ApplicationEventPublisher eventPublisher;
-    // 监空统计有关mapper
-    private final LinkAccessStatsMapper linkAccessStatsMapper;
-    private final LinkLocaleStatsMapper linkLocaleStatsMapper;
-    private final LinkOsStatsMapper linkOsStatsMapper;
-    private final LinkBrowserStatsMapper linkBrowserStatsMapper;
-    private final LinkAccessLogsMapper linkAccessLogsMapper;
-    private final LinkDeviceStatsMapper linkDeviceStatsMapper;
-    private final LinkNetworkStatsMapper linkNetworkStatsMapper;
-    private final LinkAccessStatsService linkAccessStatsService;
     // mq
     private final ShortLinkStatsMessageProducer ShortLinkStatsMessageProducer;
     // 验证白名单
@@ -445,70 +436,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 shortLinkDO.setId(null); // ID置空，重新生成
                 // 注意：这里插入的 shortLinkDO 里 favicon 还是旧的，没关系，异步线程一会儿会改它
                 baseMapper.insert(shortLinkDO);
-                // 3.2 处理 t_link_access_logs 监控日志表
-                final LambdaUpdateWrapper<LinkAccessLogsDO> linkAccessLogsUpdateWrapper = Wrappers.lambdaUpdate(LinkAccessLogsDO.class)
-                        .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkAccessLogsDO::getGid, requestParam.getOriginGid());
-                final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkAccessLogsMapper.update(linkAccessLogsDO, linkAccessLogsUpdateWrapper);
-                // 3.3 处理t_link_access_stats 基础数据监控表 gid是分片键不能修改 所以先删后该
-                final LambdaQueryWrapper<LinkAccessStatsDO> linkAccessStatsUpdateWrapper = Wrappers.lambdaQuery(LinkAccessStatsDO.class)
-                        .eq(LinkAccessStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkAccessStatsDO::getGid, requestParam.getOriginGid());
-                final List<LinkAccessStatsDO> linkAccessStatsDOList = linkAccessStatsMapper.selectList(linkAccessStatsUpdateWrapper);
-                // 集合不为空时删 先删在插
-                if(CollUtil.isNotEmpty(linkAccessStatsDOList)) {
-                    // TODO 性能问题
-                    linkAccessStatsMapper.physicalDeleteBatchIds(linkAccessStatsDOList.stream().
-                            map(LinkAccessStatsDO::getId)
-                            .toList());
-                }
-                linkAccessStatsDOList.forEach(each -> each.setGid(requestParam.getGid()));
-                // 批量新增
-                linkAccessStatsService.saveBatch(linkAccessStatsDOList);
-                // 3.4 处理 t_link_browser_stats 浏览器监控表
-                final LambdaUpdateWrapper<LinkBrowserStatsDO> linkBrowserStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkBrowserStatsDO.class)
-                        .eq(LinkBrowserStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkBrowserStatsDO::getGid, requestParam.getOriginGid());
-                final LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkBrowserStatsMapper.update(linkBrowserStatsDO, linkBrowserStatsUpdateWrapper);
-                // 3.5 处理 t_link_device_stats 设备监控表
-                final LambdaUpdateWrapper<LinkDeviceStatsDO> linkDeviceStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkDeviceStatsDO.class)
-                        .eq(LinkDeviceStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkDeviceStatsDO::getGid, requestParam.getOriginGid());
-                final LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkDeviceStatsMapper.update(linkDeviceStatsDO, linkDeviceStatsUpdateWrapper);
-                // 3.6 处理 t_link_locale_stats 地理位置监控表
-                final LambdaUpdateWrapper<LinkLocaleStatsDO> linkLocaleStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkLocaleStatsDO.class)
-                        .eq(LinkLocaleStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkLocaleStatsDO::getGid, requestParam.getOriginGid());
-                        final LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkLocaleStatsMapper.update(linkLocaleStatsDO, linkLocaleStatsUpdateWrapper);
-                //  3.7 处理 t_link_network_stats 网络监控表
-                final LambdaUpdateWrapper<LinkNetworkStatsDO> linkNetworkStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkNetworkStatsDO.class)
-                        .eq(LinkNetworkStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkNetworkStatsDO::getGid, requestParam.getOriginGid());
-                final LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkNetworkStatsMapper.update(linkNetworkStatsDO, linkNetworkStatsUpdateWrapper);
-                // 3.8 处理 t_link_os_stats 操作系统监控表
-                final LambdaUpdateWrapper<LinkOsStatsDO> linkOsStatsUpdateWrapper = Wrappers.lambdaUpdate(LinkOsStatsDO.class)
-                        .eq(LinkOsStatsDO::getFullShortUrl, requestParam.getFullShortUrl())
-                        .eq(LinkOsStatsDO::getGid, requestParam.getOriginGid());
-                final LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
-                        .gid(requestParam.getGid())
-                        .build();
-                linkOsStatsMapper.update(linkOsStatsDO, linkOsStatsUpdateWrapper);
-
             } finally {
                 rLock.unlock();
             }
