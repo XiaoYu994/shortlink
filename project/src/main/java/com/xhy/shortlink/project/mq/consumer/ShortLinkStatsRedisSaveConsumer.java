@@ -62,7 +62,7 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
         final String stream = message.getStream();
         final RecordId messageId = message.getId();
         // 如果被消费
-        if(!messageQueueIdempotentHandler.isMessageBeingConsumed(messageId.toString())) {
+        if(messageQueueIdempotentHandler.isMessageBeingConsumed(messageId.toString())) {
             // 消息执行完成
             if(messageQueueIdempotentHandler.isAccomplish(messageId.toString())) {
                 return;

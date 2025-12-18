@@ -55,7 +55,7 @@ public class DelayShortLinkStatsConsumer {
                 ShortLinkStatsRecordDTO statsRecord = blockingDeque.poll(500, TimeUnit.MILLISECONDS);
                 if (statsRecord != null) {
                     // 2. 幂等性检查逻辑
-                    if (!messageQueueIdempotentHandler.isMessageBeingConsumed(statsRecord.getKeys())) {
+                    if (messageQueueIdempotentHandler.isMessageBeingConsumed(statsRecord.getKeys())) {
                         // 如果已经完成，直接跳过
                         if (messageQueueIdempotentHandler.isAccomplish(statsRecord.getKeys())) {
                             continue;
