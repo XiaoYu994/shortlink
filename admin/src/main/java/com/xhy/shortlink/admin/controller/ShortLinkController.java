@@ -25,7 +25,7 @@ import java.util.List;
 /*
 * 后台调用短链接服务
 * */
-@RestController
+@RestController(value = "shortLinkControllerByAdmin")
 @RequiredArgsConstructor
 public class ShortLinkController {
 

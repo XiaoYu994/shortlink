@@ -64,7 +64,7 @@ import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAUL
 @Service
 @RequiredArgsConstructor
 public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements ShortLinkService {
-    private final RBloomFilter<String> shortlinkCachePenetrationBloomFilter;
+    private final   RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter;
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final StringRedisTemplate stringRedisTemplate;
@@ -123,7 +123,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
 
         // 2. 布隆过滤器拦截 (解决缓存穿透)
-        if (!shortlinkCachePenetrationBloomFilter.contains(fullShortUrl)) {
+        if (!shortlinkUriCreateCachePenetrationBloomFilter.contains(fullShortUrl)) {
             ((HttpServletResponse) response).sendRedirect("/page/notfound");
             return;
         }
@@ -341,7 +341,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 创建成功后访问 还没有过缓存时间，系统就会返回404页面，用户就会觉得是bug
         stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
         // 短链接没有问题就将这个短链接加入布隆过滤器
-        shortlinkCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
+        shortlinkUriCreateCachePenetrationBloomFilter.add(shortlinkDO.getFullShortUrl());
 
         // 【修改点 2】：所有核心业务完成后，发布异步事件去抓取图标
         // 这里可以直接复用更新时的那个 Event 类
@@ -566,7 +566,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 使用UUID避免返回的短链接重复，降低这个重复的概率
             originUrl += UUID.randomUUID().toString();
             shortUri = HashUtil.hashToBase62(originUrl);
-            if(!shortlinkCachePenetrationBloomFilter.contains(defaultDomain + "/" + shortUri)){
+            if(!shortlinkUriCreateCachePenetrationBloomFilter.contains(defaultDomain + "/" + shortUri)){
                 break;
             }
                 customGenerateCount++;

@@ -1,9 +1,11 @@
 server:
   port: 8000
-
 spring:
   application:
     name: short-link-gateway
+  profiles:
+    active: aggregation
+    # active: dev
   data:
     redis:
       host: 172.28.64.14
@@ -15,23 +17,3 @@ spring:
         server-addr: 122.51.107.126:8848
         username: nacos
         password: dA8UJZMYb.KI3szlG4nz3KJKAD4uwK2
-    gateway:
-      routes:
-        - id: short-link-admin
-          uri: lb://short-link-admin/api/short-link/admin/**
-          predicates:
-            - Path=/api/short-link/admin/**
-          filters:
-            - name: TokenValidate
-              args:
-                whitePathList:
-                  - /api/short-link/admin/v1/user/login
-                  - /api/short-link/admin/v1/user/has-username
-                  - /api/short-link/admin/v1/user/check-login
-
-        - id: short-link-project
-          uri: lb://short-link-project/api/short-link/**
-          predicates:
-            - Path=/api/short-link/**
-          filters:
-            - name: TokenValidate

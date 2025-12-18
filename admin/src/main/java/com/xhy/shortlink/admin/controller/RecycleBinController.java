@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 /*
 * 后管调用中台回收站接口
 * */
-@RestController
+@RestController(value = "recycleBinControllerByAdmin")
 @RequiredArgsConstructor
 public class RecycleBinController {
 
