@@ -18,6 +18,7 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.DELAY_Q
 
 @Slf4j
 @Component
+@Deprecated
 @RequiredArgsConstructor
 public class DelayShortLinkStatsConsumer {
 
