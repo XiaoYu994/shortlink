@@ -6,5 +6,5 @@ import com.xhy.shortlink.project.dao.entity.GroupDO;
 /*
 * 分组持久层
 * */
-public interface GroupMapper extends BaseMapper<GroupDO> {
+public interface LinkGroupMapper extends BaseMapper<GroupDO> {
 }
