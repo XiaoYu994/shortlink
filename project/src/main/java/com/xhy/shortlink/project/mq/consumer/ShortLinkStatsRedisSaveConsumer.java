@@ -70,11 +70,8 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
         }
         try {
             final Map<String, String> proudcerMap = message.getValue();
-            final String fullShortUrl = proudcerMap.get("fullShortUrl");
-            if (StrUtil.isNotBlank(fullShortUrl)) {
-                final ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(proudcerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
-                actualSaveShortLinkStats(statsRecord);
-            }
+            final ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(proudcerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
+            actualSaveShortLinkStats(statsRecord);
             stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId.getValue());
         } catch (Throwable e){
             // 某某某情况宕机了

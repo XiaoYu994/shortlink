@@ -70,11 +70,8 @@ public class ShortLinkStatsRocketMQSaveConsumer implements RocketMQListener<Map<
             throw new ServiceException("消息未完成流程，需要消息队列重试");
         }
         try {
-            String fullShortUrl = producerMap.get("fullShortUrl");
-            if (StrUtil.isNotBlank(fullShortUrl)) {
-                ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(producerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
-                actualSaveShortLinkStats(statsRecord);
-            }
+            ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(producerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
+            actualSaveShortLinkStats(statsRecord);
         } catch (Throwable ex) {
             // 删除幂等标识
             messageQueueIdempotentHandler.delMessageProcessed(keys);
