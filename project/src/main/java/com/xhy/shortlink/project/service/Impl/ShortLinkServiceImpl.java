@@ -347,6 +347,67 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
     @Override
+    public ShortLinkCreateRespDTO createShortLinkByLock(ShortLinkCreateReqDTO requestParam) {
+        verificationWhitelist(requestParam.getOriginUrl());
+        String fullShortUrl ;
+        ShortLinkDO shortlinkDO;
+        final RLock lock = redissonClient.getLock(SHORT_LINK_CREATE_LOCK_KEY);
+        lock.lock();
+        try {
+            String suffix = generateSuffixByLock(requestParam);
+            fullShortUrl = StrBuilder.create(defaultDomain)
+                    .append("/")
+                    .append(suffix).toString();
+             shortlinkDO = ShortLinkDO.builder()
+                    .gid(requestParam.getGid())
+                    .createdType(requestParam.getCreateType())
+                    .domain(defaultDomain)
+                    .describe(requestParam.getDescribe())
+                    .validDateType(requestParam.getValidDateType())
+                    .validDate(requestParam.getValidDate())
+                    .fullShortUrl(fullShortUrl)
+                    .originUrl(requestParam.getOriginUrl())
+                    .shortUri(suffix)
+                    .build();
+            // 同时加入路由表
+            final ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
+                    .gid(shortlinkDO.getGid())
+                    .fullShortUrl(shortlinkDO.getFullShortUrl())
+                    .build();
+            // 如果发生布隆冲突，就说明短链接重复了，这个时候数据库就会报key冲突 之前设置了 唯一索引 full_short_url
+            try {
+                baseMapper.insert(shortlinkDO);
+                shortLinkGoToMapper.insert(shortLinkGoToDO);
+            } catch (DuplicateKeyException e) {
+                throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
+            }
+            // 缓存预热 创建短链接的时间大于一天存1天，永久短链接也存1天的过期时间
+            stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
+                            shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
+                    LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+            // 创建成功后，一定要把“空值缓存”删掉
+            // 场景 用户输入了一个不存在的短链接，系统缓存空值，但是用户立刻去创建这个短链接，
+            // 创建成功后访问 还没有过缓存时间，系统就会返回404页面，用户就会觉得是bug
+            stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+        } finally {
+            lock.unlock();
+        }
+            // 【修改点 2】：所有核心业务完成后，发布异步事件去抓取图标
+            // 这里可以直接复用更新时的那个 Event 类
+            eventPublisher.publishEvent(new UpdateFaviconEvent(
+                    shortlinkDO.getFullShortUrl(),
+                    shortlinkDO.getGid(),
+                    requestParam.getOriginUrl()
+            ));
+            return ShortLinkCreateRespDTO.builder()
+                    .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
+                    .gid(shortlinkDO.getGid())
+                    .originUrl(requestParam.getOriginUrl())
+                    .build();
+
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam) {
         final List<String> originUrlList = requestParam.getOriginUrls();
@@ -495,6 +556,32 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 customGenerateCount++;
         }
         return shortUri;
+    }
+
+    /*
+    * 通过分布式锁判断
+    * */
+    private String generateSuffixByLock(ShortLinkCreateReqDTO requestParam) {
+        int customGenerateCount = 0;
+        String shorUri;
+        while (true) {
+            if (customGenerateCount > 10) {
+                throw new ServiceException("短链接频繁生成，请稍后再试");
+            }
+            String originUrl = requestParam.getOriginUrl();
+            originUrl += UUID.randomUUID().toString();
+            shorUri = HashUtil.hashToBase62(originUrl);
+            LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                    .eq(ShortLinkDO::getGid, requestParam.getGid())
+                    .eq(ShortLinkDO::getFullShortUrl, defaultDomain + "/" + shorUri)
+                    .eq(ShortLinkDO::getDelFlag, 0);
+            ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
+            if (shortLinkDO == null) {
+                break;
+            }
+            customGenerateCount++;
+        }
+        return shorUri;
     }
 
     private void verificationWhitelist(String originUrl) {

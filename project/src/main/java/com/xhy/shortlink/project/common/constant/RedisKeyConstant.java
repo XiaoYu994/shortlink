@@ -59,4 +59,8 @@ public class RedisKeyConstant {
      */
     public static final String SHORT_LINK_STATS_STREAM_GROUP_KEY = "short-link:stats-stream:only-group";
 
+    /*
+    * 分布式锁创建短链接
+    * */
+    public static final String SHORT_LINK_CREATE_LOCK_KEY =  "short-link:create-lock";
 }

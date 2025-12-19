@@ -35,7 +35,7 @@ public class ShortLinkController {
     }
 
     /*
-    * 创建短链接
+    * 创建短链接 布隆过滤器
     * */
     @PostMapping("/api/short-link/v1/create")
     @SentinelResource(
@@ -45,6 +45,14 @@ public class ShortLinkController {
     )
     public Result<ShortLinkCreateRespDTO> createShortlink(@RequestBody ShortLinkCreateReqDTO requestParam) {
         return Results.success(shortlinkService.createShortlink(requestParam));
+    }
+
+    /*
+     * 创建短链接 分布式锁
+     * */
+    @PostMapping("/api/short-link/v1/create/by-lock")
+    public Result<ShortLinkCreateRespDTO> createShortLinkByLock(@RequestBody ShortLinkCreateReqDTO requestParam) {
+        return Results.success(shortlinkService.createShortLinkByLock(requestParam));
     }
 
     /*
