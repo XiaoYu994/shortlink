@@ -73,7 +73,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             int maxRetries = 10;
             String gid = null;
             // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
-            GroupDO groupDO = groupMapper.selectByGidIgnoreLogicDelete(gid,username);
             while (retryCount < maxRetries) {
                 gid = saveGroupUniqueReturnGid();
                 if(StrUtil.isNotEmpty(gid)){
