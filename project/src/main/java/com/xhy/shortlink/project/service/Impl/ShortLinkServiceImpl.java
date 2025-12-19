@@ -104,7 +104,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
             if (redirectUrl != null) {
                 ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-                shortLinkStats(fullShortUrl,null, statsRecord);
+                shortLinkStats(statsRecord);
                 ((HttpServletResponse) response).sendRedirect(redirectUrl);
                 return;
             }
@@ -137,7 +137,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
                 if (redirectUrl != null) {
                     ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-                    shortLinkStats(fullShortUrl,null, statsRecord);
+                    shortLinkStats(statsRecord);
                     ((HttpServletResponse) response).sendRedirect(redirectUrl);
                     return;
                 }
@@ -184,7 +184,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             long initialTTL = LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
             stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
             ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-            shortLinkStats(fullShortUrl,shortLinkDO.getGid(), statsRecord);
+            shortLinkStats(statsRecord);
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
         } finally {
             lock.unlock();
@@ -242,10 +242,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
 
 
-    public void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord) {
+    public void shortLinkStats(ShortLinkStatsRecordDTO statsRecord) {
         Map<String,String> producerMap = new HashMap<>();
-        producerMap.put("gid",gid);
-        producerMap.put("fullShortUrl",fullShortUrl);
         // 序列化和反序列化要一致，不然会导致消息消费失败
         producerMap.put("statsRecord", JSON.toJSONString(statsRecord));
         ShortLinkStatsMessageProducer.send(producerMap);

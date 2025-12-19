@@ -66,7 +66,7 @@ public class DelayShortLinkStatsConsumer {
                     }
 
                     try {
-                        shortLinkService.shortLinkStats(null, null, statsRecord);
+                        shortLinkService.shortLinkStats(statsRecord);
                         // 正常处理完，标记完成
                         messageQueueIdempotentHandler.setAccomplish(statsRecord.getKeys());
                     } catch (Throwable e) {

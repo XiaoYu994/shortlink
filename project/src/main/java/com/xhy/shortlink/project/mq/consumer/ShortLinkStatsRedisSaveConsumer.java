@@ -72,9 +72,8 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
             final Map<String, String> proudcerMap = message.getValue();
             final String fullShortUrl = proudcerMap.get("fullShortUrl");
             if (StrUtil.isNotBlank(fullShortUrl)) {
-                final String gid = proudcerMap.get("gid");
                 final ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(proudcerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
-                actualSaveShortLinkStats(fullShortUrl, gid, statsRecord);
+                actualSaveShortLinkStats(statsRecord);
             }
             stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId.getValue());
         } catch (Throwable e){
@@ -88,19 +87,17 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
 
     }
 
-    private void actualSaveShortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord) {
-        fullShortUrl = Optional.ofNullable(fullShortUrl).orElse(statsRecord.getFullShortUrl());
+    private void actualSaveShortLinkStats(ShortLinkStatsRecordDTO statsRecord) {
+        String fullShortUrl = statsRecord.getFullShortUrl();
         RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, fullShortUrl));
         RLock rLock = readWriteLock.readLock();
         rLock.lock();
         try {
             // 只有当gid为空的时候才去查询路由表
-            if(StrUtil.isBlank(gid)) {
-                LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
-                        .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
-                ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
-                gid = shortLinkGotoDO.getGid();
-            }
+            LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
+                    .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
+            ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
+           String gid = shortLinkGotoDO.getGid();
             Date currentDate = new Date();
             int hour = DateUtil.hour(currentDate, true);
             Week week = DateUtil.dayOfWeekEnum(currentDate);
