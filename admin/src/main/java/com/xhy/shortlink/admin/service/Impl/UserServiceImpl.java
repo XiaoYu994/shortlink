@@ -88,10 +88,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
                if (insert < 1) {
                    throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
                }
-               // 添加布隆过滤器
-               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+
                // 添加默认分组
                groupService.addGroup(requestParam.getUsername(),"默认分组");
+               // 添加布隆过滤器
+               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
            } catch (DuplicateKeyException e) {
                throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
            } finally {
