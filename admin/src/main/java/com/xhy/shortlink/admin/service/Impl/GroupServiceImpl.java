@@ -2,6 +2,7 @@ package com.xhy.shortlink.admin.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -10,7 +11,9 @@ import com.xhy.shortlink.admin.common.biz.user.UserContext;
 import com.xhy.shortlink.admin.common.convention.exception.ClientException;
 import com.xhy.shortlink.admin.common.convention.result.Result;
 import com.xhy.shortlink.admin.dao.entity.GroupDO;
+import com.xhy.shortlink.admin.dao.entity.GroupUniqueDO;
 import com.xhy.shortlink.admin.dao.mapper.GroupMapper;
+import com.xhy.shortlink.admin.dao.mapper.GroupUniqueMapper;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.admin.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
@@ -20,9 +23,11 @@ import com.xhy.shortlink.admin.service.GroupService;
 import com.xhy.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +38,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.xhy.shortlink.admin.common.constant.RedisCacheConstant.LOCK_GROUP_CREATE_KEY;
-import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_SAVE_ERROR;
 import static com.xhy.shortlink.admin.common.convention.errorcode.BaseErrorCode.SERVICE_UPDATE_ERROR;
 
 @Slf4j
@@ -47,6 +51,8 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     private final ShortLinkActualRemoteService shortLinkActualRemoteService;
     private final GroupMapper groupMapper;
+    private final GroupUniqueMapper groupUniqueMapper;
+    private final RBloomFilter<String> gidRegisterCachePenetrationBloomFilter;
 
     @Override
     public void addGroup(String groupName) {
@@ -63,26 +69,46 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             if (CollUtil.isNotEmpty(groupDOList) && groupDOList.size() >= groupMaxNum) {
                 throw new ClientException(String.format("已超出最大分组数:%d",groupMaxNum));
             }
-            //gid 使用随机生成的6位数
-            String gid = RandomCodeGenerator.generateSixDigitCode();
+            int retryCount = 0;
+            int maxRetries = 10;
+            String gid = null;
             // 插入之前要查询gid是否已经存在 逻辑删除的也要查询出来
             GroupDO groupDO = groupMapper.selectByGidIgnoreLogicDelete(gid,username);
-            while (groupDO != null) {
-                gid = RandomCodeGenerator.generateSixDigitCode();
-                groupDO = groupMapper.selectByGidIgnoreLogicDelete(gid,username);
+            while (retryCount < maxRetries) {
+                gid = saveGroupUniqueReturnGid();
+                if(StrUtil.isNotEmpty(gid)){
+                    final GroupDO group = GroupDO.builder()
+                            .gid(gid)
+                            .name(groupName)
+                            .username(username)
+                            .build();
+                    baseMapper.insert(group);
+                    gidRegisterCachePenetrationBloomFilter.add(gid);
+                    break;
+                }
+                retryCount++;
             }
-            final GroupDO group = GroupDO.builder()
-                    .gid(gid)
-                    .name(groupName)
-                    .username(username)
-                    .build();
-            final int insert = baseMapper.insert(group);
-            if (insert <= 0) {
-                throw new ClientException(SERVICE_SAVE_ERROR);
+            if(StrUtil.isEmpty(gid)) {
+                throw new ClientException("生成gid频繁");
             }
         } finally {
             lock.unlock();
         }
+    }
+
+    private String saveGroupUniqueReturnGid() {
+        String gid = RandomCodeGenerator.generateSixDigitCode();
+        if(!gidRegisterCachePenetrationBloomFilter.contains(gid)) {
+            GroupUniqueDO groupUniqueDO = GroupUniqueDO.builder()
+                    .gid(gid)
+                    .build();
+            try {
+                groupUniqueMapper.insert(groupUniqueDO);
+            } catch (DuplicateKeyException e) {
+                return null;
+            }
+        }
+        return gid;
     }
 
     @Override
@@ -130,10 +156,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getGid, requestParam.getGid());
         final GroupDO groupDO = GroupDO.builder().name(requestParam.getName())
                 .build();
-        final int update = baseMapper.update(groupDO, updateWrapper);
-        if (update <= 0) {
-            throw new ClientException(SERVICE_UPDATE_ERROR);
-        }
+        baseMapper.update(groupDO, updateWrapper);
     }
 
     @Override
