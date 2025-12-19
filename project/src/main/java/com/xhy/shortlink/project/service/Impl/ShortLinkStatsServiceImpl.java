@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xhy.shortlink.project.common.biz.user.UserContext;
+import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
 import com.xhy.shortlink.project.dto.req.*;
@@ -31,9 +33,11 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final GroupMapper groupMapper;
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkStatsRespDTO oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
+        checkGroupBelongToUser(requestParam.getGid());
         // 查询基础数据统计
         final List<LinkAccessStatsDO> linkAccessStatsDOList = linkAccessStatsMapper.listStatsByShortLink(requestParam);
         if (CollUtil.isEmpty(linkAccessStatsDOList)) {
@@ -186,6 +190,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
 
     @Override
     public ShortLinkStatsRespDTO groupShortLinkStats(ShortLinkStatsGroupReqDTO requestParam) {
+        checkGroupBelongToUser(requestParam.getGid());
         // 查询基础数据统计
         final List<LinkAccessStatsDO> linkAccessStatsDOList = linkAccessStatsMapper.listStatsByShortLinkGroup(requestParam);
         if (CollUtil.isEmpty(linkAccessStatsDOList)) {
@@ -337,6 +342,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
 
     @Override
     public IPage<ShortLinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(ShortLinkStatsAccessRecordReqDTO requestParam) {
+        checkGroupBelongToUser(requestParam.getGid());
         // 查询访问记录
         final LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
                 .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
@@ -372,6 +378,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
 
     @Override
     public IPage<ShortLinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(ShortLinkStatsAccessRecordGroupReqDTO requestParam) {
+        checkGroupBelongToUser(requestParam.getGid());
         // 查询访问记录
         final IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectGroupPage(requestParam);
         if(CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
@@ -400,6 +407,19 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                     .orElse("旧访客"));
         });
         return actualResult;
+    }
+
+
+    private void checkGroupBelongToUser(String gid) {
+        final String username = Optional.ofNullable(UserContext.getUsername())
+                .orElseThrow(() -> new ServiceException("用户未登录"));
+        final LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getGid, gid)
+                .eq(GroupDO::getUsername, username);
+        final List<GroupDO> groupDOList = groupMapper.selectList(queryWrapper);
+        if(CollUtil.isEmpty(groupDOList)) {
+            throw new ServiceException("用户信息与分组标识不匹配");
+        }
     }
 
 }
