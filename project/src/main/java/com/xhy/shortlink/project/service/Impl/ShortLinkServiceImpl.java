@@ -320,6 +320,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             baseMapper.insert(shortlinkDO);
             shortLinkGoToMapper.insert(shortLinkGoToDO);
         } catch (DuplicateKeyException e) {
+            // 说明布隆过滤器误判被数据库唯一索引捕获，需要重新加入到布隆过滤器中(也有可能是Redis宕机，布隆过滤器数据丢失)
+            if(!shortlinkUriCreateCachePenetrationBloomFilter.contains(fullShortUrl)) {
+                shortlinkUriCreateCachePenetrationBloomFilter.add(fullShortUrl);
+            }
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
         // 缓存预热 创建短链接的时间大于一天存1天，永久短链接也存1天的过期时间
