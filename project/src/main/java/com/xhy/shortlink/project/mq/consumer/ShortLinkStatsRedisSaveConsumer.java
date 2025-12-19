@@ -95,7 +95,7 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
            String gid = shortLinkGotoDO.getGid();
-            Date currentDate = new Date();
+            Date currentDate = statsRecord.getCurrentDate();
             int hour = DateUtil.hour(currentDate, true);
             Week week = DateUtil.dayOfWeekEnum(currentDate);
             int weekday = week.getIso8601Value();

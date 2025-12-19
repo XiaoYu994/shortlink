@@ -232,6 +232,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .os(os)
                     .network(network)
                     .browser(browser)
+                    .currentDate(new Date())
                     .remoteAddr(remoteAddr)
                     .uipFirstFlag(uipFirstFlag)
                     .uvFirstFlag(uvFirstFlag.get())
