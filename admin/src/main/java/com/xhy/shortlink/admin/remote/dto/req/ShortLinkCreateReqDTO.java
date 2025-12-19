@@ -29,7 +29,7 @@ public class ShortLinkCreateReqDTO {
     /*
     * 创建类型
     * */
-    private Integer createType;
+    private Integer createdType;
 
     /*
     * 有效期类型

@@ -300,7 +300,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .append(suffix).toString();
         final ShortLinkDO shortlinkDO = ShortLinkDO.builder()
                 .gid(requestParam.getGid())
-                .createdType(requestParam.getCreateType())
+                .createdType(requestParam.getCreatedType())
                 .domain(defaultDomain)
                 .describe(requestParam.getDescribe())
                 .validDateType(requestParam.getValidDateType())
@@ -360,7 +360,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .append(suffix).toString();
              shortlinkDO = ShortLinkDO.builder()
                     .gid(requestParam.getGid())
-                    .createdType(requestParam.getCreateType())
+                    .createdType(requestParam.getCreatedType())
                     .domain(defaultDomain)
                     .describe(requestParam.getDescribe())
                     .validDateType(requestParam.getValidDateType())
