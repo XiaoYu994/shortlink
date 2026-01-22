@@ -1,5 +1,10 @@
 server:
   port: 8001
+  tomcat:
+    threads:
+      max: 500       # 最大工作线程数，推荐 400-800
+      min-spare: 50  # 最小空闲线程数，推荐 50-100
+    connection-timeout: 20000
 
 spring:
   application:

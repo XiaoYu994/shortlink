@@ -17,8 +17,9 @@ public class ShortLinkLocalCacheConfig {
     public Cache<String, String> shortLinkCache() {
         return Caffeine.newBuilder()
                 .initialCapacity(100)
-                .maximumSize(5000) // 防止内存溢出
-                .expireAfterWrite(30, TimeUnit.SECONDS) // 写入30秒后过期，保证最终一致性
+                .maximumSize(10000) // 存1万条热点数据，大概占用 10MB-20MB 内存，很安全
+                .expireAfterWrite(30, TimeUnit.MINUTES) // 写入半小时后过期，避免频繁失效导致穿透到 Redis
+                .recordStats() // 开启统计，生产环境可以通过监控看到缓存命中率
                 .build();
     }
 }
