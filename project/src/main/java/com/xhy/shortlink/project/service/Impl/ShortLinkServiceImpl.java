@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
@@ -38,6 +39,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
@@ -76,6 +78,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     // 验证白名单
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
 
+    // 注入 Caffeine 缓存
+    private final Cache<String, String> shortLinkCache;
+
+    // 注入 RocketMQ 模板
+    private final RocketMQTemplate rocketMQTemplate;
+
+    // 定义 Topic
+    private final String CACHE_INVALIDATE_TOPIC = "short_link_cache_invalidate_topic";
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -83,24 +93,34 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @SneakyThrows
     @Override
     public void redirect(String shortUri, ServletRequest request, ServletResponse response) {
-        // 获取请求的端口号 80不显示
-       String serverPort = Optional.of(request.getServerPort())
-               .filter(each -> !Objects.equals(each,80))
-               .map(String::valueOf)
-               .map(each -> ":" + each)
-               .orElse("");
         // 不带http
-        String fullShortUrl = request.getServerName() + serverPort + "/" + shortUri;
+        String fullShortUrl = defaultDomain + "/" + shortUri;
         // 缓存 key
         String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
         // 缓存空值key
         String keyIsNull = String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
 
-        // 1. 优先从缓存中查询
-        String originalLinkComposite = stringRedisTemplate.opsForValue().get(key);
-
-        // 【修正点1】如果缓存中有值，必须先解析，再判断是否过期/续期，最后跳转
+        // 先判断本地缓存中有没有
+        String originalLinkComposite = shortLinkCache.getIfPresent(key);
         if (StrUtil.isNotBlank(originalLinkComposite)) {
+            String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
+            if (redirectUrl != null) {
+                // 统计监控并跳转
+                ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
+                shortLinkStats(statsRecord);
+                ((HttpServletResponse) response).sendRedirect(redirectUrl);
+                return;
+            }
+            shortLinkCache.invalidate(key);
+        }
+
+        // 1. Redis Cache (L2)
+        originalLinkComposite = stringRedisTemplate.opsForValue().get(key);
+
+        // 如果缓存中有值，必须先解析，再判断是否过期/续期，最后跳转
+        if (StrUtil.isNotBlank(originalLinkComposite)) {
+            // 将 Redis 查到的热点数据写入 Caffeine
+            shortLinkCache.put(key, originalLinkComposite);
             String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
             if (redirectUrl != null) {
                 ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
@@ -133,6 +153,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 5. 双重检查 (Double Check)
             originalLinkComposite = stringRedisTemplate.opsForValue().get(key);
             if (StrUtil.isNotBlank(originalLinkComposite)) {
+                // 加入本地缓存
+                shortLinkCache.put(key, originalLinkComposite);
                 // 锁内的解析和续期（防止在等待锁的过程中别人已经查好放入缓存了）
                 String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
                 if (redirectUrl != null) {
@@ -183,6 +205,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 计算初始 TTL (例如：过期时间 - 当前时间，或者默认 1 天)
             long initialTTL = LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
             stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
+            // 加入本地缓存
+            shortLinkCache.put(key, cacheValue);
             ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
             shortLinkStats(statsRecord);
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
@@ -315,7 +339,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .gid(shortlinkDO.getGid())
                 .fullShortUrl(shortlinkDO.getFullShortUrl())
                 .build();
-        // 如果发生布隆冲突，就说明短链接重复了，这个时候数据库就会报key冲突 之前设置了 唯一索引 full_short_url
+        // 如果发生布隆误判，就说明短链接重复了，这个时候数据库就会报key冲突 之前设置了 唯一索引 full_short_url
         try {
             baseMapper.insert(shortlinkDO);
             shortLinkGoToMapper.insert(shortLinkGoToDO);
@@ -514,11 +538,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     requestParam.getOriginUrl()
             ));
         }
-        //直接删除之前的缓存和过期的空缓存 TODO 这里的删除会不会有什么问题 源码中采用的是判断
+        //直接删除之前的缓存和过期的空缓存
         stringRedisTemplate.delete(Arrays.asList(
                 String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()),
                 String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl())
         ));
+        // 发送 MQ 广播消息通知清除本地 Caffeine (L1)
+        // 直接发送短链接 fullShortUrl 字符串即可
+        try {
+            rocketMQTemplate.syncSend(CACHE_INVALIDATE_TOPIC, requestParam.getFullShortUrl());
+        } catch (Exception e) {
+            // 记录日志，通常缓存删除失败可以接受最终一致性（Caffeine 设置了过期时间）
+            log.error("发送缓存失效广播消息失败", e);
+        }
     }
 
     @Override
