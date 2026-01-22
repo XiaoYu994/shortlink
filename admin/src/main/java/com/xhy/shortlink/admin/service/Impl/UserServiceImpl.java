@@ -30,6 +30,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 import java.util.UUID;
@@ -92,7 +94,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,UserDO> implements U
                // 添加默认分组
                groupService.addGroup(requestParam.getUsername(),"默认分组");
                // 添加布隆过滤器
-               userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+               // 只有当数据库事务 Commit 成功后，才执行里面的代码
+               TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                   @Override
+                   public void afterCommit() {
+                       // 数据库这就稳了，再更新 Redis
+                       userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
+                   }
+               });
            } catch (DuplicateKeyException e) {
                throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
            } finally {
