@@ -30,6 +30,11 @@ public class ShortLinkController {
     * 跳转短链接
     * */
     @GetMapping("/{short-uri}")
+    @SentinelResource(
+            value = "short_link_redirect",
+            blockHandler = "redirectBlockHandler",
+            blockHandlerClass = CustomBlockHandler.class
+    )
     public void redirect(@PathVariable("short-uri") String shortUri , ServletRequest request, ServletResponse  response) {
         shortlinkService.redirect(shortUri, request, response);
     }
