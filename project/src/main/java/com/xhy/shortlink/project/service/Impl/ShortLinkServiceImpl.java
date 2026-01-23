@@ -39,6 +39,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.producer.SendCallback;
+import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
@@ -368,6 +370,24 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 shortlinkDO.getGid(),
                 requestParam.getOriginUrl()
         ));
+
+        // 发送 AI 风控审核消息 (异步)
+        try {
+            rocketMQTemplate.asyncSend("short_link_risk_check_topic", shortlinkDO, new SendCallback() {
+                @Override
+                public void onSuccess(SendResult sendResult) {
+                    // 发送成功，静默处理
+                }
+                @Override
+                public void onException(Throwable e) {
+                    log.error("风控消息发送失败", e);
+                    // 这里可以做补偿逻辑，或者记录日志人工处理
+                }
+            });
+        } catch (Exception e) {
+            log.error("MQ 发送异常", e);
+        }
+
         return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
                 .gid(shortlinkDO.getGid())

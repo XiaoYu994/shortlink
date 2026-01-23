@@ -29,6 +29,14 @@ spring:
         server-addr: 122.51.107.126:8848
         username: nacos
         password: dA8UJZMYb.KI3szlG4nz3KJKAD4uwK2
+  # Spring AI Alibaba DashScope 配置
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}  # 从环境变量读取或使用默认值
+      chat:
+        options:
+          model: qwen3-max
+
 
 short-link:
   domain:
