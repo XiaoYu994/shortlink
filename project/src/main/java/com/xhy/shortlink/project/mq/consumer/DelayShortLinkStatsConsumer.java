@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBlockingDeque;
 import org.redisson.api.RedissonClient;
-import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -17,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.DELAY_QUEUE_STATS_KEY;
 
 @Slf4j
-@Component
 @Deprecated
 @RequiredArgsConstructor
 public class DelayShortLinkStatsConsumer {
