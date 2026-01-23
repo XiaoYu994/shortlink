@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.xhy.shortlink.project.common.biz.user.UserContext;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
@@ -357,6 +358,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .fullShortUrl(shortlinkDO.getFullShortUrl())
                 .originUrl(shortlinkDO.getOriginUrl())
                 .gid(shortlinkDO.getGid())
+                 .userId(Long.parseLong(UserContext.getUserId()))
                 .build());
         return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
@@ -532,6 +534,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .fullShortUrl(requestParam.getFullShortUrl())
                     .originUrl(requestParam.getOriginUrl())
                     .gid(requestParam.getGid())
+                    .userId(Long.parseLong(UserContext.getUserId()))
                     .build());
         }
         //直接删除之前的缓存和过期的空缓存

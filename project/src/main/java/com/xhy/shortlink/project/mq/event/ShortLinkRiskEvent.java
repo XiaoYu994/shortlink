@@ -28,4 +28,9 @@ public class ShortLinkRiskEvent {
      * 分组标识
      */
     private String gid;
+
+    /*
+    *  用户 id 后续发送用户通知要用
+    * */
+    private Long userId;
 }

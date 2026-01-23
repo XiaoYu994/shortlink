@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xhy.shortlink.project.common.biz.user.UserContext;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
@@ -63,7 +64,9 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
         // 删除对应的缓存 空值
         stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
         // 加入 AI 检测
-        riskProducer.send(BeanUtil.toBean(requestParam, ShortLinkRiskEvent.class));
+        ShortLinkRiskEvent riskEvent = BeanUtil.toBean(requestParam, ShortLinkRiskEvent.class);
+        riskEvent.setUserId(Long.parseLong(UserContext.getUserId()));
+        riskProducer.send(riskEvent);
     }
 
     @Override

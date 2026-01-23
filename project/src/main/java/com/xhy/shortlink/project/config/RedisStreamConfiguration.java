@@ -2,6 +2,7 @@ package com.xhy.shortlink.project.config;
 
 import com.xhy.shortlink.project.mq.consumer.redis.ShortLinkRiskRedisConsumer;
 import com.xhy.shortlink.project.mq.consumer.redis.ShortLinkStatsSaveRedisConsumer;
+import com.xhy.shortlink.project.mq.consumer.redis.ShortLinkViolationNotifyRedisConsumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,6 +39,8 @@ public class RedisStreamConfiguration {
     private final ShortLinkStatsSaveRedisConsumer shortLinkStatsRedisSaveConsumer;
     // 注入 AI 风控消费者
     private final ShortLinkRiskRedisConsumer shortLinkRiskRedisConsumer;
+    // 消息通知消费者
+    private final ShortLinkViolationNotifyRedisConsumer shortLinkViolationNotifyRedisConsumer;
     // 注入 StringRedisTemplate 用于初始化 Group
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -99,6 +102,17 @@ public class RedisStreamConfiguration {
                         .build();
         // 绑定：riskReadRequest -> riskConsumer
         listenerContainer.register(riskReadRequest, shortLinkRiskRedisConsumer);
+
+        // 4. 注册发送通知消费者
+        initStreamGroup(NOTIFY_STREAM_TOPIC_KEY, NOTIFY_STREAM_Group_KEY);
+        StreamMessageListenerContainer.StreamReadRequest<String> notifyReadRequest =
+                StreamMessageListenerContainer.StreamReadRequest.builder(StreamOffset.create(NOTIFY_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()))
+                        .cancelOnError(throwable -> false)
+                        .consumer(Consumer.from(NOTIFY_STREAM_Group_KEY, "notify-consumer"))
+                        .autoAcknowledge(true)
+                        .build();
+        // 绑定：notifyReadRequest -> riskConsumer
+        listenerContainer.register(notifyReadRequest, shortLinkViolationNotifyRedisConsumer);
         // 启动容器
         listenerContainer.start();
         return listenerContainer;

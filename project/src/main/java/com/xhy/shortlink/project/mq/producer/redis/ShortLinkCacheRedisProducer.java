@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.CHANNEL_TOPIC;
+import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.CHANNEL_TOPIC_KEY;
 
 /*
  * 短链接清除本地缓存 Redis 实现 (Pub/Sub 模式)
@@ -24,7 +24,7 @@ public class ShortLinkCacheRedisProducer implements ShortLinkMessageProducer<Str
         try {
             // 2. 使用 convertAndSend 发送广播消息
             // 注意：这不是存数据，而是“喊话”。只有当前在线的消费者能收到。
-            stringRedisTemplate.convertAndSend(CHANNEL_TOPIC, fullShortUrl);
+            stringRedisTemplate.convertAndSend(CHANNEL_TOPIC_KEY, fullShortUrl);
 
 
         } catch (Exception e) {

@@ -41,4 +41,14 @@ public class RocketMQConstant {
      *   AI 风控审核消息 group
      */
     public final static String RISK_CHECK_GROUP = "short_link_project_risk_check_group";
+
+    /**
+     *   发送用户通知 topic
+     */
+    public static final String NOTIFY_TOPIC = "short_link_project_notify_topic";
+
+    /**
+     *   发送用户通知 group
+     */
+    public static final String NOTIFY_GROUP = "short_link_project_notify_group";
 }

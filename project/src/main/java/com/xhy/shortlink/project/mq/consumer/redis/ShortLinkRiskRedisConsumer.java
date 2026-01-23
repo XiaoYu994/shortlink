@@ -5,16 +5,20 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkRiskCheckRespDTO;
 import com.xhy.shortlink.project.mq.event.ShortLinkRiskEvent;
+import com.xhy.shortlink.project.mq.event.ShortLinkViolationEvent;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.service.UrlRiskControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Map;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
@@ -43,9 +47,11 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
 
             // 3. 如果 AI 判定为不安全
             if (!result.isSafe()) {
-                log.warn("⚠️ [Redis] 发现违规链接！URL: {}, 原因: {}", shortLinkRiskEvent.getFullShortUrl(), result.getDescription());
+                log.warn("⚠️ [Redis] 发现违规链接！URL: {}, 原因: {}", shortLinkRiskEvent.getFullShortUrl(), result.getDetail());
                 // 4. 封禁处理
                 disableLink(shortLinkRiskEvent);
+                // 5. 发送违规通知事件
+                sendViolationNotification(shortLinkRiskEvent, result.getSummary());
             } else {
                 log.info("✅ [Redis] AI 审核通过: {}", shortLinkRiskEvent.getFullShortUrl());
             }
@@ -58,6 +64,33 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
             // 1. 如果你希望异常后【不重试】，在这里也加上 ACK。
             // 2. 如果你希望异常后【重试】，这里不要 ACK，然后需要写一个定时任务去处理 Pending List。
             // 简单做法：通常 AI 风控如果报错了（比如网络抖动），我们希望它能保留在 Pending List 里后续人工处理，所以这里不 ACK。
+        }
+    }
+
+    /*
+    *  发送风控通知
+    * */
+    private void sendViolationNotification(ShortLinkRiskEvent event, String reason) {
+        try {
+            ShortLinkViolationEvent violationEvent = ShortLinkViolationEvent.builder()
+                    .fullShortUrl(event.getFullShortUrl())
+                    .gid(event.getGid())
+                    .reason(reason)
+                    .userId(event.getUserId())
+                    .time(LocalDateTime.now())
+                    .build();
+
+            // 序列化发送
+            String json = JSON.toJSONString(violationEvent);
+            MapRecord<String, String, String> record = StreamRecords.newRecord()
+                    .ofMap(Collections.singletonMap("json", json))
+                    .withStreamKey(NOTIFY_STREAM_TOPIC_KEY);
+
+            stringRedisTemplate.opsForStream().add(record);
+            log.info("已发送违规通知事件: {}", event.getFullShortUrl());
+
+        } catch (Exception e) {
+            log.error("发送违规通知失败", e);
         }
     }
 
@@ -75,7 +108,7 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
         // C. 发送 Redis Pub/Sub 广播消息，清除所有节点的本地 Caffeine 缓存 (L1)
         try {
             // 注意：这里使用的是 Redis 的 convertAndSend，不是 RocketMQ
-            stringRedisTemplate.convertAndSend(CHANNEL_TOPIC, shortLinkRiskEvent.getFullShortUrl());
+            stringRedisTemplate.convertAndSend(CHANNEL_TOPIC_KEY, shortLinkRiskEvent.getFullShortUrl());
             log.info("[Redis] 已发送缓存清除广播: {}", shortLinkRiskEvent.getFullShortUrl());
         } catch (Exception e) {
             log.error("[Redis] 风控封禁广播发送失败", e);

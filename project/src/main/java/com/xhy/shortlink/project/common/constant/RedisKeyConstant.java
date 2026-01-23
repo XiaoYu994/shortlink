@@ -67,7 +67,7 @@ public class RedisKeyConstant {
     /*
      * 清除缓存广播频道
      * */
-    public static final String CHANNEL_TOPIC = "short-link:cache-invalidate:topic";
+    public static final String CHANNEL_TOPIC_KEY = "short-link:cache-invalidate:topic";
 
     /*
      * AI 风控检测 Topic 缓存标识
@@ -78,4 +78,15 @@ public class RedisKeyConstant {
      * AI 风控检测 Group 缓存标识
      * */
     public static final String RISK_CHECK_STREAM_GROUP_KEY = "short-link:risk-stream:only-group";
+
+
+    /*
+     * 发送风控通知 topic 缓存标识
+     * */
+    public static final String NOTIFY_STREAM_TOPIC_KEY = "short-link:notify-stream";
+
+    /*
+     * 发送风控通知 group 缓存标识
+     * */
+    public static final String NOTIFY_STREAM_Group_KEY = "short-link:notify-stream:only-group";
 }

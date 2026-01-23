@@ -33,11 +33,12 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
                         你是一个资深网络安全专家（Cybersecurity Analyst）。
                         你的核心任务是根据用户提供的【URL特征】和【网页内容摘要】，判断该链接是否存在安全风险。
                         
-                        请重点识别以下风险类型：
+                        如果发现风险，请严格按照以下分类进行归类 (riskType)：
                         1. PHISHING (网络钓鱼)：伪造银行、支付、社交账号登录页。
-                        2. GAMBLING (非法赌博)：涉及真钱博彩、在线赌场。
-                        3. PORN (色情低俗)：包含露骨色情内容。
-                        4. SCAM (诈骗/杀猪盘)：虚假投资、刷单、中奖欺诈。
+                        2. GAMBLING (非法赌博)：涉及真钱博彩、在线赌场、六合彩。
+                        3. PORN (色情低俗)：包含露骨色情内容、招嫖信息。
+                        4. SCAM (诈骗/杀猪盘)：虚假投资、刷单、中奖欺诈、贷款诈骗。
+                        5. OTHER (其他违规)：政治敏感、暴力恐怖等。
                         
                         请务必以 JSON 格式输出结果。
                         """)
@@ -48,10 +49,10 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     public ShortLinkRiskCheckRespDTO checkUrlRisk(String url) {
         // 1. 【前置规则】本地黑名单/白名单快速过滤 (省钱 + 提速)
         if (isWhiteList(url)) {
-            return buildSafeResponse("WhiteList Domain");
+            return buildSafeResponse("白名单域名");
         }
         if (isBlackListPattern(url)) {
-            return buildRiskResponse("PHISHING", "Hit local keyword blacklist (Suspicious Domain Pattern)");
+            return buildRiskResponse("PHISHING", "疑似钓鱼网址", "命中本地黑名单关键词规则 (Suspicious Pattern)");
         }
 
         // 2. 【数据获取】抓取网页内容 (作为 AI 的“眼睛”)
@@ -63,7 +64,7 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
             // 某些钓鱼网站存活时间极短，无法访问往往意味着风险
             if (isSuspiciousConnectionError(e)) {
                 log.warn("网页访问异常，结合域名特征判黑。URL: {}, Error: {}", url, e.getClass().getSimpleName());
-                return buildRiskResponse("SUSPICIOUS_ACCESS", "Website inaccessible (Potential Dead Phishing Link)");
+                return buildRiskResponse("SUSPICIOUS", "网站无法访问", "访问超时或域名不存在，疑似快闪钓鱼站");
             }
             // 普通超时，标记为无法获取内容，仅让 AI 分析 URL 本身
             pageContent = "[System Warning] Content fetch failed: " + e.getMessage();
@@ -95,12 +96,11 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
                 2. 检查网页文本是否包含敏感词（如“充值”、“提现”、“性感荷官”、“账号解冻”）。
                 3. 如果网页内容缺失（显示 System Warning），仅根据 URL 结构进行风险评估。
                 
-                返回 JSON:
-                {
-                    "safe": boolean,
-                    "riskType": "NONE" | "PHISHING" | "GAMBLING" | "PORN" | "SCAM" | "WARNING",
-                    "description": "简要说明风险点"
-                }
+                请返回 JSON 格式，包含以下字段：
+                1. "safe": boolean (是否安全)
+                2. "riskType": string (从 PHISHING, GAMBLING, PORN, SCAM, OTHER, NONE 中选择)
+                3. "summary": string (给用户看的简短通知，必须中文，不超过10个字。例如："涉及网络赌博"、"疑似诈骗网站")
+                4. "detail": string (详细的风控推理过程，说明判断依据)
                 """.formatted(url, StringUtils.truncate(pageContent, MAX_ANALYSIS_CHARS));
 
         // 使用 .entity() 自动映射回 Java 对象
@@ -134,15 +134,15 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
         // 当错误信息包含 "DataInspectionFailed" 时，说明内容极度违规（色情/涉政），AI 拒绝生成
         if (e.getMessage() != null && e.getMessage().contains("DataInspectionFailed")) {
             log.warn("AI 平台内容安全风控拦截 (确认为高危链接)。URL: {}", url);
-            return buildRiskResponse("RISK_BY_PLATFORM", "AI Content Safety Filter Triggered (High Risk)");
+            return buildRiskResponse("HIGH_RISK", "严重违规内容", "AI 平台触发内容安全风控拦截 (DataInspectionFailed)");
         }
 
         // 其他异常（如网络超时、Token不足），执行 Fail-Open（默认放行）策略，避免阻塞业务
         log.error("AI 服务调用异常，执行降级放行策略。URL: {}, Error: {}", url, e.getMessage());
         return ShortLinkRiskCheckRespDTO.builder()
                 .safe(true) // 降级放行
-                .riskType("UNKNOWN")
-                .description("Service Unavailable (Fallback)")
+                .summary("系统审核中")
+                .detail("AI 服务暂时不可用: " + e.getMessage())
                 .build();
     }
 
@@ -166,10 +166,20 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     }
 
     private ShortLinkRiskCheckRespDTO buildSafeResponse(String desc) {
-        return ShortLinkRiskCheckRespDTO.builder().safe(true).riskType("NONE").description(desc).build();
+        return ShortLinkRiskCheckRespDTO.builder()
+                .safe(true)
+                .riskType("NONE")
+                .summary("正常")
+                .detail(desc)
+                .build();
     }
 
-    private ShortLinkRiskCheckRespDTO buildRiskResponse(String type, String desc) {
-        return ShortLinkRiskCheckRespDTO.builder().safe(false).riskType(type).description(desc).build();
+    private ShortLinkRiskCheckRespDTO buildRiskResponse(String type, String summary, String detail) {
+        return ShortLinkRiskCheckRespDTO.builder()
+                .safe(false)
+                .riskType(type)
+                .summary(summary) // 给用户看
+                .detail(detail)   // 给管理员看
+                .build();
     }
 }

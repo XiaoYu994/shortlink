@@ -218,4 +218,16 @@ CREATE TABLE `t_user`  (
   UNIQUE INDEX `idx_unique_username`(`username` ASC) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE `t_user_notification` (
+                                       `id` bigint NOT NULL COMMENT 'ID',
+                                       `user_id` bigint DEFAULT NULL COMMENT '用户ID',
+                                       `type` tinyint(1) DEFAULT NULL COMMENT '通知类型: 0-系统通知 1-违规提醒',
+                                       `title` varchar(64) DEFAULT NULL COMMENT '标题',
+                                       `content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '内容',
+                                       `read_flag` tinyint(1) DEFAULT '0' COMMENT '是否已读: 0-未读 1-已读',
+                                       `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+                                       PRIMARY KEY (`id`),
+                                       KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表';
+
 SET FOREIGN_KEY_CHECKS = 1;
