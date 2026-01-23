@@ -1,86 +1,86 @@
-# 数据源集合
+# 1. 必填：逻辑库名
+databaseName: admin_db
+
+# 2. 必填：运行模式 (5.4.x 强制要求)
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+# 3. 数据源
 dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    # 注意：这里请确认你的数据库名是 link 还是其他的？
+    # 如果 user 表在 link 库，就用 link；如果在单独的库，请修改这里
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
     password: root
 
 rules:
+  # ===========================
+  # 分片规则 (Sharding)
+  # ===========================
   - !SHARDING
     tables:
+      # 用户表分片
       t_user:
-        # 真实数据节点，比如数据库源以及数据库在数据库中真实存在的
         actualDataNodes: ds_0.t_user_${0..15}
-        # 分表策略
         tableStrategy:
-          # 用于单分片键的标准分片场景
           standard:
-            # 分片键
             shardingColumn: username
-            # 分片算法，对应 rules[0].shardingAlgorithms
-            shardingAlgorithmName: user_table_hash_mod
+            shardingAlgorithmName: user_table_inline # 改个名字区分
+      # 分组表分片
       t_group:
-        # 真实数据节点，比如数据库源以及数据库在数据库中真实存在的
         actualDataNodes: ds_0.t_group_${0..15}
-        # 分表策略
         tableStrategy:
-          # 用于单分片键的标准分片场景
           standard:
-            # 分片键
             shardingColumn: username
-            # 分片算法，对应 rules[0].shardingAlgorithms
-            shardingAlgorithmName: group_table_hash_mod
-    # 分片算法
+            shardingAlgorithmName: group_table_inline # 改个名字区分
+
     shardingAlgorithms:
-      # 数据表分片算法
-      user_table_hash_mod:
-        # 根据分片键 Hash 分片
-        type: HASH_MOD
-        # 分片数量
+      # ✅ 核心修复：使用 INLINE 算法处理字符串 Hash
+      # 也就是对 username 进行 hashCode 取绝对值，然后对 16 取模
+      user_table_inline:
+        type: INLINE
         props:
-          sharding-count: 16
-      # 数据表分片算法
-      group_table_hash_mod:
-        # 根据分片键 Hash 分片
-        type: HASH_MOD
-        # 分片数量
+          algorithm-expression: t_user_${Math.abs(username.hashCode()) % 16}
+
+      group_table_inline:
+        type: INLINE
         props:
-          sharding-count: 16
-  # 数据加密存储规则
+          algorithm-expression: t_group_${Math.abs(username.hashCode()) % 16}
+
+  # ===========================
+  # 加密规则 (Encrypt) - 5.4.1 新语法
+  # ===========================
   - !ENCRYPT
-    # 需要加密的表集合
     tables:
-      # 用户表
       t_user:
-        # 用户表中哪些字段需要进行加密
         columns:
-          # 手机号字段，逻辑字段，不一定是在数据库中真实存在
           phone:
-            # 手机号字段存储的密文字段，这个是数据库中真实存在的字段
-            cipherColumn: phone
-            # 字段加密算法
-            encryptorName: common_encryptor
-          # 邮箱字段
+            # 5.4.x 写法变了：cipher 是一个对象
+            cipher:
+              name: phone # 数据库里真实的列名
+              encryptorName: common_encryptor
           mail:
-            cipherColumn: mail
-            encryptorName: common_encryptor
-          # 密码字段
-#          password:
-#            cipherColumn: password
-#            encryptorName: common_encryptor
-        # 是否按照密文字段查询
-        queryWithCipherColumn: true
-    # 加密算法
+            cipher:
+              name: mail
+              encryptorName: common_encryptor
+
     encryptors:
-      # 自定义加密算法名称
       common_encryptor:
-        # 加密算法类型
         type: AES
         props:
-          # AES 加密密钥
           aes-key-value: d6oadCl789rrb9A3GWo
-# 展现逻辑 SQL & 真实 SQL
+  # 添加单表加载规则
+  - !SINGLE
+    tables:
+      # 语法：*.* 代表“加载所有未被分片的表”
+      # ShardingSphere 会自动扫描 ds_0，发现 t_link_access_stats 并加载它
+      - "*.*"
+    # 指定默认数据源（当存在多个数据源时必填，单个数据源时可选但建议加上）
+    defaultDataSource: ds_0
 props:
   sql-show: true

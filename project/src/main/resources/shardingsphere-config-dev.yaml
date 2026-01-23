@@ -1,4 +1,9 @@
-# 数据源集合
+databaseName: link_db
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
 dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
@@ -10,37 +15,55 @@ dataSources:
 rules:
   - !SHARDING
     tables:
-      t_link: # 短链接表
-        # 真实数据节点，比如数据库源以及数据库在数据库中真实存在的
+      t_link:
+        # 你的真实表是 t_link_0 ... t_link_15
         actualDataNodes: ds_0.t_link_${0..15}
-        # 分表策略
         tableStrategy:
-          # 用于单分片键的标准分片场景
           standard:
-            # 分片键
             shardingColumn: gid
-            # 分片算法，对应 rules[0].shardingAlgorithms
-            shardingAlgorithmName: link_table_hash_mod
-      t_link_goto: # 路由表
+            shardingAlgorithmName: t_link_mod
+      t_link_goto:
         actualDataNodes: ds_0.t_link_goto_${0..15}
         tableStrategy:
           standard:
             shardingColumn: full_short_url
-            shardingAlgorithmName: linkGoto_table_hash_mod
-    # 分片算法
+            shardingAlgorithmName: t_link_goto_mod
+      # 分组表分片
+      t_group:
+        actualDataNodes: ds_0.t_group_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: group_table_inline # 改个名字区分
+
     shardingAlgorithms:
-      # 短链接表分片算法
-      link_table_hash_mod:
-        # 根据分片键 Hash 分片
-        type: HASH_MOD
-        # 分片数量
+      # ✅ 修正点：使用 MOD 算法，而不是 HASH_MOD
+      # HASH_MOD 是先哈希再取模，MOD 是直接取模 (如果你 gid 是数字)
+      # 如果 gid 是字符串，必须用 INLINE 配合 groovy 脚本
+
+      # 假设你的 gid 是 long 类型，或者你想用简单的 hash 取模：
+      t_link_mod:
+        type: INLINE
         props:
-          sharding-count: 16
-      # 路由表分片算法
-      linkGoto_table_hash_mod:
-        type: HASH_MOD
+          algorithm-expression: t_link_${Math.abs(gid.hashCode()) % 16}
+
+      t_link_goto_mod:
+        type: INLINE
         props:
-          sharding-count: 16
-# 展现逻辑 SQL & 真实 SQL
+          algorithm-expression: t_link_goto_${Math.abs(full_short_url.hashCode()) % 16}
+
+      group_table_inline:
+        type: INLINE
+        props:
+          algorithm-expression: t_group_${Math.abs(username.hashCode()) % 16}
+  # 添加单表加载规则
+  - !SINGLE
+    tables:
+      # 语法：*.* 代表“加载所有未被分片的表”
+      # ShardingSphere 会自动扫描 ds_0，发现 t_link_access_stats 并加载它
+      - "*.*"
+    # 指定默认数据源（当存在多个数据源时必填，单个数据源时可选但建议加上）
+    defaultDataSource: ds_0
+
 props:
   sql-show: true
