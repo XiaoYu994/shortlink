@@ -13,6 +13,8 @@ import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRecoverReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRemoveReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinSaveReqDTO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkRecycleBinPageRespDTO;
+import com.xhy.shortlink.project.mq.event.ShortLinkRiskEvent;
+import com.xhy.shortlink.project.mq.producer.ShortLinkMessageProducer;
 import com.xhy.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -28,6 +30,7 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SH
 @RequiredArgsConstructor
 public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements RecycleBinService {
     private final StringRedisTemplate stringRedisTemplate;
+    private final ShortLinkMessageProducer<ShortLinkRiskEvent> riskProducer;
 
     @Override
     public void recycleBinSave(ShortLinkRecycleBinSaveReqDTO requestParam) {
@@ -59,6 +62,8 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
         baseMapper.update(ShortLinkDO.builder().enableStatus(0).build(), updateWrapper);
         // 删除对应的缓存 空值
         stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+        // 加入 AI 检测
+        riskProducer.send(BeanUtil.toBean(requestParam, ShortLinkRiskEvent.class));
     }
 
     @Override

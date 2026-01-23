@@ -779,9 +779,9 @@ const toRecycleBin = (data) => {
 }
 // 回收站中恢复
 const recoverLink = (data) => {
-  const { gid, fullShortUrl } = data
+  const { gid, fullShortUrl,originUrl } = data
   API.smallLinkPage
-    .recoverLink({ gid, fullShortUrl })
+    .recoverLink({ gid, originUrl,fullShortUrl})
     .then((res) => {
       ElMessage.success('恢复成功')
       queryRecycleBinPage()
