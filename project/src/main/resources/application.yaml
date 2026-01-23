@@ -49,7 +49,7 @@ short-link:
       amap-key: 23ea4562d80a83d1dd47922b4913d5e0
   goto-domain:
     white-list:
-      enable: true
+      enable: false
       names: '拿个offer,知乎,掘金,博客园,github'
       details:
         - nageoffer.com
@@ -73,10 +73,7 @@ mybatis-plus:
 rocketmq:
   name-server: 127.0.0.1:9876
   producer:
-    group: short-link_project-service_stats-save_pg
-    topic: short-link_project-service_topic
+    group: short-link-producer-group # 必须配置一个默认的生产者组
     send-message-timeout: 2000
     retry-times-when-send-failed: 1
     retry-times-when-send-async-failed: 1
-  consumer:
-    group: short-link_project-service_stats-save_cg

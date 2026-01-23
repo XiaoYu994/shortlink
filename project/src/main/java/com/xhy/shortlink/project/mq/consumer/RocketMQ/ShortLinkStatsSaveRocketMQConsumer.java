@@ -1,4 +1,4 @@
-package com.xhy.shortlink.project.mq.consumer;
+package com.xhy.shortlink.project.mq.consumer.RocketMQ;
 
 
 import cn.hutool.core.date.DateUtil;
@@ -12,34 +12,41 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
-import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
+import com.xhy.shortlink.project.mq.event.ShortLinkStatsRecordEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.LOCK_GID_UPDATE_KEY;
+import static com.xhy.shortlink.project.common.constant.RocketMQConstant.STATIC_GROUP;
+import static com.xhy.shortlink.project.common.constant.RocketMQConstant.STATIC_TOPIC;
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
 
 /*
- * 短链接监控状态保存消息队列消费者 Redis Stream实现
+ * 短链接监控状态保存消息队列消费者 RocketMQ实现
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "short-link.message-queue.implement", havingValue = "Redis")
-public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, MapRecord<String,String,String>> {
+@ConditionalOnProperty(name = "short-link.message-queue.implement", havingValue = "RocketMQ")
+@RocketMQMessageListener(
+        topic = STATIC_TOPIC,
+        consumerGroup = STATIC_GROUP
+)
+public class ShortLinkStatsSaveRocketMQConsumer implements RocketMQListener<ShortLinkStatsRecordEvent> {
     private final RedissonClient redissonClient;
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkGoToMapper shortLinkGoToMapper;
@@ -50,41 +57,32 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
-    private final StringRedisTemplate stringRedisTemplate;
-    private final MessageQueueIdempotentHandler  messageQueueIdempotentHandler;
-
+    private final MessageQueueIdempotentHandler messageQueueIdempotentHandler;
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
 
     @Override
-    public void onMessage(MapRecord<String, String, String> message) {
-        final String stream = message.getStream();
-        final RecordId messageId = message.getId();
-        // 如果被消费
-        if(messageQueueIdempotentHandler.isMessageBeingConsumed(messageId.toString())) {
-            // 消息执行完成
-            if(messageQueueIdempotentHandler.isAccomplish(messageId.toString())) {
+    public void onMessage(ShortLinkStatsRecordEvent event) {
+        String keys = event.getFullShortUrl();
+        if (messageQueueIdempotentHandler.isMessageBeingConsumed(keys)) {
+            // 判断当前的这个消息流程是否执行完成
+            if (messageQueueIdempotentHandler.isAccomplish(keys)) {
                 return;
             }
             throw new ServiceException("消息未完成流程，需要消息队列重试");
         }
         try {
-            final Map<String, String> proudcerMap = message.getValue();
-            final ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(proudcerMap.get("statsRecord"), ShortLinkStatsRecordDTO.class);
-            actualSaveShortLinkStats(statsRecord);
-            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId.getValue());
-        } catch (Throwable e){
-            // 某某某情况宕机了
-            messageQueueIdempotentHandler.delMessageProcessed(messageId.toString());
-            log.error("消息消费失败", e);
-            throw e;
+            actualSaveShortLinkStats(event);
+        } catch (Throwable ex) {
+            // 删除幂等标识
+            messageQueueIdempotentHandler.delMessageProcessed(keys);
+            log.error("记录短链接监控消费异常", ex);
+            throw ex;
         }
-        // 设置消息流程执行完成
-        messageQueueIdempotentHandler.setAccomplish(messageId.toString());
-
+        messageQueueIdempotentHandler.setAccomplish(keys);
     }
 
-    private void actualSaveShortLinkStats(ShortLinkStatsRecordDTO statsRecord) {
+    private void actualSaveShortLinkStats(ShortLinkStatsRecordEvent statsRecord) {
         String fullShortUrl = statsRecord.getFullShortUrl();
         RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, fullShortUrl));
         RLock rLock = readWriteLock.readLock();
@@ -94,7 +92,7 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
             LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
-           String gid = shortLinkGotoDO.getGid();
+            String gid = shortLinkGotoDO.getGid();
             Date currentDate = statsRecord.getCurrentDate();
             int hour = DateUtil.hour(currentDate, true);
             Week week = DateUtil.dayOfWeekEnum(currentDate);
@@ -182,7 +180,7 @@ public class ShortLinkStatsRedisSaveConsumer implements StreamListener<String, M
                 // 短链接访问统计数据自增
                 shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
             }
-        }  finally {
+        } finally {
             rLock.unlock();
         }
 

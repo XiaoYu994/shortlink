@@ -63,4 +63,19 @@ public class RedisKeyConstant {
     * 分布式锁创建短链接
     * */
     public static final String SHORT_LINK_CREATE_LOCK_KEY =  "short-link:create-lock";
+
+    /*
+     * 清除缓存广播频道
+     * */
+    public static final String CHANNEL_TOPIC = "short-link:cache-invalidate:topic";
+
+    /*
+     * AI 风控检测 Topic 缓存标识
+     * */
+    public static final String RISK_CHECK_STREAM_TOPIC_KEY = "short-link:risk-stream";
+
+    /*
+     * AI 风控检测 Group 缓存标识
+     * */
+    public static final String RISK_CHECK_STREAM_GROUP_KEY = "short-link:risk-stream:only-group";
 }

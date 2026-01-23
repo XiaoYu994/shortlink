@@ -1,4 +1,4 @@
-package com.xhy.shortlink.project.dto.biz;
+package com.xhy.shortlink.project.mq.event;
 
 
 import lombok.AllArgsConstructor;
@@ -9,13 +9,13 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 /*
- * 短链接统计实体
+ * 短链接统计事件
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShortLinkStatsRecordDTO {
+public class ShortLinkStatsRecordEvent {
 
     /**
      * 完整短链接
@@ -61,12 +61,6 @@ public class ShortLinkStatsRecordDTO {
      * UIP访问标识
      */
     private Boolean uipFirstFlag;
-
-    /**
-     * 消息队列唯一标识
-     */
-    private String keys;
-
 
     /**
      * 当前时间

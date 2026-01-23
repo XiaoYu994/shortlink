@@ -4,9 +4,9 @@ import com.xhy.shortlink.project.dto.resp.ShortLinkRiskCheckRespDTO;
 
 public interface UrlRiskControlService {
     /**
-     * Check if the URL is safe.
-     * @param url The URL to check
-     * @return Risk check result
+     * 检测 URL 是否合法
+     * @param url 创建的原始链接
+     * @return 检测的结果
      */
     ShortLinkRiskCheckRespDTO checkUrlRisk(String url);
 }

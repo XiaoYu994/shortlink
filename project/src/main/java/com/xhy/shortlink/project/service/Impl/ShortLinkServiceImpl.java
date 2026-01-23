@@ -5,7 +5,6 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
-import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -21,13 +20,14 @@ import com.xhy.shortlink.project.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.project.dao.event.UpdateFaviconEvent;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
-import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.project.dto.resp.*;
-import com.xhy.shortlink.project.mq.ShortLinkStatsMessageProducer;
+import com.xhy.shortlink.project.mq.event.ShortLinkRiskEvent;
+import com.xhy.shortlink.project.mq.event.ShortLinkStatsRecordEvent;
+import com.xhy.shortlink.project.mq.producer.ShortLinkMessageProducer;
 import com.xhy.shortlink.project.service.ShortLinkService;
 import com.xhy.shortlink.project.toolkit.HashUtil;
 import com.xhy.shortlink.project.toolkit.LinkUtil;
@@ -39,9 +39,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.producer.SendCallback;
-import org.apache.rocketmq.client.producer.SendResult;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
@@ -76,18 +73,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     // 1. 注入事件发布器
     private final ApplicationEventPublisher eventPublisher;
     // mq
-    private final ShortLinkStatsMessageProducer ShortLinkStatsMessageProducer;
+    // 1. 专门发监控统计的
+    private final ShortLinkMessageProducer<ShortLinkStatsRecordEvent> statsProducer;
+    // 2. 专门发缓存清除的
+    private final ShortLinkMessageProducer<String> cacheProducer;
+    // 3. 专门发 AI 风控的
+    private final ShortLinkMessageProducer<ShortLinkRiskEvent> riskProducer;
     // 验证白名单
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
 
     // 注入 Caffeine 缓存
     private final Cache<String, String> shortLinkCache;
-
-    // 注入 RocketMQ 模板
-    private final RocketMQTemplate rocketMQTemplate;
-
-    // 定义 Topic
-    private final String CACHE_INVALIDATE_TOPIC = "short_link_cache_invalidate_topic";
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -108,8 +104,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
             if (redirectUrl != null) {
                 // 统计监控并跳转
-                ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-                shortLinkStats(statsRecord);
+                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
                 ((HttpServletResponse) response).sendRedirect(redirectUrl);
                 return;
             }
@@ -125,8 +120,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             shortLinkCache.put(key, originalLinkComposite);
             String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
             if (redirectUrl != null) {
-                ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-                shortLinkStats(statsRecord);
+                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
                 ((HttpServletResponse) response).sendRedirect(redirectUrl);
                 return;
             }
@@ -160,8 +154,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 // 锁内的解析和续期（防止在等待锁的过程中别人已经查好放入缓存了）
                 String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
                 if (redirectUrl != null) {
-                    ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-                    shortLinkStats(statsRecord);
+                    statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
                     ((HttpServletResponse) response).sendRedirect(redirectUrl);
                     return;
                 }
@@ -209,8 +202,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
             // 加入本地缓存
             shortLinkCache.put(key, cacheValue);
-            ShortLinkStatsRecordDTO statsRecord = buildLinkStatsRecordDTO(fullShortUrl, request, response);
-            shortLinkStats(statsRecord);
+            statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
         } finally {
             lock.unlock();
@@ -218,7 +210,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
     // 构造短链接访问统计参数
-    private ShortLinkStatsRecordDTO buildLinkStatsRecordDTO(String fullShortUrl, ServletRequest request, ServletResponse response) {
+    private ShortLinkStatsRecordEvent buildLinkStatsRecordDTO(String fullShortUrl, ServletRequest request, ServletResponse response) {
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
         Cookie[] cookies = ((HttpServletRequest) request).getCookies();
             AtomicReference<String> uv = new AtomicReference<>();
@@ -252,7 +244,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             String browser = LinkUtil.getBrowser(((HttpServletRequest) request));
             String device = LinkUtil.getDevice(((HttpServletRequest) request));
             String network = LinkUtil.getNetwork(((HttpServletRequest) request));
-            return ShortLinkStatsRecordDTO.builder()
+            return ShortLinkStatsRecordEvent.builder()
                     .fullShortUrl(fullShortUrl)
                     .device(device)
                     .os(os)
@@ -264,16 +256,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .uvFirstFlag(uvFirstFlag.get())
                     .uv(uv.get())
                     .build();
-    }
-
-
-
-
-    public void shortLinkStats(ShortLinkStatsRecordDTO statsRecord) {
-        Map<String,String> producerMap = new HashMap<>();
-        // 序列化和反序列化要一致，不然会导致消息消费失败
-        producerMap.put("statsRecord", JSON.toJSONString(statsRecord));
-        ShortLinkStatsMessageProducer.send(producerMap);
     }
 
     /**
@@ -318,7 +300,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortlink(ShortLinkCreateReqDTO requestParam) {
-        // TODO 网络抖动导致创建两个一模一样的短链接
         // 验证短链接是否是白名单中的链接
         verificationWhitelist(requestParam.getOriginUrl());
         String suffix = generateSuffix(requestParam);
@@ -372,22 +353,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         ));
 
         // 发送 AI 风控审核消息 (异步)
-        try {
-            rocketMQTemplate.asyncSend("short_link_risk_check_topic", shortlinkDO, new SendCallback() {
-                @Override
-                public void onSuccess(SendResult sendResult) {
-                    // 发送成功，静默处理
-                }
-                @Override
-                public void onException(Throwable e) {
-                    log.error("风控消息发送失败", e);
-                    // 这里可以做补偿逻辑，或者记录日志人工处理
-                }
-            });
-        } catch (Exception e) {
-            log.error("MQ 发送异常", e);
-        }
-
+        riskProducer.send(ShortLinkRiskEvent.builder()
+                .fullShortUrl(shortlinkDO.getFullShortUrl())
+                .originUrl(shortlinkDO.getOriginUrl())
+                .gid(shortlinkDO.getGid())
+                .build());
         return ShortLinkCreateRespDTO.builder()
                 .fullShortUrl("http://" + shortlinkDO.getFullShortUrl())
                 .gid(shortlinkDO.getGid())
@@ -557,6 +527,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     requestParam.getGid(), // 传入最新的 GID
                     requestParam.getOriginUrl()
             ));
+            // 发送 AI 风控审核消息 (异步)
+            riskProducer.send(ShortLinkRiskEvent.builder()
+                    .fullShortUrl(requestParam.getFullShortUrl())
+                    .originUrl(requestParam.getOriginUrl())
+                    .gid(requestParam.getGid())
+                    .build());
         }
         //直接删除之前的缓存和过期的空缓存
         stringRedisTemplate.delete(Arrays.asList(
@@ -564,13 +540,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl())
         ));
         // 发送 MQ 广播消息通知清除本地 Caffeine (L1)
-        // 直接发送短链接 fullShortUrl 字符串即可
-        try {
-            rocketMQTemplate.syncSend(CACHE_INVALIDATE_TOPIC, requestParam.getFullShortUrl());
-        } catch (Exception e) {
-            // 记录日志，通常缓存删除失败可以接受最终一致性（Caffeine 设置了过期时间）
-            log.error("发送缓存失效广播消息失败", e);
-        }
+        cacheProducer.send(requestParam.getFullShortUrl());
     }
 
     @Override

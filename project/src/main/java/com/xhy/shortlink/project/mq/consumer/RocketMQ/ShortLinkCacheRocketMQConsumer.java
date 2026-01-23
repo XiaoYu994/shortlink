@@ -1,4 +1,4 @@
-package com.xhy.shortlink.project.mq.consumer;
+package com.xhy.shortlink.project.mq.consumer.RocketMQ;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
+import static com.xhy.shortlink.project.common.constant.RocketMQConstant.*;
 
 
 /*
@@ -19,11 +20,12 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SH
 @Component
 @RequiredArgsConstructor
 @RocketMQMessageListener(
-        topic = "short_link_cache_invalidate_topic", // 监听的 Topic
-        consumerGroup = "short_link_cache_invalidate_group", // 消费者组
+        topic = CACHE_INVALIDATE_TOPIC,
+        consumerGroup = CACHE_INVALIDATE_GROUP, // 消费者组
+        selectorExpression = CACHE_INVALIDATE_TAG, // 指定只接收带有这个 Tag 的消息
         messageModel = MessageModel.BROADCASTING // 设置为广播模式
 )
-public class ShortLinkStatsCacheConsumer implements RocketMQListener<String> {
+public class ShortLinkCacheRocketMQConsumer implements RocketMQListener<String> {
 
     private final Cache<String, String> caffeineCache;
 

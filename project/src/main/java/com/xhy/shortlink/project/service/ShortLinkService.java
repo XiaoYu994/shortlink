@@ -3,7 +3,6 @@ package com.xhy.shortlink.project.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
-import com.xhy.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO;
@@ -30,7 +29,7 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
 
 
     /**
-    * 创建短链接
+    * 创建短链接 布隆过滤器
     * @param requestParam 请求参数
      * @return 创建结果
     * */
@@ -70,13 +69,5 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @return 查询结果
      * */
     List<ShortLinkGroupCountRespDTO> listGroupShortlinkCount(List<String> requestParam);
-
-
-    /**
-     * 短链接统计
-     *
-     * @param shortLinkStatsRecord 短链接统计实体参数
-     */
-    void shortLinkStats(ShortLinkStatsRecordDTO shortLinkStatsRecord);
 
 }
