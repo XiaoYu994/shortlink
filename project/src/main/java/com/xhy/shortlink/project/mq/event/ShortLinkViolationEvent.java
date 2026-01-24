@@ -21,4 +21,5 @@ public class ShortLinkViolationEvent {
     private String reason;       // 违规原因 (色情/赌博等)
     private LocalDateTime time;  // 违规时间
     private Long userId; // 用户 id
+    private String eventId; // 消息幂等 id
 }

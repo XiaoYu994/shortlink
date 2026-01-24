@@ -49,6 +49,11 @@ public class UserNotificationDO {
      */
     private Integer readFlag;
 
+    /*
+    *  消息幂等 id
+    * */
+    private String eventId;
+
     /**
      * 创建时间
      * (配合 MyBatisPlus 自动填充使用，或者手动 set)

@@ -246,6 +246,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             String device = LinkUtil.getDevice(((HttpServletRequest) request));
             String network = LinkUtil.getNetwork(((HttpServletRequest) request));
             return ShortLinkStatsRecordEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
                     .fullShortUrl(fullShortUrl)
                     .device(device)
                     .os(os)
@@ -355,6 +356,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 发送 AI 风控审核消息 (异步)
         riskProducer.send(ShortLinkRiskEvent.builder()
+                .eventId(UUID.randomUUID().toString())
                 .fullShortUrl(shortlinkDO.getFullShortUrl())
                 .originUrl(shortlinkDO.getOriginUrl())
                 .gid(shortlinkDO.getGid())
@@ -531,6 +533,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ));
             // 发送 AI 风控审核消息 (异步)
             riskProducer.send(ShortLinkRiskEvent.builder()
+                     .eventId(UUID.randomUUID().toString())
                     .fullShortUrl(requestParam.getFullShortUrl())
                     .originUrl(requestParam.getOriginUrl())
                     .gid(requestParam.getGid())

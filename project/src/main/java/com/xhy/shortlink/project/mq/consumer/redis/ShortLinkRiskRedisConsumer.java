@@ -2,8 +2,11 @@ package com.xhy.shortlink.project.mq.consumer.redis;
 
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xhy.shortlink.project.common.convention.exception.ServiceException;
+import com.xhy.shortlink.project.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.project.dto.resp.ShortLinkRiskCheckRespDTO;
+import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
 import com.xhy.shortlink.project.mq.event.ShortLinkRiskEvent;
 import com.xhy.shortlink.project.mq.event.ShortLinkViolationEvent;
 import com.xhy.shortlink.project.service.ShortLinkService;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
 
@@ -33,32 +37,55 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
     private final UrlRiskControlService riskControlService;
     private final ShortLinkService shortLinkService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final MessageQueueIdempotentHandler messageQueueIdempotentHandler;
+
 
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
         String streamId = message.getId().toString();
+        final Map<String, String> proudcerMap = message.getValue();
+        final ShortLinkRiskEvent event = JSON.parseObject(proudcerMap.get("json"), ShortLinkRiskEvent.class);
+        String messageId = event.getEventId();
+        if (messageQueueIdempotentHandler.isMessageBeingConsumed(messageId)) {
+            // 判断当前的这个消息流程是否执行完成
+            if (messageQueueIdempotentHandler.isAccomplish(messageId)) {
+                return;
+            }
+            throw new ServiceException("消息未完成流程，需要消息队列重试");
+        }
         try {
-            final Map<String, String> proudcerMap = message.getValue();
-            final ShortLinkRiskEvent shortLinkRiskEvent = JSON.parseObject(proudcerMap.get("json"), ShortLinkRiskEvent.class);
-            log.info("[Redis] 开始对短链接进行 AI 风控审核: {}", shortLinkRiskEvent.getFullShortUrl());
 
+            log.info("[Redis] 开始对短链接进行 AI 风控审核: {}", event.getFullShortUrl());
+            // 如果该链接已经被标记为“禁用/封禁”，说明之前的风控已经生效，直接跳过，别浪费 AI Token
+            ShortLinkDO shortLinkDO = shortLinkService.getOne(Wrappers.<ShortLinkDO>lambdaQuery()
+                    .eq(ShortLinkDO::getGid, event.getGid())
+                    .eq(ShortLinkDO::getFullShortUrl, event.getFullShortUrl())
+                    .select(ShortLinkDO::getEnableStatus)); // 只查状态字段，效率高
+            if (shortLinkDO != null && shortLinkDO.getEnableStatus() == LinkEnableStatusEnum.BANNED.getEnableStatus()) {
+                log.info("⚠️ 该链接已被封禁，跳过 AI 检测: {}", event.getFullShortUrl());
+                // 标记为完成，防止下次重复消费
+                messageQueueIdempotentHandler.setAccomplish(messageId);
+                return;
+            }
             // 2. 调用 AI 进行检测
-            ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(shortLinkRiskEvent.getOriginUrl());
+            ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(event.getOriginUrl());
 
             // 3. 如果 AI 判定为不安全
             if (!result.isSafe()) {
-                log.warn("⚠️ [Redis] 发现违规链接！URL: {}, 原因: {}", shortLinkRiskEvent.getFullShortUrl(), result.getDetail());
+                log.warn("⚠️ [Redis] 发现违规链接！URL: {}, 原因: {}", event.getFullShortUrl(), result.getDetail());
                 // 4. 封禁处理
-                disableLink(shortLinkRiskEvent);
+                disableLink(event);
                 // 5. 发送违规通知事件
-                sendViolationNotification(shortLinkRiskEvent, result.getSummary());
+                sendViolationNotification(event, result.getSummary());
             } else {
-                log.info("✅ [Redis] AI 审核通过: {}", shortLinkRiskEvent.getFullShortUrl());
+                log.info("✅ [Redis] AI 审核通过: {}", event.getFullShortUrl());
             }
             // 手动 ack
             stringRedisTemplate.opsForStream().acknowledge(RISK_CHECK_STREAM_GROUP_KEY, message);
+            messageQueueIdempotentHandler.setAccomplish(messageId);
         } catch (Exception e) {
             // Redis Stream 消费异常如果不捕获，可能会导致线程池异常，建议捕获
+            messageQueueIdempotentHandler.delMessageProcessed(messageId);
             log.error("[Redis] 风控消费异常, StreamId: {}", streamId, e);
             //  进阶思考：这里是否要 ACK？
             // 1. 如果你希望异常后【不重试】，在这里也加上 ACK。
@@ -73,6 +100,7 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
     private void sendViolationNotification(ShortLinkRiskEvent event, String reason) {
         try {
             ShortLinkViolationEvent violationEvent = ShortLinkViolationEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
                     .fullShortUrl(event.getFullShortUrl())
                     .gid(event.getGid())
                     .reason(reason)

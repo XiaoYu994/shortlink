@@ -22,7 +22,6 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
@@ -58,31 +57,31 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
 
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
+        final Map<String, String> proudcerMap = message.getValue();
+        final ShortLinkStatsRecordEvent statsRecord = JSON.parseObject(proudcerMap.get("json"), ShortLinkStatsRecordEvent.class);
         final String stream = message.getStream();
-        final RecordId messageId = message.getId();
-        // 如果被消费
-        if(messageQueueIdempotentHandler.isMessageBeingConsumed(messageId.toString())) {
-            // 消息执行完成
-            if(messageQueueIdempotentHandler.isAccomplish(messageId.toString())) {
-                return;
-            }
-            throw new ServiceException("消息未完成流程，需要消息队列重试");
-        }
+        final String messageId = statsRecord.getEventId();
+
         try {
-            // 2. 直接获取对象 (Spring 已经帮你反序列化好了)
-            final Map<String, String> proudcerMap = message.getValue();
-            final ShortLinkStatsRecordEvent statsRecord = JSON.parseObject(proudcerMap.get("json"), ShortLinkStatsRecordEvent.class);
+            // 如果被消费
+            if(messageQueueIdempotentHandler.isMessageBeingConsumed(messageId)) {
+                // 消息执行完成
+                if(messageQueueIdempotentHandler.isAccomplish(messageId)) {
+                    return;
+                }
+                throw new ServiceException("消息未完成流程，需要消息队列重试");
+            }
             actualSaveShortLinkStats(statsRecord);
-            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId.getValue());
+            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId);
             log.info("[Redis-Stream] 消费监控统计消息 ,{}", messageId);
         } catch (Throwable e){
             // 某某某情况宕机了
-            messageQueueIdempotentHandler.delMessageProcessed(messageId.toString());
+            messageQueueIdempotentHandler.delMessageProcessed(messageId);
             log.error("消息消费失败", e);
             throw e;
         }
         // 设置消息流程执行完成
-        messageQueueIdempotentHandler.setAccomplish(messageId.toString());
+        messageQueueIdempotentHandler.setAccomplish(messageId);
 
     }
 
@@ -96,7 +95,7 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
             LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                     .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
             ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
-           String gid = shortLinkGotoDO.getGid();
+            String gid = shortLinkGotoDO.getGid();
             Date currentDate = statsRecord.getCurrentDate();
             int hour = DateUtil.hour(currentDate, true);
             Week week = DateUtil.dayOfWeekEnum(currentDate);
@@ -117,74 +116,78 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
             localeParamMap.put("key",statsLocaleAmapKey);
             localeParamMap.put("ip",statsRecord.getRemoteAddr());
             // 远程调用百度接口
-            final String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
-            final JSONObject localeResultObj = JSON.parseObject(localeResultStr);
             // 根据高德接口返回结果 TODO 有问题目前
-            final String infocode = localeResultObj.getString("infocode");
             String actualProvince = "未知";
             String actualCity = "未知";
-            if(StrUtil.isNotBlank(infocode) && infocode.equals("10000")) {
-                final String province = localeResultObj.getString("province");
-                // 没有值返回的是[]
-                boolean unknownFlag = StrUtil.equals(province, "[]");
-                final LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                        .province(actualProvince = unknownFlag ? actualProvince : province)
-                        .city(actualCity = unknownFlag ? actualCity : localeResultObj.getString("city"))
-                        .adcode(unknownFlag ? "未知" : localeResultObj.getString("adcode"))
-                        .cnt(1)
-                        .fullShortUrl(fullShortUrl)
-                        .country("中国")
-                        .date(currentDate)
-                        .build();
-                linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
-                // 构造操作系统访问统计数据
-                final LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
-                        .fullShortUrl(fullShortUrl)
-                        .date(currentDate)
-                        .os(statsRecord.getOs())
-                        .cnt(1)
-                        .build();
-                linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
-                // 构造浏览器访问统计数据
-                final LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
-                        .browser(statsRecord.getBrowser())
-                        .date(currentDate)
-                        .fullShortUrl(fullShortUrl)
-                        .cnt(1)
-                        .build();
-                linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
-                // 设备访问数据统计
-                final LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
-                        .fullShortUrl(fullShortUrl)
-                        .date(currentDate)
-                        .device(statsRecord.getDevice())
-                        .cnt(1)
-                        .build();
-                linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
-                // 获取短链接访问网络统计数据
-                final LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
-                        .network(statsRecord.getNetwork())
-                        .date(currentDate)
-                        .fullShortUrl(fullShortUrl)
-                        .cnt(1)
-                        .build();
-                linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
-                // 构造短链接日志统计数据
-                final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
-                        .ip(statsRecord.getRemoteAddr())
-                        .user(statsRecord.getUv())
-                        .os(statsRecord.getOs())
-                        .browser(statsRecord.getBrowser())
-                        .fullShortUrl(fullShortUrl)
-                        .device(statsRecord.getDevice())
-                        .network(statsRecord.getNetwork())
-                        .locale(StrUtil.join("-", "中国", actualProvince, actualCity))
-                        .build();
-                linkAccessLogsMapper.insert(linkAccessLogsDO);
-                // 短链接访问统计数据自增
-                shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
+            String adcode = "未知";
+            try {
+                String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
+                JSONObject localeResultObj = JSON.parseObject(localeResultStr);
+                if ("10000".equals(localeResultObj.getString("infocode"))) {
+                    actualProvince = localeResultObj.getString("province");
+                    actualCity = localeResultObj.getString("city");
+                    adcode =  localeResultObj.getString("adcode");
+                }
+            } catch (Exception e) {
+                log.warn("IP解析失败，使用默认值", e);
             }
-        }  finally {
+            final LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
+                    .province(actualProvince)
+                    .city(actualCity )
+                    .adcode(adcode)
+                    .cnt(1)
+                    .fullShortUrl(fullShortUrl)
+                    .country("中国")
+                    .date(currentDate)
+                    .build();
+            linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
+            // 构造操作系统访问统计数据
+            final LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(currentDate)
+                    .os(statsRecord.getOs())
+                    .cnt(1)
+                    .build();
+            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
+            // 构造浏览器访问统计数据
+            final LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
+                    .browser(statsRecord.getBrowser())
+                    .date(currentDate)
+                    .fullShortUrl(fullShortUrl)
+                    .cnt(1)
+                    .build();
+            linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
+            // 设备访问数据统计
+            final LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(currentDate)
+                    .device(statsRecord.getDevice())
+                    .cnt(1)
+                    .build();
+            linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
+            // 获取短链接访问网络统计数据
+            final LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
+                    .network(statsRecord.getNetwork())
+                    .date(currentDate)
+                    .fullShortUrl(fullShortUrl)
+                    .cnt(1)
+                    .build();
+            linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
+            // 构造短链接日志统计数据
+            final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                    .ip(statsRecord.getRemoteAddr())
+                    .user(statsRecord.getUv())
+                    .os(statsRecord.getOs())
+                    .browser(statsRecord.getBrowser())
+                    .fullShortUrl(fullShortUrl)
+                    .device(statsRecord.getDevice())
+                    .network(statsRecord.getNetwork())
+                    .locale(StrUtil.join("-", "中国", actualProvince, actualCity))
+                    .build();
+            linkAccessLogsMapper.insert(linkAccessLogsDO);
+            // 短链接访问统计数据自增
+            shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
+        } finally {
             rLock.unlock();
         }
 

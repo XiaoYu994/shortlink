@@ -41,7 +41,7 @@ public class ShortLinkStaticSaveRocketMQProducer extends AbstractCommonSendProdu
                 .eventName("短链接统计消息")
                 .topic(STATIC_TOPIC)
                 .sendType(BaseSendExtendDTO.SendType.SYNC) // 同步发送消息
-                .keys(messageEvent.getFullShortUrl())
+                .keys(messageEvent.getEventId())
                 .sentTimeout(2000L)
                 .build();
     }

@@ -66,4 +66,9 @@ public class ShortLinkStatsRecordEvent {
      * 当前时间
      */
     private Date currentDate;
+
+    /*
+    *  消息 key 唯一标识
+    * */
+    private String eventId;
 }

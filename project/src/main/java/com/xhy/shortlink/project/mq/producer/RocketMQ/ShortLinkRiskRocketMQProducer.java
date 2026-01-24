@@ -54,7 +54,7 @@ public class ShortLinkRiskRocketMQProducer extends AbstractCommonSendProduceTemp
         return BaseSendExtendDTO.builder()
                 .eventName("AI风控检测")
                 .topic(RISK_CHECK_TOPIC)
-                .keys(messageEvent.getFullShortUrl())
+                .keys(messageEvent.getEventId())
                 .sendType(BaseSendExtendDTO.SendType.ASYNC) // 风控必须异步，不能卡用户创建
                 .sentTimeout(2000L)
                 .build();

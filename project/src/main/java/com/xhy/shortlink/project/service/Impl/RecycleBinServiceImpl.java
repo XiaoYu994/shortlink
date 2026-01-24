@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
 
@@ -66,6 +68,7 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
         // 加入 AI 检测
         ShortLinkRiskEvent riskEvent = BeanUtil.toBean(requestParam, ShortLinkRiskEvent.class);
         riskEvent.setUserId(Long.parseLong(UserContext.getUserId()));
+        riskEvent.setEventId(UUID.randomUUID().toString());
         riskProducer.send(riskEvent);
     }
 

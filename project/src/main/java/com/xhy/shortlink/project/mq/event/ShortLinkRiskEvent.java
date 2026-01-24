@@ -33,4 +33,9 @@ public class ShortLinkRiskEvent {
     *  用户 id 后续发送用户通知要用
     * */
     private Long userId;
+
+    /*
+    *  幂等标识
+    * */
+    private String eventId;
 }
