@@ -2,16 +2,16 @@ import axios from 'axios'
 import {getToken, getUsername} from '@/core/auth.js'
 import {isNotEmpty} from '@/utils/plugins.js'
 import router from "@/router";
+import {ElMessage} from 'element-plus'
 
-// const router = useRouter()
 const baseURL = '/api/short-link/admin/v1'
-// 创建实例
+
 const http = axios.create({
-    // api 代理为服务器请求地址
     baseURL: baseURL,
     timeout: 15000
 })
-// 请求拦截 -->在请求发送之前做一些事情
+
+// 请求拦截
 http.interceptors.request.use(
     (config) => {
         config.headers.Token = isNotEmpty(getToken()) ? getToken() : ''
@@ -22,24 +22,47 @@ http.interceptors.request.use(
         return Promise.reject(error)
     }
 )
-// 响应拦截 -->在返回结果之前做一些事情
+
+// 响应拦截
 http.interceptors.response.use(
     (res) => {
-        if (res.status == 0 || res.status == 200) {
-            // 请求成功对响应数据做处理，此处返回的数据是axios.then(res)中接收的数据
-            // code值为 0 或 200 时视为成功
-            return Promise.resolve(res)
+        if (res.status === 200) {
+            // 🔥 如果是文件流，直接返回，不校验 code
+            if (res.request.responseType === 'blob' || res.headers['content-type'].includes('application/vnd.ms-excel')) {
+                return res // 注意：这里返回完整 res，因为后面要从 headers 拿文件名
+            }
+            // 获取后端返回的 JSON 数据
+            const data = res.data
+
+            // 判断业务状态码
+            if (data.code === '0') {
+                // 🔥 优化1：直接返回 data，帮组件“剥”掉 Axios 的外壳
+                // 组件里可以直接用 res.data 拿到数据，不用 res.data.data
+                return data
+            } else {
+                // 业务失败
+                ElMessage.error(data.message || '系统繁忙，请稍后再试')
+                // 返回 reject，中断组件的 .then()
+                return Promise.reject(new Error(data.message || 'Error'))
+            }
         }
         return Promise.reject(res)
     },
     (err) => {
-        // 在请求错误时要做的事儿
-        // 此处返回的数据是axios.catch(err)中接收的数据
-        if (err.response.status === 401) {
+        // 🔥 优化2：健壮性处理。如果断网，err.response 是 undefined
+        if (err.response && err.response.status === 401) {
             localStorage.removeItem('token')
             router.push('/login')
         }
+
+        // 🔥 优化3：处理网络超时等没有 response 的情况
+        // err.response?.data?.message 是后端返回的报错
+        // err.message 是 Axios 自身的报错（如 "Network Error"）
+        const msg = err.response?.data?.message || err.message || '请求失败，请检查网络'
+
+        ElMessage.error(msg)
         return Promise.reject(err)
     }
 )
+
 export default http

@@ -5,26 +5,22 @@
         <img v-if="!isGroup" :src="getImgUrl(props.favicon)" width="25" height="25" alt="" />
         <div style="display: flex; flex-direction: column; margin-left: 5px">
           <span style="font-size: 25px; line-height: 25px; font-weight: 550">{{
-            props.title
-          }}</span>
+              props.title
+            }}</span>
           <span v-if="!isGroup" style="margin-top: 5px; font-size: 15px">{{
-            props.originUrl
-          }}</span>
+              props.originUrl
+            }}</span>
         </div>
       </div>
       <span v-if="isGroup" style="margin: 5px 0 0 5px">共{{ props.nums }}条短链接</span>
     </template>
     <div style="position: absolute; right: 30px; z-index: 999">
       <el-date-picker v-model="dateValue" :clearable="true" type="daterange" range-separator="To" start-placeholder="开始时间"
-        end-placeholder="结束时间" value-format="YYYY-MM-DD" :shortcuts="shortcuts" :size="size" />
+                      end-placeholder="结束时间" value-format="YYYY-MM-DD" :shortcuts="shortcuts" />
     </div>
-    <!-- 具体展示内容 -->
     <el-tabs v-model="showPane">
-      <!-- 切换， name用于确定展示哪个标签，和showPane对应 -->
       <el-tab-pane name="访问数据" label="访问数据">
-        <!-- 数据图表 -->
         <div class="content-box scroll-box" style="height: calc(100vh - 280px); overflow: scroll">
-          <!-- 访问曲线 -->
           <TitleContent class="chart-item" style="width: 800px" title="访问曲线" @onMounted="initLineChart">
             <template v-slot:titleButton>
               <div>
@@ -47,12 +43,10 @@
                     <span>{{ totalUip }}</span>
                   </div>
                 </div>
-                <!-- 折线图 -->
                 <div v-show="isLine" class="lineChart"></div>
-                <!-- 表格 -->
                 <div v-show="!isLine" style="padding: 20px">
                   <el-table :data="visitsData" border style="width: 100%; height: 210px; overflow: scroll"
-                    :header-cell-style="{ background: '#eef1f6', color: '#606266' }">
+                            :header-cell-style="{ background: '#eef1f6', color: '#606266' }">
                     <el-table-column prop="date" label="时间" width="160" />
                     <el-table-column prop="pv" label="访问次数" width="160" />
                     <el-table-column prop="uv" label="访问人数" width="160" />
@@ -62,10 +56,8 @@
               </div>
             </template>
           </TitleContent>
-          <!-- 地图 -->
           <TitleContent class="chart-item" style="width: 800px" title="访问地区" @onMounted="initMap">
             <template #titleButton>
-              <!-- <el-button @click="isChina = !isChina">切换为世界地图</el-button> -->
             </template>
             <template #content>
               <div class="list-chart">
@@ -73,7 +65,7 @@
                   <span style="font-size: 14px">TOP 10 省份</span>
                   <div>
                     <span v-if="!chinaMapData ?? chinaMapData?.length === 0"
-                      style="font-size: 14px; color: black; font-weight: 100">所选日期内没有访问数据</span>
+                          style="font-size: 14px; color: black; font-weight: 100">所选日期内没有访问数据</span>
                   </div>
                   <div class="top-item" v-for="(item, index) in chinaMapData" :key="item.name">
                     <div v-if="index <= 9" class="key-value">
@@ -97,7 +89,6 @@
               </div>
             </template>
           </TitleContent>
-          <!-- 24小时分布 -->
           <TitleContent class="chart-item" title="24小时分布" style="width: 800px">
             <template #content>
               <BarChart style="height: 100%; width: 100%" :chartData="{
@@ -109,13 +100,11 @@
               }"></BarChart>
             </template>
           </TitleContent>
-          <!-- 高频访问IP -->
           <TitleContent class="chart-item" title="高频访问IP" style="width: 390px">
             <template #content>
               <KeyValue :dataLists="props.info?.topIpStats" style="height: 100%; width: 100%"></KeyValue>
             </template>
           </TitleContent>
-          <!-- 一周分布 -->
           <TitleContent class="chart-item" title="一周分布" style="width: 390px">
             <template #content>
               <BarChart style="height: 100%; width: 100%" :chartData="{
@@ -125,37 +114,26 @@
             </template>
           </TitleContent>
 
-          <!-- 访问来源TOP5 -->
-          <!-- <TitleContent class="chart-item" title="访问来源 TOP5" style="width: 390px">
-            <template #content>
-              <KeyValue :data-lists="IPdataList" style="height: 100%; width: 100%;"></KeyValue>
-            </template>
-          </TitleContent> -->
-          <!-- 操作系统 -->
           <TitleContent class="chart-item" title="操作系统" style="width: 390px">
             <template #content>
               <ProgressLine style="height: 100%; width: 100%" :dataLists="props.info?.osStats"></ProgressLine>
             </template>
           </TitleContent>
-          <!-- 访问浏览器 -->
           <TitleContent class="chart-item" title="访问浏览器" style="width: 390px">
             <template #content>
               <ProgressLine style="height: 100%; width: 100%" :dataLists="props.info?.browserStats"></ProgressLine>
             </template>
           </TitleContent>
-          <!-- 访客类型 -->
           <TitleContent v-if="!isGroup" class="chart-item" title="访客类型" style="width: 390px">
             <template #content>
               <ProgressPie style="height: 100%; width: 100%" :labels="['新访客', '旧访客']" :data="userTypeList"></ProgressPie>
             </template>
           </TitleContent>
-          <!-- 访问网络 -->
           <TitleContent class="chart-item" title="访问网络" style="width: 390px">
             <template #content>
               <ProgressPie style="height: 100%; width: 100%" :labels="['WIFI', '移动数据']" :data="netWorkList"></ProgressPie>
             </template>
           </TitleContent>
-          <!-- 访问设备 -->
           <TitleContent class="chart-item" title="访问设备" style="width: 390px">
             <template #content>
               <ProgressPie style="height: 100%; width: 100%" :labels="['电脑', '移动设备']" :data="deviceList"></ProgressPie>
@@ -164,7 +142,7 @@
         </div>
       </el-tab-pane>
       <el-tab-pane name="历史记录" label="历史记录">
-        <el-table :data="tableInfo?.data?.data?.records" style="width: 100%; height: calc(100vh - 300px)">
+        <el-table :data="tableInfo?.records" style="width: 100%; height: calc(100vh - 300px)">
           <el-table-column prop="createTime" label="访问时间" width="160" />
           <el-table-column prop="ip" label="访问IP" width="140" />
           <el-table-column prop="locale" label="访客地区"> </el-table-column>
@@ -181,11 +159,10 @@
 
           <el-table-column v-if="!isGroup" prop="uvType" label="访客类型" />
         </el-table>
-        <!-- 分页器 -->
         <div class="pagination-block">
           <el-pagination v-model:current-page="pageParams.current" v-model:page-size="pageParams.size"
-            :page-sizes="[10, 15, 20, 30]" layout="total, sizes, prev, pager, next, jumper" :total="totalNums"
-            @size-change="handleSizeChange" @current-change="handleCurrentChange" />
+                         :page-sizes="[10, 15, 20, 30]" layout="total, sizes, prev, pager, next, jumper" :total="totalNums"
+                         @size-change="handleSizeChange" @current-change="handleCurrentChange" />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -335,14 +312,14 @@ const getUrl4 = (img) => {
 const dateValue = ref([getLastWeekFormatDate(), getTodayFormatDate()])
 const emit = defineEmits(['changeTime', 'changePage'])
 watch(
-  () => dateValue.value,
-  (newValue) => {
-    // 解决首次关闭数据统计页面需要点两次关闭键的bug
-    if (!newValue && !dialogVisible.value) {
-      return
+    () => dateValue.value,
+    (newValue) => {
+      // 解决首次关闭数据统计页面需要点两次关闭键的bug
+      if (!newValue && !dialogVisible.value) {
+        return
+      }
+      emit('changeTime', newValue)
     }
-    emit('changeTime', newValue)
-  }
 )
 const props = defineProps({
   title: {
@@ -362,40 +339,33 @@ const pageParams = reactive({
 })
 const totalNums = ref(0)
 watch(
-  () => props.tableInfo,
-  () => {
-    totalNums.value = props?.tableInfo?.data?.data?.total
-  }
+    () => props.tableInfo,
+    () => {
+      // 🔥🔥 核心修复：这里也是直接取 total
+      totalNums.value = +props?.tableInfo?.total || 0
+    }
 )
 watch(
-  () => pageParams,
-  (newValue) => {
-    // 解决首次关闭数据统计页面需要点两次关闭键的bug
-    if (!newValue && !dialogVisible.value) {
-      return
+    () => pageParams,
+    (newValue) => {
+      // 解决首次关闭数据统计页面需要点两次关闭键的bug
+      if (!newValue && !dialogVisible.value) {
+        return
+      }
+      emit('changePage', newValue)
+    },
+    {
+      deep: true
     }
-    emit('changePage', newValue)
-  },
-  {
-    deep: true
-  }
 )
-// const title = ref(props.title)
-// const info = ref(props.info)
 
-// watch(
-//   () => {
-//     props.info
-//   },
-//   () => {
-//     console.log(props.info, props.title)
-//     info.value = props.info
-//     title.value = props.title
-//   },
-//   {
-//     deep: true,
-//   }
-// )
+const handleSizeChange = () => {
+  // 分页大小改变逻辑，触发 watch
+}
+const handleCurrentChange = () => {
+  // 当前页改变逻辑，触发 watch
+}
+
 const dialogVisible = ref(false)
 const handleClose = () => {
   dateValue.value = null
@@ -426,21 +396,21 @@ const chinaMapData = ref([
 const chinaTotalNum = ref(0)
 // 将请求到的数据转化为中国地图中需要的数据结构
 watch(
-  () => props.info?.localeCnStats,
-  () => {
-    chinaTotalNum.value = 0
-    chinaMapData.value = props.info?.localeCnStats.map((item) => {
-      let { cnt, locale, ratio } = item
-      locale = locale.replace('省', '')
-      locale = locale.replace('市', '')
-      chinaTotalNum.value += cnt
-      return { name: locale, value: cnt, ratio }
-    })
-    initChinaMap()
-  },
-  {
-    deep: true
-  }
+    () => props.info?.localeCnStats,
+    () => {
+      chinaTotalNum.value = 0
+      chinaMapData.value = props.info?.localeCnStats.map((item) => {
+        let { cnt, locale, ratio } = item
+        locale = locale.replace('省', '')
+        locale = locale.replace('市', '')
+        chinaTotalNum.value += cnt
+        return { name: locale, value: cnt, ratio }
+      })
+      initChinaMap()
+    },
+    {
+      deep: true
+    }
 )
 // 世界地图中展示的数据
 const worldMapData = ref([
@@ -820,31 +790,31 @@ const totalUip = ref(0)
 const uipList = ref([])
 // 更新数据
 watch(
-  () => props?.info?.daily,
-  () => {
-    // 归零
-    totalPv.value = 0
-    totalUv.value = 0
-    totalUip.value = 0
-    pvList.value = []
-    uvList.value = []
-    uipList.value = []
-    dailyXAxis.value = []
-    visitsData.value = props?.info?.daily
-    // 获取总数量和数据集数组
-    visitsData?.value?.forEach((item) => {
-      const { pv, uv, uip, date } = item
-      const formDate = date.split('-')[1] + '月' + date.split('-')[2] + '日'
-      totalPv.value += pv
-      totalUv.value += uv
-      totalUip.value += uip
-      pvList.value.push(pv)
-      uvList.value.push(uv)
-      uipList.value.push(uip)
-      dailyXAxis.value.push(formDate)
-    })
-    initLineChart()
-  }
+    () => props?.info?.daily,
+    () => {
+      // 归零
+      totalPv.value = 0
+      totalUv.value = 0
+      totalUip.value = 0
+      pvList.value = []
+      uvList.value = []
+      uipList.value = []
+      dailyXAxis.value = []
+      visitsData.value = props?.info?.daily
+      // 获取总数量和数据集数组
+      visitsData?.value?.forEach((item) => {
+        const { pv, uv, uip, date } = item
+        const formDate = date.split('-')[1] + '月' + date.split('-')[2] + '日'
+        totalPv.value += pv
+        totalUv.value += uv
+        totalUip.value += uip
+        pvList.value.push(pv)
+        uvList.value.push(uv)
+        uipList.value.push(uip)
+        dailyXAxis.value.push(formDate)
+      })
+      initLineChart()
+    }
 )
 // 访问表格数据
 const visitsData = ref()
@@ -853,56 +823,56 @@ const userTypeList = ref([0, 0])
 const deviceList = ref([0, 0])
 const netWorkList = ref([0, 0])
 watch(
-  () => props.info?.uvTypeStats,
-  () => {
-    // 初始化
-    userTypeList.value = [0, 0]
-    // 对访问用户类型的数据进行转化
-    props.info?.uvTypeStats?.forEach((item) => {
-      if (item.uvType === 'newUser') {
-        userTypeList.value[0] = item.cnt
-      } else if (item.uvType === 'oldUser') {
-        userTypeList.value[1] = item.cnt
-      }
-    })
-  },
-  {
-    immediate: true
-  }
+    () => props.info?.uvTypeStats,
+    () => {
+      // 初始化
+      userTypeList.value = [0, 0]
+      // 对访问用户类型的数据进行转化
+      props.info?.uvTypeStats?.forEach((item) => {
+        if (item.uvType === 'newUser') {
+          userTypeList.value[0] = item.cnt
+        } else if (item.uvType === 'oldUser') {
+          userTypeList.value[1] = item.cnt
+        }
+      })
+    },
+    {
+      immediate: true
+    }
 )
 watch(
-  () => props.info?.deviceStats,
-  () => {
-    deviceList.value = [0, 0]
-    // 对访问设备类型的数据进行转化
-    props.info?.deviceStats?.forEach((item) => {
-      if (item.device === 'Mobile') {
-        deviceList.value[1] = item.cnt
-      } else {
-        deviceList.value[0] = item.cnt
-      }
-    })
-  },
-  {
-    immediate: true
-  }
+    () => props.info?.deviceStats,
+    () => {
+      deviceList.value = [0, 0]
+      // 对访问设备类型的数据进行转化
+      props.info?.deviceStats?.forEach((item) => {
+        if (item.device === 'Mobile') {
+          deviceList.value[1] = item.cnt
+        } else {
+          deviceList.value[0] = item.cnt
+        }
+      })
+    },
+    {
+      immediate: true
+    }
 )
 watch(
-  () => props.info?.networkStats,
-  () => {
-    netWorkList.value = [0, 0]
-    // 对访问设备类型的数据进行转化
-    props.info?.networkStats?.forEach((item) => {
-      if (item.device === 'Mobile') {
-        netWorkList.value[1] = item.cnt
-      } else {
-        netWorkList.value[0] = item.cnt
-      }
-    })
-  },
-  {
-    immediate: true
-  }
+    () => props.info?.networkStats,
+    () => {
+      netWorkList.value = [0, 0]
+      // 对访问设备类型的数据进行转化
+      props.info?.networkStats?.forEach((item) => {
+        if (item.device === 'Mobile') {
+          netWorkList.value[1] = item.cnt
+        } else {
+          netWorkList.value[0] = item.cnt
+        }
+      })
+    },
+    {
+      immediate: true
+    }
 )
 </script>
 

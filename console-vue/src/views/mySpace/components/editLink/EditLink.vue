@@ -5,7 +5,13 @@
         <el-input v-model="formData.originUrl" placeholder="请输入http://或https://开头的链接或应用跳转链接"></el-input>
       </el-form-item>
       <el-form-item label="描述信息" prop="describe">
-        <el-input :rows="4" v-model="formData.describe" type="textarea" placeholder="可通过换行创建多个短链，一行一个，单次最多创建50条" />
+        <el-input
+            v-loading="isLoading"
+            :rows="4"
+            v-model="formData.describe"
+            type="textarea"
+            placeholder="可通过换行创建多个短链，一行一个，单次最多创建50条"
+        />
         <span>{{ describeRows + '/' + maxDescribeRows }}</span>
       </el-form-item>
 
@@ -21,13 +27,24 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item v-if="formData.validDateType === 1" label="选择时间">
-        <el-date-picker :disabled-date="disabledDate" v-model="formData.validDate" value-format="YYYY-MM-DD HH:mm:ss"
-          type="datetime" placeholder="选择日期" :shortcuts="shortcuts" />
+        <el-date-picker
+            :disabled-date="disabledDate"
+            v-model="formData.validDate"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            type="datetime"
+            placeholder="选择日期"
+            :shortcuts="shortcuts"
+        />
         <span class="alert">链接失效后将自动跳转到404页面 !</span>
       </el-form-item>
       <el-form-item>
         <div style="width: 100%; display: flex; justify-content: flex-end;">
-          <el-button class="buttons" type="primary" @click="onSubmit(ruleFormRef)">确认</el-button>
+          <el-button
+              class="buttons"
+              type="primary"
+              :loading="loading"
+              @click="onSubmit(ruleFormRef)"
+          >确认</el-button>
           <el-button class="buttons" @click="cancel">取消</el-button>
         </div>
       </el-form-item>
@@ -41,7 +58,7 @@ import {useStore} from 'vuex'
 import {ElMessage} from "element-plus";
 
 const store = useStore()
-const defaultDomain = store.state.domain?? ' '
+const defaultDomain = store.state.domain ?? ' '
 const props = defineProps({
   groupInfo: Array,
   editData: Object
@@ -49,36 +66,15 @@ const props = defineProps({
 const { proxy } = getCurrentInstance()
 const API = proxy.$API
 const editData = props.editData
-// url的校验规则
+
 const reg = /^(https?:\/\/(([a-zA-Z0-9]+-?)+[a-zA-Z0-9]+\.)+(([a-zA-Z0-9]+-?)+[a-zA-Z0-9]+))(:\d+)?(\/.*)?(\?.*)?(#.*)?$/;
-// 自定义时间中选择几天
+
 const shortcuts = [
-  {
-    text: '一天',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 3600 * 1000 * 24)
-      return date
-    },
-  },
-  {
-    text: '七天',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 3600 * 1000 * 24 * 7)
-      return date
-    },
-  },
-  {
-    text: '三十天',
-    value: () => {
-      const date = new Date()
-      date.setTime(date.getTime() + 3600 * 1000 * 24 * 30)
-      return date
-    },
-  },
+  { text: '一天', value: () => { const date = new Date(); date.setTime(date.getTime() + 3600 * 1000 * 24); return date }, },
+  { text: '七天', value: () => { const date = new Date(); date.setTime(date.getTime() + 3600 * 1000 * 24 * 7); return date }, },
+  { text: '三十天', value: () => { const date = new Date(); date.setTime(date.getTime() + 3600 * 1000 * 24 * 30); return date }, },
 ]
-// eslint-disable-next-line vue/no-dupe-keys
+
 const groupInfo = ref()
 const formData = reactive({
   domain: defaultDomain,
@@ -91,6 +87,7 @@ const formData = reactive({
   validDateType: editData.validDateType,
   fullShortUrl: editData.fullShortUrl
 })
+
 const initFormData = () => {
   formData.domain = defaultDomain
   formData.originUrl = null
@@ -100,85 +97,91 @@ const initFormData = () => {
   formData.validDateType = 0
   formData.fullShortUrl = null
 }
-const maxOriginUrlRows = ref(100)// 最多多少行
-// 链接有多少行
+
+const maxOriginUrlRows = ref(100)
 const originUrlRows = ref(0)
+const loading = ref(false) // 提交按钮 loading
+const isLoading = ref(false) // 描述框 loading
+
 // 防抖
 const fd = (fn, delay) => {
   let timer = null
   return function (url) {
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-    timer = setTimeout(() => {
-      fn(url)
-    }, delay)
+    if (timer) { clearTimeout(timer); timer = null }
+    timer = setTimeout(() => { fn(url) }, delay)
   }
 }
+
+// 自动获取标题
 const queryTitle = (url) => {
   if (reg.test(url)) {
-    API.smallLinkPage.queryTitle({ url: url }).then(res => {
-      formData.describe = res?.data?.data
-    })
+    isLoading.value = true
+    // catch 防止查询标题失败阻塞
+    API.smallLinkPage.queryTitle({ url: url })
+        .then(res => {
+          // 假设拦截器返回 JSON body, 标题在 res.data
+          formData.describe = res?.data
+        })
+        .catch(() => {})
+        .finally(() => { isLoading.value = false })
   }
 }
 const getTitle = fd(queryTitle, 1000)
+
 watch(
-  () => formData.originUrl,
-  nV => {
-    originUrlRows.value = (nV || '').split(/\r|\r\n|\n/)?.length ?? 0
-    // 只有在描述内容为空时才会去查询链接对应的标题
-    if (!formData.describe) {
-      getTitle(nV)
+    () => formData.originUrl,
+    nV => {
+      originUrlRows.value = (nV || '').split(/\r|\r\n|\n/)?.length ?? 0
+      if (!formData.describe) {
+        getTitle(nV)
+      }
     }
-  }
-)
-const maxDescribeRows = ref(100) // 最多多少行
-// 描述信息有多少行
-const describeRows = ref(0)
-watch(
-  () => formData.describe,
-  nV => {
-    describeRows.value = (nV || '').split(/\r|\r\n|\n/)?.length ?? 0
-  }
 )
 
-// 将分组数据传给选择分组选项并默认选中第一项
+const maxDescribeRows = ref(100)
+const describeRows = ref(0)
 watch(
-  () => props.groupInfo,
-  nV => {
-    groupInfo.value = nV
-    formData.gid = nV[0].gid
-  },
-  {
-    immediate: true
-  }
+    () => formData.describe,
+    nV => {
+      describeRows.value = (nV || '').split(/\r|\r\n|\n/)?.length ?? 0
+    }
 )
+
 watch(
-  () => props.editData,
-  (nV) => {
-    // console.log(nV, oV)
-    formData.originUrl = nV.originUrl
-    formData.gid = nV.gid
-    formData.originGid = nV.gid
-    formData.createdType = nV.createdType
-    formData.validDate = nV.validDate
-    formData.describe = nV.describe
-    formData.validDateType = nV.validDateType
-    formData.fullShortUrl = nV.fullShortUrl
-  },
-  {
-    immediate: true
-  }
+    () => props.groupInfo,
+    nV => {
+      groupInfo.value = nV
+      // 这里的逻辑有点奇怪：编辑时应该回显原来的 gid，而不是默认第一个
+      // 但原代码就是这样写的，如果 editData 有值，下面的 watch props.editData 会覆盖它
+      if (nV && nV.length > 0) {
+        formData.gid = nV[0].gid
+      }
+    },
+    { immediate: true }
 )
+
+watch(
+    () => props.editData,
+    (nV) => {
+      if (!nV) return
+      formData.originUrl = nV.originUrl
+      formData.gid = nV.gid
+      formData.originGid = nV.gid
+      formData.createdType = nV.createdType
+      formData.validDate = nV.validDate
+      formData.describe = nV.describe
+      formData.validDateType = nV.validDateType
+      formData.fullShortUrl = nV.fullShortUrl
+    },
+    { immediate: true }
+)
+
 // 校验规则
 const formRule = reactive({
   originUrl: [
     { required: true, message: '请输入链接', trigger: 'blur' },
     {
       validator: function (rule, value, callback) {
-        // console.log('============', value, value.split('/n'))
         if (value) {
           value.split(/\r|\r\n|\n/).forEach(item => {
             if (!reg.test(item)) {
@@ -200,7 +203,6 @@ const formRule = reactive({
     { required: true, message: '请输入描述信息', trigger: 'blur' },
     {
       validator: function (rule, value, callback) {
-        // console.log('============', value, value.split('/n'))
         if (describeRows.value > maxDescribeRows.value) {
           callback(new Error('超过输入' + maxDescribeRows.value + '行'))
         } else {
@@ -210,55 +212,50 @@ const formRule = reactive({
       trigger: 'blur'
     },
   ],
-  validDate: [
-    { required: false, message: '请输日期', trigger: 'blur' },
-    // {
-    //   validator: function (rule, value, callback) {
-    //     if (describeRows.value > maxDescribeRows.value) {
-    //       callback(new Error('超过输入' + maxDescribeRows.value + '行'))
-    //     } else {
-    //       callback()
-    //     }
-    //   },
-    //   trigger: 'blur'
-    // }
-  ]
+  validDate: [{ required: false, message: '请输日期', trigger: 'blur' }]
 })
-// 限制日期选择器选择过去的时间
+
 const disabledDate = (time) => {
-  return new Date(time).getTime() < new Date().getTime()//选当前时间之后的时间
+  return new Date(time).getTime() < new Date().getTime()
 }
 
-// 将组件里面的确认和取消点击事件传出去
 const emits = defineEmits(['onSubmit', 'cancel', 'updatePage'])
-// 点击确定按钮后的校验
 const ruleFormRef = ref()
+
+// 提交修改
 const onSubmit = async (formEl) => {
-  if (!formEl) {
-    return
-  }
+  if (!formEl) return
   await formEl.validate(async (valid, fields) => {
     if (valid) {
-      emits('onSubmit', false)
-      const res = await API.smallLinkPage.editSmallLink(formData)
-      if (res?.data?.code !== '0') {
-        ElMessage.error(res.data.message)
-      } else {
+      try {
+        loading.value = true
+        // 调用接口 (拦截器已处理错误)
+        await API.smallLinkPage.editSmallLink(formData)
+
+        // 成功处理
         ElMessage.success('修改成功')
-        emits('updatePage')
+        emits('onSubmit', false) // 关闭弹窗
+        emits('updatePage') // 刷新列表
+
+      } catch (error) {
+        console.error('修改短链接失败', error)
+      } finally {
+        loading.value = false
       }
     }
   })
 }
+
 const cancel = () => {
   emits('cancel', false)
   initFormData()
 }
+
 onBeforeUnmount(() => {
   initFormData()
 })
+
 defineExpose({
-  // 当外部对话框以任何方式关闭时，初始化表单数据
   initFormData
 })
 </script>
