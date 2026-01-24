@@ -1,14 +1,18 @@
 package com.xhy.shortlink.project.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xhy.shortlink.project.common.biz.user.UserContext;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.project.dao.mapper.GroupMapper;
 import com.xhy.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRecoverReqDTO;
@@ -20,6 +24,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
 
@@ -30,6 +36,7 @@ import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.GOTO_SH
 @RequiredArgsConstructor
 public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements RecycleBinService {
     private final StringRedisTemplate stringRedisTemplate;
+    private final GroupMapper  groupMapper;
 
     @Override
     public void recycleBinSave(ShortLinkRecycleBinSaveReqDTO requestParam) {
@@ -44,6 +51,14 @@ public class RecycleBinServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLin
 
     @Override
     public IPage<ShortLinkRecycleBinPageRespDTO> pageShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
+        // 1. 查出当前用户的所有 GID
+        List<String> groupIds = groupMapper.selectGidListByUsername(UserContext.getUsername());
+
+        // 如果用户没有任何分组，直接返回空页，别去查数据库了
+        if (CollUtil.isEmpty(groupIds)) {
+            return new Page<>();
+        }
+        requestParam.setGidList(groupIds);
         IPage<ShortLinkDO>  resultPage = baseMapper.pageRecycleBinLink(requestParam);
         return resultPage.convert(each -> {
             final ShortLinkRecycleBinPageRespDTO result = BeanUtil.toBean(each, ShortLinkRecycleBinPageRespDTO.class);
