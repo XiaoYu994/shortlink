@@ -124,9 +124,9 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
                 String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
                 JSONObject localeResultObj = JSON.parseObject(localeResultStr);
                 if ("10000".equals(localeResultObj.getString("infocode"))) {
-                    actualProvince = localeResultObj.getString("province");
-                    actualCity = localeResultObj.getString("city");
-                    adcode =  localeResultObj.getString("adcode");
+                    actualProvince = localeResultObj.getString("province").equals("[]") ? actualProvince : localeResultObj.getString("province");
+                    actualCity = localeResultObj.getString("city").equals("[]") ? actualCity : localeResultObj.getString("city");
+                    adcode =  localeResultObj.getString("adcode").equals("[]") ? adcode : localeResultObj.getString("adcode");
                 }
             } catch (Exception e) {
                 log.warn("IP解析失败，使用默认值", e);
