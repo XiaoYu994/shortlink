@@ -22,6 +22,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
@@ -58,8 +59,11 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
         final Map<String, String> proudcerMap = message.getValue();
+        // 1. 获取 Redis 生成的消息 ID (用于最后删除)
+        RecordId id = message.getId();
         final ShortLinkStatsRecordEvent statsRecord = JSON.parseObject(proudcerMap.get("json"), ShortLinkStatsRecordEvent.class);
         final String stream = message.getStream();
+        // 2. 获取业务 UUID (用于幂等性判断)
         final String messageId = statsRecord.getEventId();
 
         try {
@@ -72,7 +76,7 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
                 throw new ServiceException("消息未完成流程，需要消息队列重试");
             }
             actualSaveShortLinkStats(statsRecord);
-            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),messageId);
+            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream),id.getValue());
             log.info("[Redis-Stream] 消费监控统计消息 ,{}", messageId);
         } catch (Throwable e){
             // 某某某情况宕机了

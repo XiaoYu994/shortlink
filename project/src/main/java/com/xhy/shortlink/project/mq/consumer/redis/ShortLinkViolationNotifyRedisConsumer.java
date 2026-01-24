@@ -11,10 +11,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.Objects;
 
 
 /*
@@ -29,13 +32,16 @@ public class ShortLinkViolationNotifyRedisConsumer implements StreamListener<Str
     // private final SmsService smsService; // 假设你有短信服务
     // private final EmailService emailService; // 假设你有邮件服务
     private final MessageQueueIdempotentHandler messageQueueIdempotentHandler;
+    private final StringRedisTemplate stringRedisTemplate;
 
 
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
         String json = message.getValue().get("json");
         ShortLinkViolationEvent event = JSON.parseObject(json, ShortLinkViolationEvent.class);
+        RecordId id = message.getId();
         String messageId = event.getEventId();
+        String stream = message.getStream(); // Stream 的 Key
         try {
             // 如果被消费
             if(messageQueueIdempotentHandler.isMessageBeingConsumed(messageId)) {
@@ -77,6 +83,8 @@ public class ShortLinkViolationNotifyRedisConsumer implements StreamListener<Str
             // 4. 发送邮件 (模拟)
             // emailService.send(user.getEmail(), "您的链接已被封禁...");
 
+            // 处理成功后，从 Redis Stream 中删除该消息
+            stringRedisTemplate.opsForStream().delete(Objects.requireNonNull(stream), id.getValue());
         } catch (Exception e) {
             messageQueueIdempotentHandler.delMessageProcessed(messageId);
             log.error("处理违规通知失败", e);

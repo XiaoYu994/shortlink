@@ -46,6 +46,7 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
         final Map<String, String> proudcerMap = message.getValue();
         final ShortLinkRiskEvent event = JSON.parseObject(proudcerMap.get("json"), ShortLinkRiskEvent.class);
         String messageId = event.getEventId();
+        String streamKey = message.getStream();
         if (messageQueueIdempotentHandler.isMessageBeingConsumed(messageId)) {
             // 判断当前的这个消息流程是否执行完成
             if (messageQueueIdempotentHandler.isAccomplish(messageId)) {
@@ -82,6 +83,8 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
             }
             // 手动 ack
             stringRedisTemplate.opsForStream().acknowledge(RISK_CHECK_STREAM_GROUP_KEY, message);
+            // 删除消息
+            stringRedisTemplate.opsForStream().delete(streamKey, streamId);
             messageQueueIdempotentHandler.setAccomplish(messageId);
         } catch (Exception e) {
             // Redis Stream 消费异常如果不捕获，可能会导致线程池异常，建议捕获
@@ -123,11 +126,11 @@ public class ShortLinkRiskRedisConsumer implements StreamListener<String, MapRec
     }
 
     private void disableLink(ShortLinkRiskEvent shortLinkRiskEvent) {
-        // A. 修改数据库状态 enable_status = 1 (禁用)
+        // A. 修改数据库状态 enable_status = 2 (平台禁用)
         shortLinkService.update(null, Wrappers.lambdaUpdate(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, shortLinkRiskEvent.getGid())
                 .eq(ShortLinkDO::getFullShortUrl, shortLinkRiskEvent.getFullShortUrl())
-                .set(ShortLinkDO::getEnableStatus, 1));
+                .set(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.BANNED.getEnableStatus()));
 
         // B. 删除 Redis 字符串缓存 (L2)
         String redisKey = String.format(GOTO_SHORT_LINK_KEY, shortLinkRiskEvent.getFullShortUrl());
