@@ -111,11 +111,12 @@ public class ShortLinkRiskRocketMQConsumer implements RocketMQListener<ShortLink
     }
 
     private void disableLink(ShortLinkRiskEvent event) {
-        // A. 修改数据库状态 enable_status = 1 (禁用)
+        // A. 修改数据库状态 enable_status = 2 (平台封禁)
         shortLinkService.update(null, Wrappers.lambdaUpdate(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, event.getGid())
                 .eq(ShortLinkDO::getFullShortUrl, event.getFullShortUrl())
-                .set(ShortLinkDO::getEnableStatus, 1)); // 1 表示禁用
+                .set(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.BANNED.getEnableStatus()));
+
 
         // B. 删除 Redis 缓存
         String redisKey = String.format(GOTO_SHORT_LINK_KEY, event.getFullShortUrl());

@@ -52,7 +52,7 @@ CREATE TABLE `t_link`  (
   `origin_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '原始链接',
   `gid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '分组标识',
   `favicon` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '网站图标',
-  `enable_status` tinyint(1) NULL DEFAULT 0 COMMENT '启用标识 （0：启用）（1：未启用）',
+  `enable_status` tinyint(1) NULL DEFAULT 0 COMMENT '启用标识 （0：启用）（1：未启用）（2：平台封禁）',
   `created_type` tinyint(1) NULL DEFAULT 0 COMMENT '创建类型 0：接口 1：控制台',
   `valid_date_type` tinyint(1) NULL DEFAULT NULL COMMENT '有效期类型 0：永久有效 1：用户自定义',
   `valid_date` datetime NULL DEFAULT NULL COMMENT '有效期',

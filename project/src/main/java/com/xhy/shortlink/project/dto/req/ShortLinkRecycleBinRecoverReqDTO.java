@@ -22,4 +22,9 @@ public class ShortLinkRecycleBinRecoverReqDTO {
     * 短链接
     * */
     private String fullShortUrl;
+
+    /*
+    *  短链接启用标识
+    * */
+    private Integer enableStatus;
 }

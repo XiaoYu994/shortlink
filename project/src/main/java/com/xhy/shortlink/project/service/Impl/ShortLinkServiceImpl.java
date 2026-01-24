@@ -14,6 +14,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.xhy.shortlink.project.common.biz.user.UserContext;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
+import com.xhy.shortlink.project.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.project.config.GotoDomainWhiteListConfiguration;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
@@ -186,7 +187,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             LambdaQueryWrapper<ShortLinkDO> linkWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
                     .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
                     .eq(ShortLinkDO::getGid, shortLinkGoToDO.getGid())
-                    .eq(ShortLinkDO::getEnableStatus, 0);
+                    .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getEnableStatus());
             ShortLinkDO shortLinkDO = baseMapper.selectOne(linkWrapper);
 
             if (shortLinkDO == null || (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date()))) {
@@ -466,7 +467,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         ShortLinkDO shortLinkDO = baseMapper.selectOne(Wrappers.lambdaQuery(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, requestParam.getOriginGid())
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
-                .eq(ShortLinkDO::getEnableStatus, 0));
+                .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getEnableStatus()));
 
         if (shortLinkDO == null) {
             throw new ClientException("短链接记录不存在");
@@ -563,7 +564,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     public List<ShortLinkGroupCountRespDTO> listGroupShortlinkCount(List<String> requestParam) {
         // 构造条件 (只写 Where 和 GroupBy 部分)
         LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getEnableStatus, 0)
+                .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getEnableStatus())
                 .in(ShortLinkDO::getGid, requestParam)
                 .groupBy(ShortLinkDO::getGid);
         return shortLinkMapper.selectGroupCount(queryWrapper);
