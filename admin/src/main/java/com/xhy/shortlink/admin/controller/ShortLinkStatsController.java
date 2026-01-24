@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /*
- * 短链接统计接口
+ * 后管调用短链接统计接口
  * */
 @RestController(value = "shortLinkStatsControllerByAdmin")
 @RequiredArgsConstructor

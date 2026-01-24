@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /*
-* 获取目标网站标题控制器
+* 后管调用获取目标网站标题控制器
 * */
 @RestController(value = "urlTitleControllerByAdmin")
 @RequiredArgsConstructor

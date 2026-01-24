@@ -46,7 +46,7 @@ public interface ShortLinkActualRemoteService {
      * @param requestParam 请求参数
      * */
      @PostMapping("/api/short-link/v1/update")
-     void updateShortlink(@RequestBody ShortLinkUpdateReqDTO requestParam);
+     Result<Void> updateShortlink(@RequestBody ShortLinkUpdateReqDTO requestParam);
 
 
     /**
@@ -78,7 +78,7 @@ public interface ShortLinkActualRemoteService {
      * @param requestParam 回收站请求参数
      */
     @PostMapping("/api/short-link/v1/recycle-bin/save")
-    void RecycleBinSave(ShortLinkRecycleBinSaveReqDTO requestParam);
+    Result<Void> RecycleBinSave(@RequestBody ShortLinkRecycleBinSaveReqDTO requestParam);
 
     /**
      * 分页查询回收站链接
@@ -93,14 +93,14 @@ public interface ShortLinkActualRemoteService {
      * @param requestParam 请求参数
      */
     @PostMapping("/api/short-link/v1/recycle-bin/recover")
-    void recoverShortlink(@RequestBody ShortLinkRecycleBinRecoverReqDTO requestParam);
+    Result<Void> recoverShortlink(@RequestBody ShortLinkRecycleBinRecoverReqDTO requestParam);
 
     /**
      * 移除短链接
      * @param requestParam 请求参数
      */
     @PostMapping("/api/short-link/v1/recycle-bin/remove")
-    void removeShortlink(@RequestBody ShortLinkRecycleBinRemoveReqDTO requestParam);
+    Result<Void> removeShortlink(@RequestBody ShortLinkRecycleBinRemoveReqDTO requestParam);
 
     /**
      * 获取单个短链接监控数据
