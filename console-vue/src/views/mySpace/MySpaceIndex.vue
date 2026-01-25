@@ -21,7 +21,7 @@
               <el-tooltip show-after="500" class="box-item" effect="dark" :content="'查看图表'" placement="bottom-end">
                 <el-icon v-if="!(item.shortLinkCount === 0 || item.shortLinkCount === null)" class="edit"
                          :class="{ zero: item.shortLinkCount === 0 }"
-                         @click.stop="chartsVisible({ describe: item.name, gid: item.gid, group: true })">
+                         @click.stop="chartsVisible({ description: item.name, gid: item.gid, group: true })">
                   <Histogram />
                 </el-icon>
               </el-tooltip>
@@ -93,8 +93,8 @@
               }">
                 <img :src="getImgUrl(scope.row.favicon)" :key="scope?.row?.id" width="20" height="20" alt="" />
                 <div class="name-date">
-                  <el-tooltip show-after="500" :content="scope.row.describe">
-                    <span>{{ scope.row.describe }}</span>
+                  <el-tooltip show-after="500" :content="scope.row.description">
+                    <span>{{ scope.row.description }}</span>
                   </el-tooltip>
                   <div class="time" style="display: flex">
                     <span>{{ scope.row.createTime }}</span>
@@ -142,7 +142,7 @@
                   </el-icon>
                 </div>
                 <template #dropdown>
-                  <el-dropdown-item @click="pageParams.orderTag = 'todayPv', orderIndex = 1">今日访问次数</el-dropdown-item>
+                  <el-dropdown-item v-if="!isRecycleBin" @click="pageParams.orderTag = 'todayPv', orderIndex = 1">今日访问次数</el-dropdown-item>
                   <el-dropdown-item @click="pageParams.orderTag = 'totalPv', orderIndex = 1">累计访问次数</el-dropdown-item>
                 </template>
               </el-dropdown>
@@ -170,7 +170,7 @@
                   </el-icon>
                 </div>
                 <template #dropdown>
-                  <el-dropdown-item @click="pageParams.orderTag = 'todayUv', orderIndex = 2">今日访问人数</el-dropdown-item>
+                  <el-dropdown-item v-if="!isRecycleBin" @click="pageParams.orderTag = 'todayUv', orderIndex = 2">今日访问人数</el-dropdown-item>
                   <el-dropdown-item @click="pageParams.orderTag = 'totalUv', orderIndex = 2">累计访问人数</el-dropdown-item>
                 </template>
               </el-dropdown>
@@ -198,7 +198,7 @@
                   </el-icon>
                 </div>
                 <template #dropdown>
-                  <el-dropdown-item @click="pageParams.orderTag = 'todayUip', orderIndex = 3">今日IP数</el-dropdown-item>
+                  <el-dropdown-item v-if="!isRecycleBin" @click="pageParams.orderTag = 'todayUip', orderIndex = 3">今日IP数</el-dropdown-item>
                   <el-dropdown-item @click="pageParams.orderTag = 'totalUip', orderIndex = 3">累计IP数</el-dropdown-item>
                 </template>
               </el-dropdown>
@@ -400,7 +400,7 @@ const tableGid = ref()
 
 // 点击查看数据图表
 const chartsVisible = async (rowInfo, dateList) => {
-  chartsInfoTitle.value = rowInfo?.describe
+  chartsInfoTitle.value = rowInfo?.description
   const { fullShortUrl, gid, group, originUrl, favicon, enableStatus } = rowInfo
 
   originUrl1.value = originUrl
@@ -541,7 +541,12 @@ const pageParams = reactive({
 })
 
 watch(() => pageParams.orderTag, () => {
-  queryPage()
+  // 根据当前是否在回收站，调用不同的查询方法
+  if (isRecycleBin.value) {
+    queryRecycleBinPage()
+  } else {
+    queryPage()
+  }
 })
 
 const totalNums = ref(0)
@@ -577,8 +582,15 @@ const isRecycleBin = ref(false)
 const recycleBinNums = ref(0)
 
 const queryRecycleBinPage = () => {
+  const gidList = editableTabs.value.map(item => item.gid)
   API.smallLinkPage
-      .queryRecycleBin({ current: pageParams.current, size: pageParams.size })
+      .queryRecycleBin({
+        current: pageParams.current,
+        size: pageParams.size,
+        orderTag: pageParams.orderTag,
+        // 补上 GID 列表 (解决 Sharding value null 问题)
+        gidList: gidList.join(',')
+      })
       .then((res) => {
         tableData.value = res.data?.records
         totalNums.value = +res.data?.total

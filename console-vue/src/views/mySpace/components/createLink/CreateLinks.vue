@@ -10,11 +10,11 @@
         />
         <span style="font-size: 12px">{{ originUrlRows + '/' + maxDescribeRows }}</span>
       </el-form-item>
-      <el-form-item label="描述信息" prop="describes">
+      <el-form-item label="描述信息" prop="description">
         <el-input
             v-loading="isLoading"
             :rows="4"
-            v-model="formData.describes"
+            v-model="formData.description"
             type="textarea"
             placeholder="请输入描述信息，一行一个，描述信息行数请与链接行数相等"
         />
@@ -92,7 +92,7 @@ const formData = reactive({
   gid: null,
   createdType: 1,
   validDate: null,
-  describes: null,
+  description: null,
   validDateType: 0
 })
 
@@ -101,7 +101,7 @@ const initFormData = () => {
   formData.originUrls = null
   formData.createdType = 1
   formData.validDate = null
-  formData.describes = null
+  formData.description = null
   formData.validDateType = 0
 }
 
@@ -120,7 +120,7 @@ watch(
 const maxDescribeRows = ref(100)
 const describeRows = ref(0)
 watch(
-    () => formData.describes,
+    () => formData.description,
     (nV) => {
       describeRows.value = (nV || '').split(/\r|\r\n|\n/)?.length ?? 0
     }
@@ -172,7 +172,7 @@ const formRule = reactive({
     }
   ],
   gid: [{ required: true, message: '请选择分组', trigger: 'blur' }],
-  describes: [
+  description: [
     { required: true, message: '请输入描述信息', trigger: 'blur' },
     {
       validator: function (rule, value, callback) {
@@ -248,14 +248,14 @@ const onSubmit = async (formEl) => {
         loading.value = true
         submitDisable.value = true
 
-        let { describes, originUrls } = formData
-        describes = transferStrToArray(describes)
+        let { description, originUrls } = formData
+        description = transferStrToArray(description)
         originUrls = transferStrToArray(originUrls)
 
         // 调用接口
         // 假设批量创建接口返回的是 Blob (文件流)
         // 拦截器需要对 responseType: 'blob' 的请求做特殊放行
-        const res = await API.smallLinkPage.addLinks({ ...formData, describes, originUrls })
+        const res = await API.smallLinkPage.addLinks({ ...formData, description, originUrls })
 
         // 成功处理
         ElMessage.success('创建成功！短链列表已开始下载')
