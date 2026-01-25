@@ -112,11 +112,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 先判断本地缓存中有没有
         String originalLinkComposite = shortLinkCache.getIfPresent(key);
         if (StrUtil.isNotBlank(originalLinkComposite)) {
-            String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
-            if (redirectUrl != null) {
+            ShortLinkCacheObj cacheObj = parseCache(originalLinkComposite, key);
+            if (cacheObj != null) {
                 // 统计监控并跳转
-                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
-                ((HttpServletResponse) response).sendRedirect(redirectUrl);
+                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl,cacheObj.gid, request, response));
+                ((HttpServletResponse) response).sendRedirect(cacheObj.originUrl);
                 return;
             }
             shortLinkCache.invalidate(key);
@@ -129,10 +129,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (StrUtil.isNotBlank(originalLinkComposite)) {
             // 将 Redis 查到的热点数据写入 Caffeine
             shortLinkCache.put(key, originalLinkComposite);
-            String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
-            if (redirectUrl != null) {
-                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
-                ((HttpServletResponse) response).sendRedirect(redirectUrl);
+            ShortLinkCacheObj cacheObj = parseCache(originalLinkComposite, key);
+            if (cacheObj != null) {
+                statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, cacheObj.gid,request, response));
+                ((HttpServletResponse) response).sendRedirect(cacheObj.originUrl);
                 return;
             }
             // 如果返回 null，说明逻辑已过期或数据异常，视为缓存未命中，继续往下走（或者直接走回源逻辑）
@@ -163,10 +163,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 // 加入本地缓存
                 shortLinkCache.put(key, originalLinkComposite);
                 // 锁内的解析和续期（防止在等待锁的过程中别人已经查好放入缓存了）
-                String redirectUrl = extractUrlAndRenew(originalLinkComposite, key);
-                if (redirectUrl != null) {
-                    statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
-                    ((HttpServletResponse) response).sendRedirect(redirectUrl);
+                ShortLinkCacheObj cacheObj = parseCache(originalLinkComposite, key);
+                if (cacheObj != null) {
+                    statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl,cacheObj.gid, request, response));
+                    ((HttpServletResponse) response).sendRedirect(cacheObj.originUrl);
                     return;
                 }
                 // 如果返回 null，说明逻辑已过期或数据异常，视为缓存未命中
@@ -207,28 +207,37 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             // 7. 重建缓存
             long validTimeStamp = (shortLinkDO.getValidDate() != null) ? shortLinkDO.getValidDate().getTime() : -1;
-            String cacheValue = validTimeStamp + "|" + shortLinkDO.getOriginUrl();
+            // 有效期 | 原始链接 | gid
+            String cacheValue = String.format("%d|%s|%s", validTimeStamp, shortLinkDO.getOriginUrl(), shortLinkDO.getGid());
             // 计算初始 TTL (例如：过期时间 - 当前时间，或者默认 1 天)
             long initialTTL = LinkUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
             stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
             // 加入本地缓存
             shortLinkCache.put(key, cacheValue);
-            statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, request, response));
+            statsProducer.send(buildLinkStatsRecordDTO(fullShortUrl, shortLinkDO.getGid(), request, response));
             ((HttpServletResponse) response).sendRedirect(shortLinkDO.getOriginUrl());
         } finally {
             lock.unlock();
         }
     }
-
+    // 🔥 新增一个内部类，方便传输解析结果
+    @lombok.Data
+    @lombok.AllArgsConstructor
+    private static class ShortLinkCacheObj {
+        private String originUrl;
+        private String gid;
+    }
     // 构造短链接访问统计参数
-    private ShortLinkStatsRecordEvent buildLinkStatsRecordDTO(String fullShortUrl, ServletRequest request, ServletResponse response) {
+    private ShortLinkStatsRecordEvent buildLinkStatsRecordDTO(String fullShortUrl, String gid, ServletRequest request, ServletResponse response) {
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
         Cookie[] cookies = ((HttpServletRequest) request).getCookies();
             AtomicReference<String> uv = new AtomicReference<>();
-            Runnable addResponseCookieTask = () -> {
+            // 确保用户有一个 Cookie，并拿到这个 UUID
+            Runnable generateNewCookieTask = () -> {
                 uv.set(UUID.fastUUID().toString());
                 final Cookie cookie = new Cookie("uv", uv.get());
                 cookie.setMaxAge(DEFAULT_COOKIE_VALID_TIME); // 设置一个月的有效期
+                cookie.setPath("/"); // 设置路径
                 ((HttpServletResponse) response).addCookie(cookie);
                 uvFirstFlag.set(true);
                 stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, uv.get()); // set去重
@@ -236,21 +245,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             // 判断用户是否已存在 Cookie 是否首次访问
             if(ArrayUtil.isNotEmpty(cookies)) {
                 Arrays.stream(cookies)
-                        .filter(cookie -> cookie.getName().equals("uv"))
+                        .filter(cookie -> "uv".equals(cookie.getName()))
                         .findFirst() // 找到第一个匹配的 Cookie
                         .map(Cookie::getValue)
-                        .ifPresentOrElse(each -> {
-                            uv.set(each);
-                            // 添加到 Set，如果集合中不存在则返回 1（新用户），存在则返回 0（老用户）
-                            final Long uvAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, each);
-                            uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
-                        }, addResponseCookieTask);
+                        .ifPresentOrElse(uv::set, generateNewCookieTask);
             } else {
-                addResponseCookieTask.run();
+                generateNewCookieTask.run();
             }
             final String remoteAddr = LinkUtil.getActualIp((HttpServletRequest) request);
-            final Long uipAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UIP_KEY + fullShortUrl, remoteAddr);
-            boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
             String os = LinkUtil.getOs(((HttpServletRequest) request));
             String browser = LinkUtil.getBrowser(((HttpServletRequest) request));
             String device = LinkUtil.getDevice(((HttpServletRequest) request));
@@ -260,21 +262,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .fullShortUrl(fullShortUrl)
                     .device(device)
                     .os(os)
+                    .gid(gid)
                     .network(network)
                     .browser(browser)
                     .currentDate(new Date())
                     .remoteAddr(remoteAddr)
-                    .uipFirstFlag(uipFirstFlag)
-                    .uvFirstFlag(uvFirstFlag.get())
                     .uv(uv.get())
                     .build();
     }
 
     /**
-     * 提取 URL 并进行智能续期
-     * @return 有效的 URL，如果过期或格式错误返回 null
+     * 解析缓存字符串并判断有效期
      */
-    private String extractUrlAndRenew(String originalLinkComposite, String key) {
+    private ShortLinkCacheObj parseCache(String originalLinkComposite, String key) {
         String[] split = originalLinkComposite.split("\\|");
         if (split.length < 2) {
             return null;
@@ -282,10 +282,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         long validTime = Long.parseLong(split[0]);
         String originalLink = split[1];
-
+        String gid = split[2];
         // 1. 校验业务逻辑是否已过期
         // validTime = -1 表示永久有效
         if (validTime != -1 && System.currentTimeMillis() > validTime) {
+            // 已过期，需要让外层知道去删缓存
+            stringRedisTemplate.delete(key);
             return null; // 已过期
         }
 
@@ -305,8 +307,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if(expireTime > 0) {
             stringRedisTemplate.expire(key, expireTime, TimeUnit.MILLISECONDS);
         }
-
-        return originalLink;
+        return new ShortLinkCacheObj(originalLink, gid);
     }
 
     @Override
@@ -345,10 +346,22 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             }
             throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
         }
+        // 存入的缓存结构 有效期 | 原始链接 | gid
         // 缓存预热 创建短链接的时间大于一天存1天，永久短链接也存1天的过期时间
-        stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
-                shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
-                LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+        // 计算有效期时间戳 (用于缓存内部的双重校验)
+        long validTimeStamp = (shortlinkDO.getValidDate() != null) ? shortlinkDO.getValidDate().getTime() : -1;
+        String cacheValue = String.format("%d|%s|%s",
+                validTimeStamp,
+                shortlinkDO.getOriginUrl(),
+                shortlinkDO.getGid()
+        );
+        // 计算 Redis Key 的物理过期时间
+        // (LinkUtil.getLinkCacheValidTime 逻辑：如果有效期不足1天则按剩余时间存，否则默认存1天)
+        long initialTTL = LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate());
+        stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, shortlinkDO.getFullShortUrl()),
+                cacheValue,
+                initialTTL,
+                TimeUnit.MILLISECONDS);
         // 创建成功后，一定要把“空值缓存”删掉
         // 场景 用户输入了一个不存在的短链接，系统缓存空值，但是用户立刻去创建这个短链接，
         // 创建成功后访问 还没有过缓存时间，系统就会返回404页面，用户就会觉得是bug
@@ -415,9 +428,19 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
             }
             // 缓存预热 创建短链接的时间大于一天存1天，永久短链接也存1天的过期时间
-            stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY,
-                            shortlinkDO.getFullShortUrl()), shortlinkDO.getOriginUrl(),
-                    LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate()), TimeUnit.MILLISECONDS);
+            long validTimeStamp = (shortlinkDO.getValidDate() != null) ? shortlinkDO.getValidDate().getTime() : -1;
+            String cacheValue = String.format("%d|%s|%s",
+                    validTimeStamp,
+                    shortlinkDO.getOriginUrl(),
+                    shortlinkDO.getGid()
+            );
+            // 计算 Redis Key 的物理过期时间
+            // (LinkUtil.getLinkCacheValidTime 逻辑：如果有效期不足1天则按剩余时间存，否则默认存1天)
+            long initialTTL = LinkUtil.getLinkCacheValidTime(shortlinkDO.getValidDate());
+            stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, shortlinkDO.getFullShortUrl()),
+                    cacheValue,
+                    initialTTL,
+                    TimeUnit.MILLISECONDS);
             // 创建成功后，一定要把“空值缓存”删掉
             // 场景 用户输入了一个不存在的短链接，系统缓存空值，但是用户立刻去创建这个短链接，
             // 创建成功后访问 还没有过缓存时间，系统就会返回404页面，用户就会觉得是bug
@@ -534,8 +557,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 String fullShortUrl = requestParam.getFullShortUrl();
                 String oldGid = requestParam.getOriginGid();
                 String newGid = requestParam.getGid();
-                // 过期时间
-
                 // 需要迁移的三种统计类型
                 List<String> statsTypes = Arrays.asList(
                         OrderTagEnum.TODAY_PV.getValue(),
@@ -550,7 +571,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     stringRedisTemplate.execute(
                             statsRankMigrateScript, // 你的脚本对象
                             Arrays.asList(oldKey, newKey), // KEYS
-                            fullShortUrl, TODAY_EXPIRETIME // ARGV
+                            fullShortUrl,
+                            String.valueOf(TimeUnit.HOURS.toSeconds(TODAY_EXPIRETIME)) // ARGV
                     );
                 }
             } finally {

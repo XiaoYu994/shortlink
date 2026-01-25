@@ -52,15 +52,11 @@ public class ShortLinkStatsRecordEvent {
      */
     private String uv;
 
-    /**
-     * UV访问标识
-     */
-    private Boolean uvFirstFlag;
+    /*
+    *  gid
+    * */
+    private String gid;
 
-    /**
-     * UIP访问标识
-     */
-    private Boolean uipFirstFlag;
 
     /**
      * 当前时间

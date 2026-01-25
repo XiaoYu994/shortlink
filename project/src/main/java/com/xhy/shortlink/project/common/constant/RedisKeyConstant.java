@@ -96,4 +96,25 @@ public class RedisKeyConstant {
     public static final String RANK_KEY = "short-link:rank:%s:{%s}:%s";
 
 
+    /*
+     *  利用 HLL 统计短链 today UV
+     * */
+    public static final String TODAY_UV_HLL_KEY = "short-link:stats:uv:hll:%s:%s";
+
+
+    /*
+     *  利用 HLL 统计短链 total UV
+     * */
+    public static final String TOTAL_UV_HLL_KEY = "short-link:stats:uv:hll:total:%s";
+
+    /*
+     *  利用 HLL 统计短链 today UIP
+     * */
+    public static final String TODAY_UIP_HLL_KEY = "short-link:stats:uip:hll:%s:%s";
+
+    /*
+     *  利用 HLL 统计短链 total UIP
+     * */
+    public static final String TOTAL_UIP_HLL_KEY = "short-link:stats:uip:hll:total:%s";
+
 }

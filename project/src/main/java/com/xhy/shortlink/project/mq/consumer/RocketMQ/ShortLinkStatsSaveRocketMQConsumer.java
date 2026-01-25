@@ -2,7 +2,6 @@ package com.xhy.shortlink.project.mq.consumer.RocketMQ;
 
 
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.date.Week;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;
@@ -25,13 +24,15 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.LOCK_GID_UPDATE_KEY;
-import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.RANK_KEY;
+import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.project.common.constant.RocketMQConstant.STATIC_GROUP;
 import static com.xhy.shortlink.project.common.constant.RocketMQConstant.STATIC_TOPIC;
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
@@ -60,8 +61,6 @@ public class ShortLinkStatsSaveRocketMQConsumer implements RocketMQListener<Shor
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final MessageQueueIdempotentHandler messageQueueIdempotentHandler;
-    // 定义 Lua 脚本对象
-    private final DefaultRedisScript<Long> statsSaveScript;
     private final StringRedisTemplate stringRedisTemplate;
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -89,137 +88,208 @@ public class ShortLinkStatsSaveRocketMQConsumer implements RocketMQListener<Shor
 
     private void actualSaveShortLinkStats(ShortLinkStatsRecordEvent statsRecord) {
         String fullShortUrl = statsRecord.getFullShortUrl();
+        // 运行并发写入统计，修改互斥
         RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, fullShortUrl));
         RLock rLock = readWriteLock.readLock();
         rLock.lock();
         try {
-            // 只有当gid为空的时候才去查询路由表
-            LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
-                    .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
-            ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
-            String gid = shortLinkGotoDO.getGid();
-            Date currentDate = statsRecord.getCurrentDate();
-            int hour = DateUtil.hour(currentDate, true);
-            Week week = DateUtil.dayOfWeekEnum(currentDate);
-            int weekday = week.getIso8601Value();
-            // 构造基础访问统计数据
-            final LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
-                    .hour(hour)
-                    .weekday(weekday)
-                    .fullShortUrl(fullShortUrl)
-                    .date(currentDate)
-                    .pv(1)
-                    .uv(statsRecord.getUvFirstFlag() ? 1:0)
-                    .uip(statsRecord.getUipFirstFlag() ? 1:0)
-                    .build();
-            linkAccessStatsMapper.shortLinkStats(List.of(linkAccessStatsDO));
-            // 构造区域访问统计数据
-            Map<String,Object> localeParamMap = new HashMap<>();
-            localeParamMap.put("key",statsLocaleAmapKey);
-            localeParamMap.put("ip",statsRecord.getRemoteAddr());
-            // 远程调用百度接口
-            // 根据高德接口返回结果 TODO 有问题目前
-            String actualProvince = "未知";
-            String actualCity = "未知";
-            String adcode = "未知";
-            try {
-                String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
-                JSONObject localeResultObj = JSON.parseObject(localeResultStr);
-                if ("10000".equals(localeResultObj.getString("infocode"))) {
-                    actualProvince = localeResultObj.getString("province").equals("[]") ? actualProvince : localeResultObj.getString("province");
-                    actualCity = localeResultObj.getString("city").equals("[]") ? actualCity : localeResultObj.getString("city");
-                    adcode =  localeResultObj.getString("adcode").equals("[]") ? adcode : localeResultObj.getString("adcode");
-                }
-            } catch (Exception e) {
-                log.warn("IP解析失败，使用默认值", e);
+            // 1. 获取 GID
+            String gid = statsRecord.getGid();
+            if (StrUtil.isBlank(gid)) {
+                LambdaQueryWrapper<ShortLinkGoToDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGoToDO.class)
+                        .eq(ShortLinkGoToDO::getFullShortUrl, fullShortUrl);
+                ShortLinkGoToDO shortLinkGotoDO = shortLinkGoToMapper.selectOne(queryWrapper);
+                gid = shortLinkGotoDO.getGid();
             }
-            final LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                    .province(actualProvince)
-                    .city(actualCity )
-                    .adcode(adcode)
-                    .cnt(1)
-                    .fullShortUrl(fullShortUrl)
-                    .country("中国")
-                    .date(currentDate)
-                    .build();
-            linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
-            // 构造操作系统访问统计数据
-            final LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
-                    .fullShortUrl(fullShortUrl)
-                    .date(currentDate)
-                    .os(statsRecord.getOs())
-                    .cnt(1)
-                    .build();
-            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
-            // 构造浏览器访问统计数据
-            final LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
-                    .browser(statsRecord.getBrowser())
-                    .date(currentDate)
-                    .fullShortUrl(fullShortUrl)
-                    .cnt(1)
-                    .build();
-            linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
-            // 设备访问数据统计
-            final LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
-                    .fullShortUrl(fullShortUrl)
-                    .date(currentDate)
-                    .device(statsRecord.getDevice())
-                    .cnt(1)
-                    .build();
-            linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
-            // 获取短链接访问网络统计数据
-            final LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
-                    .network(statsRecord.getNetwork())
-                    .date(currentDate)
-                    .fullShortUrl(fullShortUrl)
-                    .cnt(1)
-                    .build();
-            linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
-            // 构造短链接日志统计数据
-            final LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
-                    .ip(statsRecord.getRemoteAddr())
-                    .user(statsRecord.getUv())
-                    .os(statsRecord.getOs())
-                    .browser(statsRecord.getBrowser())
-                    .fullShortUrl(fullShortUrl)
-                    .device(statsRecord.getDevice())
-                    .network(statsRecord.getNetwork())
-                    .locale(StrUtil.join("-", "中国", actualProvince, actualCity))
-                    .build();
-            linkAccessLogsMapper.insert(linkAccessLogsDO);
-            // 短链接访问统计数据自增
-            shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
-            // --- 开始 Redis 写入优化 ---
-            String todayDate = DateUtil.formatDate(new Date());
-            // 构造 3 个 Key
-            String pvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, todayDate);
-            String uvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(),gid, todayDate);
-            String uipKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(),gid, todayDate);
 
-            // 构造参数
-            List<String> keys = Arrays.asList(pvKey, uvKey, uipKey);
-            String uvFlag = statsRecord.getUvFirstFlag() ? "true" : "false";
-            String uipFlag = statsRecord.getUipFirstFlag() ? "true" : "false";
-            // 后续可以进行本地缓存缓冲 批量写入
-            String score = "1";
-            try {
-                stringRedisTemplate.execute(
-                        statsSaveScript,
-                        keys,
-                        fullShortUrl,
-                        uvFlag,
-                        uipFlag,
-                        score,
-                        TODAY_EXPIRETIME
-                );
-            } catch (Throwable ex) {
-                // Redis 写入失败不应该影响主流程（MySQL已入库），打个日志即可
-                // 或者根据业务严谨度决定是否抛出异常重试
-                log.error("Redis排行榜数据写入失败", ex);
+            // 2. 使用消息体的时间，保证 redis 和 DB 一致
+            String todayStr = DateUtil.formatDate(statsRecord.getCurrentDate());
+
+            // 3. Redis 统计
+            // A. PV
+            String pvRankKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, todayStr);
+            stringRedisTemplate.opsForZSet().incrementScore(pvRankKey, fullShortUrl, 1);
+
+            // B. 今日 UV Key (带日期) -> 用于判断“今日是否新用户”
+            String todayUvHllKey = String.format(TODAY_UV_HLL_KEY,fullShortUrl,todayStr);
+            // uvAddedToday = 1 (新) / 0 (旧)
+            Long uvAddedToday = stringRedisTemplate.opsForHyperLogLog().add(todayUvHllKey, statsRecord.getUv());
+            // 为 uv 添加过期时间
+            if (stringRedisTemplate.getExpire(todayUvHllKey) == -1) {
+                stringRedisTemplate.expire(todayUvHllKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
+
+            long todayUvCount = stringRedisTemplate.opsForHyperLogLog().size(todayUvHllKey);
+            String uvRankKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(), gid, todayStr);
+            stringRedisTemplate.opsForZSet().add(uvRankKey, fullShortUrl, todayUvCount);
+
+            // C.历史总 UV Key (不带日期) -> 用于判断“历史上是否新用户”
+            String totalUvHllKey = String.format(TOTAL_UV_HLL_KEY,fullShortUrl);
+            Long uvAddedTotal = stringRedisTemplate.opsForHyperLogLog().add(totalUvHllKey, statsRecord.getUv());
+
+            // D. UIP
+            String todayUipHllKey = String.format(TODAY_UIP_HLL_KEY,fullShortUrl,todayStr);
+            Long uipAddedToday = stringRedisTemplate.opsForHyperLogLog().add(todayUipHllKey, statsRecord.getRemoteAddr());
+            if (stringRedisTemplate.getExpire(todayUipHllKey) == -1) {
+                stringRedisTemplate.expire(todayUipHllKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
+            }
+
+            long todayUipCount = stringRedisTemplate.opsForHyperLogLog().size(todayUipHllKey);
+            String uipRankKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(), gid, todayStr);
+            stringRedisTemplate.opsForZSet().add(uipRankKey, fullShortUrl, todayUipCount);
+
+            // E. Total UIP
+            String totalUipHllKey = String.format(TOTAL_UIP_HLL_KEY,fullShortUrl);
+            Long uipAddedTotal = stringRedisTemplate.opsForHyperLogLog().add(totalUipHllKey, statsRecord.getRemoteAddr());
+
+            // 4. 数据库统计 (PV 都在这里 +1)
+            saveStatsToDatabase(
+                    statsRecord,
+                    fullShortUrl,
+                    gid,
+                    uvAddedToday == 1,
+                    uipAddedToday == 1,
+                    uvAddedTotal == 1,
+                    uipAddedTotal == 1
+            );
         } finally {
             rLock.unlock();
         }
+    }
 
+    /**
+     * 将详细的访问统计数据保存到数据库
+     * 包括：基础统计、地区、OS、浏览器、设备、网络、详细日志
+     */
+    private void saveStatsToDatabase(ShortLinkStatsRecordEvent statsRecord,
+                                     String fullShortUrl,
+                                     String gid,
+                                     boolean isTodayNewUv,
+                                     boolean isTodayNewUip,
+                                     boolean isTotalNewUv,
+                                     boolean isTotalNewUip) {
+        Date currentDate = statsRecord.getCurrentDate();
+        // 提取时间维度
+        int hour = DateUtil.hour(currentDate, true);
+        int weekday = DateUtil.dayOfWeekEnum(currentDate).getIso8601Value();
+        String remoteAddr = statsRecord.getRemoteAddr();
+
+        // 1. 远程调用高德接口解析 IP (增加超时保护)
+        String actualProvince = "未知";
+        String actualCity = "未知";
+        String adcode = "未知";
+
+        Map<String, Object> localeParamMap = new HashMap<>();
+        localeParamMap.put("key", statsLocaleAmapKey);
+        localeParamMap.put("ip", remoteAddr);
+
+        try {
+            // 设置 3000ms 超时，防止 HTTP 请求阻塞消费者线程
+            String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap, 3000);
+            JSONObject localeResultObj = JSON.parseObject(localeResultStr);
+            if ("10000".equals(localeResultObj.getString("infocode"))) {
+                String province = localeResultObj.getString("province");
+                boolean unknownProvince = StrUtil.isBlank(province) || "[]".equals(province);
+                actualProvince = unknownProvince ? actualProvince : province;
+
+                String city = localeResultObj.getString("city");
+                boolean unknownCity = StrUtil.isBlank(city) || "[]".equals(city);
+                actualCity = unknownCity ? actualCity : city;
+
+                String code = localeResultObj.getString("adcode");
+                boolean unknownAdcode = StrUtil.isBlank(code) || "[]".equals(code);
+                adcode = unknownAdcode ? adcode : code;
+            }
+        } catch (Exception e) {
+            log.warn("IP解析失败或超时, IP: {}", remoteAddr, e);
+            // 异常时保持默认值“未知”，不阻断流程
+        }
+
+        // 2. 保存地区统计 (LinkLocaleStats)
+        // 假设 Mapper XML 中使用了 INSERT ... ON DUPLICATE KEY UPDATE cnt = cnt + 1
+        LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .province(actualProvince)
+                .city(actualCity)
+                .adcode(adcode)
+                .cnt(1)
+                .country("中国")
+                .date(currentDate)
+                .build();
+        linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
+
+        // 3. 保存操作系统统计 (LinkOsStats)
+        LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .os(statsRecord.getOs())
+                .cnt(1)
+                .date(currentDate)
+                .build();
+        linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
+
+        // 4. 保存浏览器统计 (LinkBrowserStats)
+        LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .browser(statsRecord.getBrowser())
+                .cnt(1)
+                .date(currentDate)
+                .build();
+        linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
+
+        // 5. 保存设备统计 (LinkDeviceStats)
+        LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .device(statsRecord.getDevice())
+                .cnt(1)
+                .date(currentDate)
+                .build();
+        linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
+
+        // 6. 保存网络统计 (LinkNetworkStats)
+        LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .network(statsRecord.getNetwork())
+                .cnt(1)
+                .date(currentDate)
+                .build();
+        linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
+
+        // 7. 保存访问流水日志 (LinkAccessLogs) - 纯新增，不聚合
+        LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .ip(remoteAddr)
+                .user(statsRecord.getUv()) // Cookie UUID
+                .os(statsRecord.getOs())
+                .browser(statsRecord.getBrowser())
+                .device(statsRecord.getDevice())
+                .network(statsRecord.getNetwork())
+                .locale(StrUtil.join("-", "中国", actualProvince, actualCity))
+                .build();
+        linkAccessLogsMapper.insert(linkAccessLogsDO);
+
+        // 8. 保存基础访问统计 (LinkAccessStats) - 分小时统计 PV/UV/UIP
+        // 注意：因为使用了 HLL，这里的 UV/UIP 仅仅是记录 MQ 传过来的标记
+        // 如果要严格一致，数据库的 UV/UIP 统计建议依赖 HLL 的结果或 AccessLogs 的离线分析
+        LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .date(currentDate)
+                .hour(hour)
+                .weekday(weekday)
+                .pv(1) // PV 永远 +1
+                .uv(isTodayNewUv ? 1 : 0)
+                .uip(isTodayNewUip ? 1 : 0)
+                .build();
+        linkAccessStatsMapper.shortLinkStats(Collections.singletonList(linkAccessStatsDO));
+
+        // 9. 主表总数统计 (ShortLinkMapper)
+        // 更新 total_pv, total_uv, total_uip
+        // 这里利用 HLL 对“历史总数”的判断
+        shortLinkMapper.incrementStats(
+                gid,
+                fullShortUrl,
+                1, // total_pv +1
+                isTotalNewUv ? 1 : 0,
+                isTotalNewUip ? 1 : 0
+        );
     }
 }
