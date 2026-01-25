@@ -104,11 +104,11 @@ public class RedisStreamConfiguration {
         listenerContainer.register(riskReadRequest, shortLinkRiskRedisConsumer);
 
         // 4. 注册发送通知消费者
-        initStreamGroup(NOTIFY_STREAM_TOPIC_KEY, NOTIFY_STREAM_Group_KEY);
+        initStreamGroup(NOTIFY_STREAM_TOPIC_KEY, NOTIFY_STREAM_GROUP_KEY);
         StreamMessageListenerContainer.StreamReadRequest<String> notifyReadRequest =
                 StreamMessageListenerContainer.StreamReadRequest.builder(StreamOffset.create(NOTIFY_STREAM_TOPIC_KEY, ReadOffset.lastConsumed()))
                         .cancelOnError(throwable -> false)
-                        .consumer(Consumer.from(NOTIFY_STREAM_Group_KEY, "notify-consumer"))
+                        .consumer(Consumer.from(NOTIFY_STREAM_GROUP_KEY, "notify-consumer"))
                         .autoAcknowledge(true)
                         .build();
         // 绑定：notifyReadRequest -> riskConsumer

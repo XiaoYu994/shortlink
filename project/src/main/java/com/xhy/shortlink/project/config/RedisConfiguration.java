@@ -2,10 +2,13 @@ package com.xhy.shortlink.project.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.scripting.support.ResourceScriptSource;
 
 @Configuration
 public class RedisConfiguration {
@@ -33,5 +36,27 @@ public class RedisConfiguration {
 
         template.afterPropertiesSet();
         return template;
+    }
+
+    /*
+    *  修改短链接分组的时候迁移 Redis Zset 数据
+    * */
+    @Bean
+    public DefaultRedisScript<Long> statsRankMigrateScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/stats_rank_migrate.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    /*
+     *  统计短链接今日监控数据，并写入 Redis Zset
+     * */
+    @Bean
+    public DefaultRedisScript<Long> statsSaveScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/stats_rank_save.lua")));
+        script.setResultType(Long.class);
+        return script;
     }
 }

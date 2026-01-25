@@ -70,4 +70,10 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * */
     List<ShortLinkGroupCountRespDTO> listGroupShortlinkCount(List<String> requestParam);
 
+    /**
+     * 从 Redis Zset 中获取今日实时统计的数据
+     * @param requestParam 请求参数
+     */
+    void fillTodayStats(ShortLinkPageRespDTO requestParam);
+
 }

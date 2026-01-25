@@ -8,7 +8,7 @@ import com.xhy.shortlink.admin.remote.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkRecycleBinRecoverReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkRecycleBinRemoveReqDTO;
 import com.xhy.shortlink.admin.remote.dto.req.ShortLinkRecycleBinSaveReqDTO;
-import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkRecycleBinPageRespDTO;
+import com.xhy.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.admin.service.RecycleBinService;
 import com.xhy.shortlink.admin.toolkit.ResultUtils;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,7 @@ public class RecycleBinController {
     * 后管调用中台回收链接分页查询接口
     * */
     @GetMapping("/api/short-link/admin/v1/recycle-bin/page")
-    public Result<Page<ShortLinkRecycleBinPageRespDTO>> pageRecycleShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
+    public Result<Page<ShortLinkPageRespDTO>> pageRecycleShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
         return recycleBinService.pageRecycleShortlink(requestParam);
     }
 

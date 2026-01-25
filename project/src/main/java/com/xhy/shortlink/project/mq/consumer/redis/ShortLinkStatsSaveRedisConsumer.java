@@ -10,6 +10,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
+import com.xhy.shortlink.project.common.enums.OrderTagEnum;
 import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
 import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
@@ -24,13 +25,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.LOCK_GID_UPDATE_KEY;
+import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.RANK_KEY;
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
+import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.TODAY_EXPIRETIME;
 
 /*
  * 短链接监控状态保存消息队列消费者 Redis Stream实现
@@ -52,6 +56,9 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final MessageQueueIdempotentHandler  messageQueueIdempotentHandler;
+
+    // 定义 Lua 脚本对象
+    private final DefaultRedisScript<Long> statsSaveScript;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -191,6 +198,35 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
             linkAccessLogsMapper.insert(linkAccessLogsDO);
             // 短链接访问统计数据自增
             shortLinkMapper.incrementStats(gid, fullShortUrl,1,statsRecord.getUvFirstFlag() ? 1:0, statsRecord.getUipFirstFlag() ? 1:0);
+            // --- 开始 Redis 写入优化 ---
+            String todayDate = DateUtil.formatDate(new Date());
+            // 构造 3 个 Key
+            String pvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, todayDate);
+            String uvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(),gid, todayDate);
+            String uipKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(),gid, todayDate);
+
+            // 构造参数
+            List<String> keys = Arrays.asList(pvKey, uvKey, uipKey);
+            String uvFlag = statsRecord.getUvFirstFlag() ? "true" : "false";
+            String uipFlag = statsRecord.getUipFirstFlag() ? "true" : "false";
+            // 后续可以进行本地缓存缓冲 批量写入
+            String score = "1";
+            try {
+                // 执行 Lua 脚本
+                stringRedisTemplate.execute(
+                        statsSaveScript,
+                        keys,
+                        fullShortUrl,
+                        uvFlag,
+                        uipFlag,
+                        score,
+                        TODAY_EXPIRETIME
+                );
+            } catch (Throwable ex) {
+                // Redis 写入失败不应该影响主流程（MySQL已入库），打个日志即可
+                // 或者根据业务严谨度决定是否抛出异常重试
+                log.error("Redis排行榜数据写入失败", ex);
+            }
         } finally {
             rLock.unlock();
         }

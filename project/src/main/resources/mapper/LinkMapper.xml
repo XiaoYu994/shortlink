@@ -3,44 +3,35 @@
 <mapper namespace="com.xhy.shortlink.project.dao.mapper.ShortLinkMapper">
 
     <sql id="Base_Column_List">
-        t.id, t.domain, t.short_uri, t.full_short_url, t.origin_url,
-        t.gid, t.favicon, t.enable_status, t.created_type, t.valid_date_type,
-        t.valid_date, t.`describe`, t.total_pv, t.total_uv, t.total_uip,
-        t.create_time, t.update_time, t.del_flag
+        id, domain, short_uri, full_short_url, origin_url, gid, favicon,
+        enable_status, created_type, valid_date_type, valid_date, `description`,
+        total_pv, total_uv, total_uip, create_time, update_time, del_flag,
+        last_access_time
     </sql>
 
-    <!-- 分页查询短链接 -->
-    <select id="pageLink" parameterType="com.xhy.shortlink.project.dto.req.ShortLinkPageReqDTO"
-            resultType="com.xhy.shortlink.project.dao.entity.ShortLinkDO">
+    <!-- 用于查询“今天之前”的数据 -->
+    <select id="pageLinkFallback" resultType="com.xhy.shortlink.project.dao.entity.ShortLinkDO">
         SELECT
-        <include refid="Base_Column_List"/>,
-        COALESCE(s.today_pv, 0) AS todayPv,
-        COALESCE(s.today_uv, 0) AS todayUv,
-        COALESCE(s.today_uip, 0) AS todayUip
+        <include refid="Base_Column_List"/>
+        FROM t_link
+        WHERE gid = #{gid}
+        AND del_flag = 0
+        AND enable_status = 0
+        AND (last_access_time &lt; #{todayStart} OR last_access_time IS NULL)
+        ORDER BY create_time DESC
+        LIMIT #{start}, #{size}
+    </select>
+
+
+    <!-- 分页查询短链接 -->
+    <select id="pageLink" resultType="com.xhy.shortlink.project.dao.entity.ShortLinkDO">
+        SELECT
+        <include refid="Base_Column_List"/>
         FROM t_link t
-        LEFT JOIN (
-        /* 今日聚合子查询：先按 full_short_url 汇总，再连接 */
-        SELECT full_short_url,
-        SUM(pv) AS today_pv,
-        SUM(uv) AS today_uv,
-        SUM(uip) AS today_uip
-        FROM t_link_access_stats
-        WHERE date = CURDATE()
-        GROUP BY full_short_url
-        ) s ON t.full_short_url = s.full_short_url
         WHERE t.gid = #{gid}
         AND t.enable_status = 0
         AND t.del_flag = 0
         <choose>
-            <when test="orderTag == 'todayPv'">
-                ORDER BY todayPv DESC
-            </when>
-            <when test="orderTag == 'todayUv'">
-                ORDER BY todayUv DESC
-            </when>
-            <when test="orderTag == 'todayUip'">
-                ORDER BY todayUip DESC
-            </when>
             <when test="orderTag == 'totalPv'">
                 ORDER BY t.total_pv DESC
             </when>
@@ -56,27 +47,17 @@
         </choose>
     </select>
 
-
+    <!-- 查询回收站分页链接-->
     <select id="pageRecycleBinLink" resultType="com.xhy.shortlink.project.dao.entity.ShortLinkDO"
             parameterType="com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO">
         SELECT
         <include refid="Base_Column_List"/>,
-        COALESCE(s.today_pv, 0) AS todayPv,
-        COALESCE(s.today_uv, 0) AS todayUv,
-        COALESCE(s.today_uip, 0) AS todayUip
+        0 AS todayPv,
+        0 AS todayUv,
+        0 AS todayUip
         FROM t_link t
-        LEFT JOIN (
-        /* 今日聚合子查询：先按 full_short_url 汇总，再连接 */
-        SELECT full_short_url,
-        SUM(pv) AS today_pv,
-        SUM(uv) AS today_uv,
-        SUM(uip) AS today_uip
-        FROM t_link_access_stats
-        WHERE date = CURDATE()
-        GROUP BY full_short_url
-        ) s ON t.full_short_url = s.full_short_url
         WHERE
-         t.enable_status != 0
+        t.enable_status != 0
         AND t.del_flag = 0
         <if test="gidList != null and gidList.size() > 0">
             AND t.gid IN
@@ -85,15 +66,6 @@
             </foreach>
         </if>
         <choose>
-            <when test="orderTag == 'todayPv'">
-                ORDER BY todayPv DESC
-            </when>
-            <when test="orderTag == 'todayUv'">
-                ORDER BY todayUv DESC
-            </when>
-            <when test="orderTag == 'todayUip'">
-                ORDER BY todayUip DESC
-            </when>
             <when test="orderTag == 'totalPv'">
                 ORDER BY t.total_pv DESC
             </when>

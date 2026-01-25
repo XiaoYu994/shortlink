@@ -88,5 +88,12 @@ public class RedisKeyConstant {
     /*
      * 发送风控通知 group 缓存标识
      * */
-    public static final String NOTIFY_STREAM_Group_KEY = "short-link:notify-stream:only-group";
+    public static final String NOTIFY_STREAM_GROUP_KEY = "short-link:notify-stream:only-group";
+
+    /*
+    *  统计今日 pv uv uip 数据 {%s} 使用 Hash Tag ，确保Redis Cluster (集群模式) 下的可用性
+    * */
+    public static final String RANK_KEY = "short-link:rank:%s:{%s}:%s";
+
+
 }

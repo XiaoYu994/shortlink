@@ -1,6 +1,7 @@
 package com.xhy.shortlink.project.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
@@ -9,12 +10,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.xhy.shortlink.project.common.biz.user.UserContext;
 import com.xhy.shortlink.project.common.convention.exception.ClientException;
 import com.xhy.shortlink.project.common.convention.exception.ServiceException;
 import com.xhy.shortlink.project.common.enums.LinkEnableStatusEnum;
+import com.xhy.shortlink.project.common.enums.OrderTagEnum;
 import com.xhy.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.project.config.GotoDomainWhiteListConfiguration;
 import com.xhy.shortlink.project.dao.entity.ShortLinkDO;
@@ -49,6 +52,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,9 +60,12 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.xhy.shortlink.project.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.DEFAULT_COOKIE_VALID_TIME;
+import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.TODAY_EXPIRETIME;
 
 /*
 * 短链接接口实现层
@@ -86,6 +93,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     // 注入 Caffeine 缓存
     private final Cache<String, String> shortLinkCache;
+
+    private final DefaultRedisScript<Long> statsRankMigrateScript;
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -313,7 +322,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .gid(requestParam.getGid())
                 .createdType(requestParam.getCreatedType())
                 .domain(defaultDomain)
-                .describe(requestParam.getDescribe())
+                .description(requestParam.getDescription())
                 .validDateType(requestParam.getValidDateType())
                 .validDate(requestParam.getValidDate())
                 .fullShortUrl(fullShortUrl)
@@ -386,7 +395,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .gid(requestParam.getGid())
                     .createdType(requestParam.getCreatedType())
                     .domain(defaultDomain)
-                    .describe(requestParam.getDescribe())
+                    .description(requestParam.getDescription())
                     .validDateType(requestParam.getValidDateType())
                     .validDate(requestParam.getValidDate())
                     .fullShortUrl(fullShortUrl)
@@ -435,18 +444,18 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam) {
         final List<String> originUrlList = requestParam.getOriginUrls();
-        final List<String> describeList = requestParam.getDescribes();
+        final List<String> describeList = requestParam.getDescription();
         List<ShortLinkBaseInfoRespDTO> resultList = new ArrayList<>();
         for(int i = 0; i < originUrlList.size(); i++) {
             ShortLinkCreateReqDTO shortLinkCreateReqDTO = BeanUtil.toBean(requestParam, ShortLinkCreateReqDTO.class);
             shortLinkCreateReqDTO.setOriginUrl(originUrlList.get(i));
-            shortLinkCreateReqDTO.setDescribe(describeList.get(i));
+            shortLinkCreateReqDTO.setDescription(describeList.get(i));
             try {
                 ShortLinkCreateRespDTO shortlink = createShortlink(shortLinkCreateReqDTO);
                 resultList.add(ShortLinkBaseInfoRespDTO.builder()
                         .fullShortUrl(shortlink.getFullShortUrl())
                         .originUrl(shortlink.getOriginUrl())
-                        .describe(describeList.get(i))
+                        .description(describeList.get(i))
                         .build());
             } catch (Throwable e) {
                 log.error("批量创建短链接失败，原始参数：{}", originUrlList.get(i), e);
@@ -483,7 +492,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                     .eq(ShortLinkDO::getGid, requestParam.getGid())
                     .set(ShortLinkDO::getOriginUrl, requestParam.getOriginUrl())
-                    .set(ShortLinkDO::getDescribe, requestParam.getDescribe())
+                    .set(ShortLinkDO::getDescription, requestParam.getDescription())
                     .set(ShortLinkDO::getValidDateType, requestParam.getValidDateType())
                     .set(ShortLinkDO::getValidDate,
                             Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
@@ -513,12 +522,37 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 // 准备新数据 (复用查出来的对象，修改属性)
                 shortLinkDO.setGid(requestParam.getGid());
                 shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
-                shortLinkDO.setDescribe(requestParam.getDescribe());
+                shortLinkDO.setDescription(requestParam.getDescription());
                 shortLinkDO.setValidDateType(requestParam.getValidDateType());
                 shortLinkDO.setValidDate(Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate());
                 shortLinkDO.setId(null); // ID置空，重新生成
                 // 注意：这里插入的 shortLinkDO 里 favicon 还是旧的，没关系，异步线程一会儿会改它
                 baseMapper.insert(shortLinkDO);
+                // 更新 Redis 中的统计的今日数据
+                // 逻辑：从旧分组的 ZSet 取出分数，添加到新分组 ZSet，然后从旧分组删除
+                String todayStr = DateUtil.today();
+                String fullShortUrl = requestParam.getFullShortUrl();
+                String oldGid = requestParam.getOriginGid();
+                String newGid = requestParam.getGid();
+                // 过期时间
+
+                // 需要迁移的三种统计类型
+                List<String> statsTypes = Arrays.asList(
+                        OrderTagEnum.TODAY_PV.getValue(),
+                        OrderTagEnum.TODAY_UV.getValue(),
+                        OrderTagEnum.TODAY_UIP.getValue()
+                );
+                for (String statsType : statsTypes) {
+                    String oldKey = String.format(RANK_KEY, statsType, oldGid, todayStr);
+                    String newKey = String.format(RANK_KEY, statsType, newGid, todayStr);
+
+                    // 执行 Lua 脚本：原子性完成 查旧 -> 删旧 -> 插新 -> 设TTL
+                    stringRedisTemplate.execute(
+                            statsRankMigrateScript, // 你的脚本对象
+                            Arrays.asList(oldKey, newKey), // KEYS
+                            fullShortUrl, TODAY_EXPIRETIME // ARGV
+                    );
+                }
             } finally {
                 rLock.unlock();
             }
@@ -552,12 +586,198 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     @Override
     public IPage<ShortLinkPageRespDTO> pageShortlink(ShortLinkPageReqDTO requestParam) {
-        final IPage<ShortLinkDO> resultPage = shortLinkMapper.pageLink(requestParam);
+        // 场景 A：如果用户点击了“今日访问量/人数/IP数”排序
+        if (StrUtil.equalsAny(requestParam.getOrderTag(), OrderTagEnum.TODAY_PV.getValue(), OrderTagEnum.TODAY_UV.getValue(), OrderTagEnum.TODAY_UIP.getValue())) {
+            return pageByRedisRank(requestParam);
+        }
+
+        // 场景 B：默认排序（按创建时间），走原来的高性能 MySQL 查询
+        IPage<ShortLinkDO> resultPage = baseMapper.pageLink(requestParam); // 这里用不带 JOIN 的简单 SQL
         return resultPage.convert(each -> {
-            final ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
+            ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
             result.setDomain("http://" + result.getDomain());
+            // 从 Redis 填充今日数据用于展示（但不用于排序）
+            fillTodayStats(result);
             return result;
         });
+    }
+
+    /**
+     * 核心：基于 Redis ZSet 的分页查询 ：Redis (今日有数据) -> MySQL (今日无数据)
+     */
+    private IPage<ShortLinkPageRespDTO> pageByRedisRank(ShortLinkPageReqDTO req) {
+        String todayStr = DateUtil.today();
+        // 获取今天的起始时间 (例如 2026-01-25 00:00:00)
+        Date todayStart = DateUtil.beginOfDay(new Date());
+        // 1. 确定要查哪个榜单
+        String rankKey = String.format(RANK_KEY, req.getOrderTag(), req.getGid(), todayStr);
+
+        // 2. 计算分页范围
+        long current = req.getCurrent();
+        long size = req.getSize();
+        long start = (current - 1) * size;
+        long end = start + size - 1;
+
+        try {
+            // 3. 查询 Redis 中“有流量”的总数
+            Long redisTotal = stringRedisTemplate.opsForZSet().zCard(rankKey);
+            redisTotal = redisTotal == null ? 0 : redisTotal;
+
+            // 4. 查询 MySQL 中“无流量”的总数 (last_access_time < 今天)
+            // 也可以直接用 selectCount 查总数减去 redisTotal，但这样查更精准
+            long dbFallbackTotal = baseMapper.countLinkFallback(req.getGid(), todayStart);
+
+            // 总条数 = Redis热数据 + DB冷数据
+            long total = redisTotal + dbFallbackTotal;
+
+            List<ShortLinkPageRespDTO> resultList = new ArrayList<>();
+            // 场景 A: 请求范围完全在 Redis 内
+            if (start < redisTotal && end < redisTotal) {
+                Set<String> urls = stringRedisTemplate.opsForZSet().reverseRange(rankKey, start, end);
+                resultList.addAll(buildResultByUrls(urls, req.getGid()));
+            }
+            // 场景 B: 请求范围跨越 Redis 和 MySQL (接壤处)
+            else if (start < redisTotal) {
+                // 1. 先取 Redis 剩下的部分
+                Set<String> urls = stringRedisTemplate.opsForZSet().reverseRange(rankKey, start, redisTotal - 1);
+                resultList.addAll(buildResultByUrls(urls, req.getGid()));
+
+                // 2. 计算需要从 DB 补多少条
+                long needMore = size - resultList.size();
+
+                // 3. 从 DB 查补位数据 (偏移量 offset = 0，因为是接在 Redis 屁股后面)
+                List<ShortLinkDO> dbList = baseMapper.pageLinkFallback(
+                        req.getGid(),
+                        todayStart,
+                        0,
+                        needMore
+                );
+                resultList.addAll(beanToDtoList(dbList));
+            }
+            // 场景 C: 请求范围完全在 MySQL 内 (纯冷数据)
+            else {
+                // 计算 DB 的偏移量
+                // 公式：当前请求的全局 offset - Redis 的总数
+                long dbOffset = start - redisTotal;
+
+                List<ShortLinkDO> dbList = baseMapper.pageLinkFallback(
+                        req.getGid(),
+                        todayStart,
+                        dbOffset,
+                        size
+                );
+                resultList.addAll(beanToDtoList(dbList));
+            }
+
+            // ==================== 返回分页对象 ====================
+            IPage<ShortLinkPageRespDTO> page = new Page<>();
+            page.setRecords(resultList);
+            page.setTotal(total);
+            page.setCurrent(current);
+            page.setSize(size);
+            return page;
+        } catch (Exception e) {
+            // ================= 触发降级 =================
+            log.error("Redis排行榜查询失败，触发降级策略，转为纯数据库查询。Gid: {}", req.getGid(), e);
+            // 降级处理：直接查数据库全量列表（忽略 last_access_time 过滤）
+            // 注意：此时无法按“今日PV”排序，只能按默认排序（如创建时间或总PV）
+            return fallbackToBaseQuery(req);
+        }
+    }
+
+    /**
+     * 降级查询方法：完全不依赖 Redis，直接查库
+     */
+    private IPage<ShortLinkPageRespDTO> fallbackToBaseQuery(ShortLinkPageReqDTO req) {
+        IPage<ShortLinkDO> resultPage = baseMapper.pageLink(req);
+        return resultPage.convert(each -> {
+            ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
+            result.setDomain("http://" + result.getDomain());
+            // 降级模式下，今日数据无法获取，置为 0
+            result.setTodayPv(0);
+            result.setTodayUv(0);
+            result.setTodayUip(0);
+            return result;
+        });
+    }
+
+    // 辅助方法：Redis 结果组装
+    private List<ShortLinkPageRespDTO> buildResultByUrls(Set<String> urls, String gid) {
+        if (urls == null || urls.isEmpty()) return new ArrayList<>();
+
+        // 1. 批量查 DB 基础信息
+        List<ShortLinkDO> linkDOList = baseMapper.selectList(Wrappers.<ShortLinkDO>lambdaQuery()
+                .in(ShortLinkDO::getFullShortUrl, urls)
+                .eq(ShortLinkDO::getGid, gid)
+                .eq(ShortLinkDO::getDelFlag, 0));
+
+        // 2. 内存重排序
+        Map<String, ShortLinkDO> linkMap = linkDOList.stream()
+                .collect(Collectors.toMap(ShortLinkDO::getFullShortUrl, Function.identity()));
+
+        List<ShortLinkPageRespDTO> list = new ArrayList<>();
+        String todayStr = DateUtil.today();
+        String pvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, todayStr);
+        String uvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(), gid, todayStr);
+        String uipKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(), gid, todayStr);
+        for (String url : urls) {
+            ShortLinkDO dbLink = linkMap.get(url);
+            if (dbLink != null) {
+                ShortLinkPageRespDTO dto = BeanUtil.toBean(dbLink, ShortLinkPageRespDTO.class);
+                dto.setDomain("http://" + dto.getDomain());
+                // 1. 查 PV
+                Double pv = stringRedisTemplate.opsForZSet().score(pvKey, url);
+                dto.setTodayPv(pv == null ? 0 : pv.intValue());
+
+                // 2. 查 UV
+                Double uv = stringRedisTemplate.opsForZSet().score(uvKey, url);
+                dto.setTodayUv(uv == null ? 0 : uv.intValue());
+
+                // 3. 查 UIP
+                Double uip = stringRedisTemplate.opsForZSet().score(uipKey, url);
+                dto.setTodayUip(uip == null ? 0 : uip.intValue());
+                list.add(dto);
+            }
+        }
+        return list;
+    }
+    // 辅助方法：DB 冷数据转换 (默认今日数据为0)
+    private List<ShortLinkPageRespDTO> beanToDtoList(List<ShortLinkDO> dbList) {
+        return dbList.stream().map(each -> {
+            ShortLinkPageRespDTO dto = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
+            dto.setDomain("http://" + dto.getDomain());
+            dto.setTodayPv(0);
+            dto.setTodayUv(0);
+            dto.setTodayUip(0);
+            return dto;
+        }).collect(Collectors.toList());
+    }
+    /**
+     * 从 Redis ZSet 中获取今日实时统计数据
+     */
+    public void fillTodayStats(ShortLinkPageRespDTO result) {
+
+        // 1. 获取当前日期，格式必须与写入时保持一致 (yyyy-MM-dd)
+        String todayDate = DateUtil.today();
+
+        // 2. 构造 Redis Key (注意使用 {gid} hash tag)
+        String gid = result.getGid();
+        String fullShortUrl = result.getFullShortUrl();
+
+        String pvKey = String.format(RANK_KEY,OrderTagEnum.TODAY_PV.getValue(), gid, todayDate);
+        String uvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(),gid, todayDate);
+        String uipKey = String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(),gid, todayDate);
+
+        // 3. 批量查询 Redis (Pipeline 优化可选，但这里单次查询也可以)
+        // score 返回 Double，如果 member 不存在则返回 null
+        Double pvScore = stringRedisTemplate.opsForZSet().score(pvKey, fullShortUrl);
+        Double uvScore = stringRedisTemplate.opsForZSet().score(uvKey, fullShortUrl);
+        Double uipScore = stringRedisTemplate.opsForZSet().score(uipKey, fullShortUrl);
+
+        // 4. 填充数据 (Null Safe 处理)
+        result.setTodayPv(pvScore == null ? 0 : pvScore.intValue());
+        result.setTodayUv(uvScore == null ? 0 : uvScore.intValue());
+        result.setTodayUip(uipScore == null ? 0 : uipScore.intValue());
     }
 
     @Override

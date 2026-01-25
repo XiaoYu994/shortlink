@@ -7,7 +7,7 @@ import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRecoverReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinRemoveReqDTO;
 import com.xhy.shortlink.project.dto.req.ShortLinkRecycleBinSaveReqDTO;
-import com.xhy.shortlink.project.dto.resp.ShortLinkRecycleBinPageRespDTO;
+import com.xhy.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.project.service.Impl.RecycleBinServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +36,7 @@ public class RecycleBinController {
     * 分页查询回收站链接
     * */
     @GetMapping("/api/short-link/v1/recycle-bin/page")
-    public Result<IPage<ShortLinkRecycleBinPageRespDTO>> pageRecycleBinShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
+    public Result<IPage<ShortLinkPageRespDTO>> pageRecycleBinShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
         return Results.success(recycleBinService.pageShortlink(requestParam));
     }
 

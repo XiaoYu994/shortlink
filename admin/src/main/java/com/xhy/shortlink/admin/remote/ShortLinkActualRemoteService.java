@@ -86,7 +86,7 @@ public interface ShortLinkActualRemoteService {
      * @return 分页结果
      */
     @GetMapping("/api/short-link/v1/recycle-bin/page")
-    Result<Page<ShortLinkRecycleBinPageRespDTO>> pageRecycleShortlink(@SpringQueryMap ShortLinkRecycleBinPageReqDTO requestParam);
+    Result<Page<ShortLinkPageRespDTO>> pageRecycleShortlink(@SpringQueryMap ShortLinkRecycleBinPageReqDTO requestParam);
 
     /**
      * 恢复短链接
