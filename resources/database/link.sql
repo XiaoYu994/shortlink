@@ -56,15 +56,21 @@ CREATE TABLE `t_link`  (
   `created_type` tinyint(1) NULL DEFAULT 0 COMMENT '创建类型 0：接口 1：控制台',
   `valid_date_type` tinyint(1) NULL DEFAULT NULL COMMENT '有效期类型 0：永久有效 1：用户自定义',
   `valid_date` datetime NULL DEFAULT NULL COMMENT '有效期',
-  `describe` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
-  `total_pv` int(11) NULL DEFAULT 0 COMMENT '历史PV',
+  `description` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `total_pv` bigint NULL DEFAULT 0 COMMENT '历史PV',
   `total_uv` int(11) NULL DEFAULT 0 COMMENT '历史UV',
   `total_uip` int(11) NULL DEFAULT 0 COMMENT '历史UIP',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT NULL COMMENT '修改时间',
   `del_flag` tinyint(1) NULL DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+  `last_access_time` datetime DEFAULT NULL COMMENT '最后访问时间',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `idx_unique_full_short_url`(`full_short_url` ASC) USING BTREE
+  UNIQUE INDEX `idx_unique_full_short_url`(`full_short_url` ASC) USING BTREE,
+  KEY `idx_gid_last_access` (`gid`,`last_access_time`), -- 用于 Redis 未命中的冷数据查询
+  INDEX `idx_gid_create_time`(`gid`, `create_time`) USING BTREE, -- 用于默认分页
+  INDEX `idx_gid_total_pv`(`gid`, `total_pv`) USING BTREE,       -- 用于PV排序
+  INDEX `idx_gid_total_uv`(`gid`, `total_uv`) USING BTREE,       -- 用于UV排序
+  INDEX `idx_gid_del_enable`(`gid`, `del_flag`, `enable_status`) USING BTREE -- 用于状态筛选
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
