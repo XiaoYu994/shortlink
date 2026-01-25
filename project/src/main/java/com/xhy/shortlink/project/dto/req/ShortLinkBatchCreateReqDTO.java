@@ -27,7 +27,7 @@ public class ShortLinkBatchCreateReqDTO {
     /**
      * 描述集合
      */
-    private List<String> describes;
+    private List<String> description;
 
     /**
      * 分组标识

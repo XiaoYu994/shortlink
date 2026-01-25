@@ -18,7 +18,7 @@ public class ShortLinkBaseInfoRespDTO {
     /**
      * 描述信息
      */
-    private String describe;
+    private String description;
 
     /**
      * 原始链接

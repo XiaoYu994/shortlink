@@ -45,5 +45,5 @@ public class ShortLinkCreateReqDTO {
     /*
     * 短链接描述
     * */
-    private String describe;
+    private String description;
 }
