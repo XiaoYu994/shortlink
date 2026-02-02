@@ -11,6 +11,12 @@ dataSources:
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
     username: root
     password: root
+  ds_cold:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link_cold?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
 
 rules:
   - !SHARDING
@@ -59,9 +65,13 @@ rules:
   # 添加单表加载规则
   - !SINGLE
     tables:
-      # 语法：*.* 代表“加载所有未被分片的表”
-      # ShardingSphere 会自动扫描 ds_0，发现 t_link_access_stats 并加载它
-      - "*.*"
+      # 语法：ds_0.* 代表“加载 ds_0 下所有未被分片的表”
+      - "ds_0.*"
+      # 冷库专用单表
+      - "ds_cold.t_link_cold"
+      - "ds_cold.t_link_goto_cold"
+      - "ds_cold.t_link_history"
+      - "ds_cold.t_link_goto_history"
     # 指定默认数据源（当存在多个数据源时必填，单个数据源时可选但建议加上）
     defaultDataSource: ds_0
 

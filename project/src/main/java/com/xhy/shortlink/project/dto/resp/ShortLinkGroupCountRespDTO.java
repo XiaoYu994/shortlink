@@ -1,11 +1,17 @@
 package com.xhy.shortlink.project.dto.resp;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /*
 * 短链接分组数量查询响应参数
 * */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ShortLinkGroupCountRespDTO {
     /*
     * 分组id
@@ -14,5 +20,5 @@ public class ShortLinkGroupCountRespDTO {
     /*
     * 短链接数量
     * */
-    private Integer shortLinkCount;
+    private Long shortLinkCount;
 }

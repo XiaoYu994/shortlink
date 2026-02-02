@@ -14,6 +14,7 @@ import com.xhy.shortlink.project.dao.entity.*;
 import com.xhy.shortlink.project.dao.mapper.*;
 import com.xhy.shortlink.project.handler.MessageQueueIdempotentHandler;
 import com.xhy.shortlink.project.mq.event.ShortLinkStatsRecordEvent;
+import com.xhy.shortlink.project.service.ShortLinkService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -44,6 +45,7 @@ import static com.xhy.shortlink.project.common.constant.ShortLinkConstant.TODAY_
 public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, MapRecord<String, String, String>> {
     private final RedissonClient redissonClient;
     private final ShortLinkMapper shortLinkMapper;
+    private final ShortLinkColdMapper shortLinkColdMapper;
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
@@ -54,6 +56,10 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final MessageQueueIdempotentHandler  messageQueueIdempotentHandler;
+    private final ShortLinkService shortLinkService;
+
+    @Value("${short-link.cold-data.rehot.threshold:1000}")
+    private int rehotThreshold;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -174,6 +180,7 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
                                      boolean isTotalNewUv,
                                      boolean isTotalNewUip) {
         Date currentDate = statsRecord.getCurrentDate();
+        String todayStr = DateUtil.formatDate(currentDate);
         // 提取时间维度
         int hour = DateUtil.hour(currentDate, true);
         int weekday = DateUtil.dayOfWeekEnum(currentDate).getIso8601Value();
@@ -289,12 +296,37 @@ public class ShortLinkStatsSaveRedisConsumer implements StreamListener<String, M
         // 9. 主表总数统计 (ShortLinkMapper)
         // 更新 total_pv, total_uv, total_uip
         // 这里利用 HLL 对“历史总数”的判断
-        shortLinkMapper.incrementStats(
+        int affected = shortLinkMapper.incrementStats(
                 gid,
                 fullShortUrl,
                 1, // total_pv +1
                 isTotalNewUv ? 1 : 0,
                 isTotalNewUip ? 1 : 0
         );
+        if (affected == 0) {
+            shortLinkColdMapper.incrementStats(
+                    gid,
+                    fullShortUrl,
+                    1,
+                    isTotalNewUv ? 1 : 0,
+                    isTotalNewUip ? 1 : 0
+            );
+        }
+        tryRehotIfNeeded(fullShortUrl, gid, todayStr);
+    }
+
+    /**
+     * 统计链路回热：当今日PV达到阈值，触发冷库回热
+     */
+    private void tryRehotIfNeeded(String fullShortUrl, String gid, String todayStr) {
+        if (rehotThreshold <= 0) {
+            return;
+        }
+        String pvKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, todayStr);
+        Double pvScore = stringRedisTemplate.opsForZSet().score(pvKey, fullShortUrl);
+        long pv = pvScore == null ? 0L : pvScore.longValue();
+        if (pv >= rehotThreshold) {
+            shortLinkService.rehotColdLink(fullShortUrl, gid);
+        }
     }
 }

@@ -26,8 +26,6 @@
         <mybatis-plus.version>3.5.15</mybatis-plus.version>
         <shardingsphere.version>5.5.0</shardingsphere.version>
 
-        <jjwt.version>0.12.5</jjwt.version>
-
         <fastjson2.version>2.0.48</fastjson2.version>
         <guava.version>33.1.0-jre</guava.version>
 
@@ -100,22 +98,6 @@
                         <artifactId>shardingsphere-test-util</artifactId>
                     </exclusion>
                 </exclusions>
-            </dependency>
-
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-api</artifactId>
-                <version>${jjwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-impl</artifactId>
-                <version>${jjwt.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt-jackson</artifactId>
-                <version>${jjwt.version}</version>
             </dependency>
 
             <dependency>

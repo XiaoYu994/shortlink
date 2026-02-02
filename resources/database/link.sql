@@ -236,4 +236,79 @@ CREATE TABLE `t_user_notification` (
                                        KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表';
 
+-- ----------------------------
+-- Cold Database (link_cold)
+-- ----------------------------
+CREATE DATABASE IF NOT EXISTS `link_cold` DEFAULT CHARACTER SET utf8mb4;
+USE `link_cold`;
+
+CREATE TABLE `t_link_cold`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `domain` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '域名',
+  `short_uri` varchar(8) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NULL DEFAULT NULL COMMENT '短链接',
+  `full_short_url` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '完整短链接',
+  `origin_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '原始链接',
+  `gid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '分组标识',
+  `favicon` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '网站图标',
+  `enable_status` tinyint(1) NULL DEFAULT 0 COMMENT '启用标识 （0：启用）（1：未启用）（2：平台封禁）',
+  `created_type` tinyint(1) NULL DEFAULT 0 COMMENT '创建类型 0：接口 1：控制台',
+  `valid_date_type` tinyint(1) NULL DEFAULT NULL COMMENT '有效期类型 0：永久有效 1：用户自定义',
+  `valid_date` datetime NULL DEFAULT NULL COMMENT '有效期',
+  `description` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `total_pv` bigint NULL DEFAULT 0 COMMENT '历史PV',
+  `total_uv` int(11) NULL DEFAULT 0 COMMENT '历史UV',
+  `total_uip` int(11) NULL DEFAULT 0 COMMENT '历史UIP',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '修改时间',
+  `del_flag` tinyint(1) NULL DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+  `last_access_time` datetime DEFAULT NULL COMMENT '最后访问时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `idx_unique_full_short_url`(`full_short_url` ASC) USING BTREE,
+  KEY `idx_gid_last_access` (`gid`,`last_access_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `t_link_goto_cold`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `gid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'default' COMMENT '分组标识',
+  `full_short_url` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '完整短链接',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `idx_full_short_url` (`full_short_url`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- History Tables (link_cold)
+-- ----------------------------
+CREATE TABLE `t_link_history`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `domain` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '域名',
+  `short_uri` varchar(8) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NULL DEFAULT NULL COMMENT '短链接',
+  `full_short_url` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '完整短链接',
+  `origin_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '原始链接',
+  `gid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '分组标识',
+  `favicon` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '网站图标',
+  `enable_status` tinyint(1) NULL DEFAULT 0 COMMENT '启用标识 （0：启用）（1：未启用）（2：平台封禁）',
+  `created_type` tinyint(1) NULL DEFAULT 0 COMMENT '创建类型 0：接口 1：控制台',
+  `valid_date_type` tinyint(1) NULL DEFAULT NULL COMMENT '有效期类型 0：永久有效 1：用户自定义',
+  `valid_date` datetime NULL DEFAULT NULL COMMENT '有效期',
+  `description` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `total_pv` bigint NULL DEFAULT 0 COMMENT '历史PV',
+  `total_uv` int(11) NULL DEFAULT 0 COMMENT '历史UV',
+  `total_uip` int(11) NULL DEFAULT 0 COMMENT '历史UIP',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '修改时间',
+  `del_flag` tinyint(1) NULL DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+  `last_access_time` datetime DEFAULT NULL COMMENT '最后访问时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `idx_unique_full_short_url`(`full_short_url` ASC) USING BTREE,
+  KEY `idx_gid_last_access` (`gid`,`last_access_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `t_link_goto_history`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `gid` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'default' COMMENT '分组标识',
+  `full_short_url` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '完整短链接',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `idx_full_short_url` (`full_short_url`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

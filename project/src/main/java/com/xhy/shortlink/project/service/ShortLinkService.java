@@ -76,4 +76,11 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      */
     void fillTodayStats(ShortLinkPageRespDTO requestParam);
 
+    /**
+     * 冷库回热
+     * @param fullShortUrl 完整短链接
+     * @param gid 分组标识
+     */
+    void rehotColdLink(String fullShortUrl, String gid);
+
 }

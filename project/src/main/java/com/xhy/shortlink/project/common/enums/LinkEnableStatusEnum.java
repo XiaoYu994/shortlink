@@ -21,7 +21,11 @@ public enum LinkEnableStatusEnum {
     /*
     *  平台封禁
     * */
-    BANNED(2);
+    BANNED(2),
+    /*
+     * 冻结（到期进入冻结期）
+     * */
+    FROZEN(3);
     @Getter
     private final int enableStatus;
 }

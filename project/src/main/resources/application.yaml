@@ -44,6 +44,15 @@ short-link:
   # 消息队列的实现方式，支持Redis、RocketMQ
   message-queue:
     implement: RocketMQ
+  cold-data:
+    enabled: true
+    days: 90
+    batch-size: 200
+    cron: "0 30 2 * * ?"
+    rehot:
+      threshold: 1000
+  expire:
+    grace-days: 30
   stats:
     locale:
       amap-key: 23ea4562d80a83d1dd47922b4913d5e0

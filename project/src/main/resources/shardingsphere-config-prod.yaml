@@ -6,6 +6,12 @@ dataSources:
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
     username: root
     password: d6oadCl789rrb9A3GWod6oadCl789rrb9A3GWod6oadCl789rrb9A3GWod6oadCl789rrb9A3GWo
+  ds_cold:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link_cold?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: d6oadCl789rrb9A3GWod6oadCl789rrb9A3GWod6oadCl789rrb9A3GWod6oadCl789rrb9A3GWo
 
 rules:
   - !SHARDING
@@ -30,6 +36,14 @@ rules:
         # 分片数量
         props:
           sharding-count: 16
+  - !SINGLE
+    tables:
+      - "ds_0.*"
+      - "ds_cold.t_link_cold"
+      - "ds_cold.t_link_goto_cold"
+      - "ds_cold.t_link_history"
+      - "ds_cold.t_link_goto_history"
+    defaultDataSource: ds_0
 # 展现逻辑 SQL & 真实 SQL
 props:
   sql-show: true

@@ -14,8 +14,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import java.util.Date;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 
 public class StatsIdempotentTest extends BaseIdempotentTest {
 
@@ -24,6 +23,7 @@ public class StatsIdempotentTest extends BaseIdempotentTest {
 
     // 🔥 Mock 这一堆 Mapper，因为我们不关心数据对不对，只关心它们被调了几次
     @MockBean private ShortLinkMapper shortLinkMapper;
+    @MockBean private ShortLinkColdMapper shortLinkColdMapper;
     @MockBean private ShortLinkGoToMapper shortLinkGoToMapper;
     @MockBean private LinkAccessStatsMapper linkAccessStatsMapper;
     @MockBean private LinkLocaleStatsMapper linkLocaleStatsMapper;
@@ -39,6 +39,8 @@ public class StatsIdempotentTest extends BaseIdempotentTest {
         ShortLinkGoToDO mockGoto = new ShortLinkGoToDO();
         mockGoto.setGid("test_gid");
         Mockito.when(shortLinkGoToMapper.selectOne(any())).thenReturn(mockGoto);
+        Mockito.when(shortLinkMapper.incrementStats(any(), any(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(1);
     }
 
     @Test
@@ -49,8 +51,6 @@ public class StatsIdempotentTest extends BaseIdempotentTest {
         ShortLinkStatsRecordEvent event = ShortLinkStatsRecordEvent.builder()
                 .eventId(messageId)
                 .fullShortUrl("nurl.ink/statsTest")
-                .uvFirstFlag(true)
-                .uipFirstFlag(true)
                 .remoteAddr("127.0.0.1")
                 .currentDate(new Date())
                 .build();

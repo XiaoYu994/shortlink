@@ -54,11 +54,11 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
             "    last_access_time = NOW() " +
             "WHERE gid = #{gid} " +
             "  AND full_short_url = #{fullShortUrl}")
-    void incrementStats(@Param("gid") String gid,
-                        @Param("fullShortUrl") String fullShortUrl,
-                        @Param("pv") int pv,
-                        @Param("uv") int uv,
-                        @Param("uip") int uip);
+    int incrementStats(@Param("gid") String gid,
+                       @Param("fullShortUrl") String fullShortUrl,
+                       @Param("pv") int pv,
+                       @Param("uv") int uv,
+                       @Param("uip") int uip);
 
 
     /*

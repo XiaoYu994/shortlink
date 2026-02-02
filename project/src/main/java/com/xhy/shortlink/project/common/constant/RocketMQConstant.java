@@ -51,4 +51,14 @@ public class RocketMQConstant {
      *   发送用户通知 group
      */
     public static final String NOTIFY_GROUP = "short_link_project_notify_group";
+
+    /**
+     *   过期短链归档 topic
+     */
+    public static final String EXPIRE_ARCHIVE_TOPIC = "short_link_project_expire_archive_topic";
+
+    /**
+     *   过期短链归档 group
+     */
+    public static final String EXPIRE_ARCHIVE_GROUP = "short_link_project_expire_archive_group";
 }
