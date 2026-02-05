@@ -13,34 +13,26 @@
         <module>project</module>
         <module>gateway</module>
         <module>aggregation</module>
+        <module>dependencies</module>
     </modules>
 
     <properties>
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-        <spring-boot.version>3.2.5</spring-boot.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
-
-        <mybatis-plus.version>3.5.15</mybatis-plus.version>
-        <shardingsphere.version>5.5.2</shardingsphere.version>
-
-        <fastjson2.version>2.0.48</fastjson2.version>
-        <guava.version>33.1.0-jre</guava.version>
-
-        <easyexcel.version>3.3.4</easyexcel.version>
-        <dozer-core.version>6.5.2</dozer-core.version>
-        <hutool-all.version>5.8.26</hutool-all.version>
-        <redisson.version>3.27.2</redisson.version>
-        <jsoup.version>1.17.2</jsoup.version>
-        <rocketmq-spring-boot-starter.version>2.3.0</rocketmq-spring-boot-starter.version>
-        <spring-ai-alibaba.version>1.1.0.0-RC2</spring-ai-alibaba.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <!-- dependencies 在父类或在类中去定义默认是下载这个依赖的 然后把这个依赖传递到这个项目中的依赖-->
     <!-- 在本类中有，并且有子类继承了它，他会把这个依赖传递下去-->
     <dependencies>
+        <!-- Spring Boot 核心启动器：所有子模块都需要 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Lombok：简化代码，所有子模块都需要 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -50,101 +42,13 @@
     <!-- 不会下载依赖，只会去对依赖进行一个规约，只有在子类去引用这里面的类才会真实的去下载这个依赖-->
     <dependencyManagement>
         <dependencies>
+            <!-- 引入 dependencies BOM，统一管理所有依赖版本 -->
             <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring-boot.version}</version>
+                <groupId>com.xhy.shortlink</groupId>
+                <artifactId>shortlink-dependencies</artifactId>
+                <version>${project.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>com.alibaba.cloud</groupId>
-                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-bom</artifactId>
-                <version>${mybatis-plus.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.rocketmq</groupId>
-                <artifactId>rocketmq-spring-boot-starter</artifactId>
-                <version>${rocketmq-spring-boot-starter.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.shardingsphere</groupId>
-                <artifactId>shardingsphere-jdbc</artifactId>
-                <version>${shardingsphere.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.apache.shardingsphere</groupId>
-                        <artifactId>shardingsphere-test-util</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <dependency>
-                <groupId>com.alibaba.fastjson2</groupId>
-                <artifactId>fastjson2</artifactId>
-                <version>${fastjson2.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.dozermapper</groupId>
-                <artifactId>dozer-core</artifactId>
-                <version>${dozer-core.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>cn.hutool</groupId>
-                <artifactId>hutool-all</artifactId>
-                <version>${hutool-all.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.redisson</groupId>
-                <artifactId>redisson-spring-boot-starter</artifactId>
-                <version>${redisson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>easyexcel</artifactId>
-                <version>${easyexcel.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jsoup</groupId>
-                <artifactId>jsoup</artifactId>
-                <version>${jsoup.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.alibaba.cloud.ai</groupId>
-                <artifactId>spring-ai-alibaba-agent-framework</artifactId>
-                <version>${spring-ai-alibaba.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.cloud.ai</groupId>
-                <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
-                <version>${spring-ai-alibaba.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -157,7 +61,8 @@
                 <configuration>
                     <source>17</source>
                     <target>17</target>
-                    <parameters>true</parameters> </configuration>
+                    <parameters>true</parameters> 
+                </configuration>
             </plugin>
         </plugins>
 
