@@ -7,50 +7,67 @@ mode:
   repository:
     type: JDBC
 
-# 3. 数据源
+# 3. 数据源配置
 dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    # 注意：这里请确认你的数据库名是 link 还是其他的？
-    # 如果 user 表在 link 库，就用 link；如果在单独的库，请修改这里
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: root
     password: root
+    # HikariCP 连接池配置
+    maximumPoolSize: 20
+    minimumIdle: 5
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
 
 rules:
   # ===========================
-  # 分片规则 (Sharding)
+  # 分片规则 (Sharding) - 使用 auto-tables 自动分片
   # ===========================
   - !SHARDING
-    tables:
-      # 用户表分片
+    autoTables:
+      # 用户表自动分片
       t_user:
-        actualDataNodes: ds_0.t_user_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: username
-            shardingAlgorithmName: user_table_inline # 改个名字区分
-      # 分组表分片
+            shardingAlgorithmName: user_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # 分组表自动分片
       t_group:
-        actualDataNodes: ds_0.t_group_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: username
-            shardingAlgorithmName: group_table_inline # 改个名字区分
+            shardingAlgorithmName: group_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
 
     shardingAlgorithms:
-      # ✅ 核心修复：使用 INLINE 算法处理字符串 Hash
-      # 也就是对 username 进行 hashCode 取绝对值，然后对 16 取模
-      user_table_inline:
-        type: INLINE
+      user_hash_mod:
+        type: HASH_MOD
         props:
-          algorithm-expression: t_user_${Math.abs(username.hashCode()) % 16}
+          sharding-count: 16
 
-      group_table_inline:
-        type: INLINE
+      group_hash_mod:
+        type: HASH_MOD
         props:
-          algorithm-expression: t_group_${Math.abs(username.hashCode()) % 16}
+          sharding-count: 16
+
+    # 分布式主键生成器
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 1
 
   # ===========================
   # 加密规则 (Encrypt) - 5.4.1 新语法
@@ -60,9 +77,8 @@ rules:
       t_user:
         columns:
           phone:
-            # 5.4.x 写法变了：cipher 是一个对象
             cipher:
-              name: phone # 数据库里真实的列名
+              name: phone
               encryptorName: common_encryptor
           mail:
             cipher:
@@ -74,13 +90,15 @@ rules:
         type: AES
         props:
           aes-key-value: d6oadCl789rrb9A3GWo
-  # 添加单表加载规则
+          digest-algorithm-name: SHA-1
+
+  # ===========================
+  # 单表加载规则
+  # ===========================
   - !SINGLE
     tables:
-      # 语法：*.* 代表“加载所有未被分片的表”
-      # ShardingSphere 会自动扫描 ds_0，发现 t_link_access_stats 并加载它
       - "*.*"
-    # 指定默认数据源（当存在多个数据源时必填，单个数据源时可选但建议加上）
     defaultDataSource: ds_0
+
 props:
   sql-show: true
