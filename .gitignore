@@ -34,3 +34,13 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### AI Assistants ###
+# Trellis workflow system
+.trellis/
+
+# Claude Code
+.claude/
+
+# Cursor AI
+.cursor/

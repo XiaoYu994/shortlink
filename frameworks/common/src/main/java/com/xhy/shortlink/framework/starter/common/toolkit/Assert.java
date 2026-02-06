@@ -17,7 +17,7 @@
 
 package com.xhy.shortlink.framework.starter.common.toolkit;
 
-import com.xhy.shortlink.framework.stater.convention.exception.ClientException;
+import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 
 import java.util.Collection;
 

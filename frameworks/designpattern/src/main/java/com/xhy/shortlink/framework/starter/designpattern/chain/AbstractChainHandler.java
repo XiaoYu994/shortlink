@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.designpattern.chain;
+package com.xhy.shortlink.framework.starter.designpattern.chain;
 
 import org.springframework.core.Ordered;
 

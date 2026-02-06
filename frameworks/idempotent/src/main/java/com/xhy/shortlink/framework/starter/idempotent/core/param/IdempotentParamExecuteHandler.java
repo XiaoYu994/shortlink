@@ -22,7 +22,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.alibaba.fastjson2.JSON;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
-import com.xhy.shortlink.framework.stater.convention.exception.ClientException;
+import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import com.xhy.shortlink.framework.starter.idempotent.core.AbstractIdempotentExecuteHandler;
 import com.xhy.shortlink.framework.starter.idempotent.core.IdempotentContext;
 import com.xhy.shortlink.framework.starter.idempotent.core.IdempotentParamWrapper;

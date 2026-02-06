@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.designpattern.config;
+package com.xhy.shortlink.framework.starter.designpattern.config;
 
-import com.xhy.shortlink.framework.stater.designpattern.chain.AbstractChainContext;
+import com.xhy.shortlink.framework.starter.designpattern.chain.AbstractChainContext;
 import com.xhy.shortlink.framework.starter.bases.config.ApplicationBaseAutoConfiguration;
-import com.xhy.shortlink.framework.stater.designpattern.strategy.AbstractStrategyChoose;
+import com.xhy.shortlink.framework.starter.designpattern.strategy.AbstractStrategyChoose;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 

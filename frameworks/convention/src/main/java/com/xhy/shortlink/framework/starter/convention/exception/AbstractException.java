@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.convention.exception;
+package com.xhy.shortlink.framework.starter.convention.exception;
 
-import com.xhy.shortlink.framework.stater.convention.errorcode.IErrorCode;
+import com.xhy.shortlink.framework.starter.convention.errorcode.IErrorCode;
 import lombok.Getter;
 import org.springframework.util.StringUtils;
 

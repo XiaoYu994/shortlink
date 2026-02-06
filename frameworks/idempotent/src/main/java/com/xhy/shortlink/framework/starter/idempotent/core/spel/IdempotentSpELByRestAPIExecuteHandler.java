@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
-import com.xhy.shortlink.framework.stater.convention.exception.ClientException;
+import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.idempotent.core.AbstractIdempotentExecuteHandler;
 import com.xhy.shortlink.framework.starter.idempotent.core.IdempotentAspect;

@@ -18,7 +18,7 @@
 package com.xhy.shortlink.framework.starter.idempotent.core.token;
 
 import lombok.RequiredArgsConstructor;
-import com.xhy.shortlink.framework.stater.convention.result.Result;
+import com.xhy.shortlink.framework.starter.convention.result.Result;
 import com.xhy.shortlink.framework.starter.web.Results;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

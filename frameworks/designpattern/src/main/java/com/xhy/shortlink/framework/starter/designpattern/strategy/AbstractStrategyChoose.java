@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.designpattern.strategy;
+package com.xhy.shortlink.framework.starter.designpattern.strategy;
 
 import com.xhy.shortlink.framework.starter.bases.ApplicationContextHolder;
 import com.xhy.shortlink.framework.starter.convention.exception.ServiceException;

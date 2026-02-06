@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.convention.page;
+package com.xhy.shortlink.framework.starter.convention.page;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

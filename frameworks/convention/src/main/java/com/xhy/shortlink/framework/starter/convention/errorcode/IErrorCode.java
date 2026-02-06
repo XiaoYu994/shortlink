@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.convention.errorcode;
+package com.xhy.shortlink.framework.starter.convention.errorcode;
 
 /**
  * 平台错误码

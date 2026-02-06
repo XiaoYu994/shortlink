@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.convention.result;
+package com.xhy.shortlink.framework.starter.convention.result;
 
 import lombok.Data;
 import lombok.experimental.Accessors;

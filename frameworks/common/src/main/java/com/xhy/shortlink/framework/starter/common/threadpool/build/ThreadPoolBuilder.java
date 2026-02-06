@@ -17,7 +17,7 @@
 
 package com.xhy.shortlink.framework.starter.common.threadpool.build;
 
-import com.xhy.shortlink.framework.stater.designpattern.builder.Builder;
+import com.xhy.shortlink.framework.starter.designpattern.builder.Builder;
 import com.xhy.shortlink.framework.starter.common.threadpool.proxy.RejectedProxyUtil;
 import com.xhy.shortlink.framework.starter.common.threadpool.support.eager.EagerThreadPoolExecutor;
 import com.xhy.shortlink.framework.starter.common.threadpool.support.eager.TaskQueue;

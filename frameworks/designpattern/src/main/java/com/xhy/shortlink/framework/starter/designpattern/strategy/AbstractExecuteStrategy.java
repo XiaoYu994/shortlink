@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.designpattern.strategy;
+package com.xhy.shortlink.framework.starter.designpattern.strategy;
 
 /**
  * 策略执行抽象

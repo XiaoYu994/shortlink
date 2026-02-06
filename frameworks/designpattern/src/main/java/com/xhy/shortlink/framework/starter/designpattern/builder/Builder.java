@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.stater.designpattern.builder;
+package com.xhy.shortlink.framework.starter.designpattern.builder;
 
 import java.io.Serializable;
 

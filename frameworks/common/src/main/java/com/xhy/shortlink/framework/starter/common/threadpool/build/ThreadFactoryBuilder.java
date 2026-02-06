@@ -17,7 +17,7 @@
 
 package com.xhy.shortlink.framework.starter.common.threadpool.build;
 
-import com.xhy.shortlink.framework.stater.designpattern.builder.Builder;
+import com.xhy.shortlink.framework.starter.designpattern.builder.Builder;
 
 import java.io.Serial;
 import java.util.concurrent.Executors;
