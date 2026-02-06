@@ -18,7 +18,7 @@
 package com.xhy.shortlink.framework.stater.designpattern.strategy;
 
 import com.xhy.shortlink.framework.starter.bases.ApplicationContextHolder;
-import com.xhy.shortlink.framework.stater.convention.exception.ServiceException;
+import com.xhy.shortlink.framework.starter.convention.exception.ServiceException;
 import com.xhy.shortlink.framework.starter.bases.init.ApplicationInitializingEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.util.StringUtils;
