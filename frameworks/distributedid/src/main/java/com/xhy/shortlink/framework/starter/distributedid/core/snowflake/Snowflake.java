@@ -53,6 +53,7 @@ public class Snowflake implements Serializable, IdGenerator {
     private static final long DATA_CENTER_ID_BITS = 5L;
     private static final long MAX_DATA_CENTER_ID = ~(-1L << DATA_CENTER_ID_BITS);
     private static final long SEQUENCE_BITS = 12L;
+    private static final long TIMESTAMP_BITS = 41L;
 
     private static final long WORKER_ID_SHIFT = SEQUENCE_BITS;
     private static final long DATA_CENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
@@ -128,7 +129,7 @@ public class Snowflake implements Serializable, IdGenerator {
      * 从 ID 中提取生成时间戳
      */
     public long getGenerateDateTime(long id) {
-        return (id >> TIMESTAMP_LEFT_SHIFT & ~(-1L << 41L)) + twepoch;
+        return (id >> TIMESTAMP_LEFT_SHIFT & ~(-1L << TIMESTAMP_BITS)) + twepoch;
     }
 
     /**

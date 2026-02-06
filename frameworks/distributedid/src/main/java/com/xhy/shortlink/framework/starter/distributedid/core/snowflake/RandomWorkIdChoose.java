@@ -29,10 +29,14 @@ import org.springframework.beans.factory.InitializingBean;
 @Slf4j
 public class RandomWorkIdChoose extends AbstractWorkIdChooseTemplate implements InitializingBean {
 
+    /**
+     * WorkId 和 DataCenterId 的最大值（5 位，0~31）
+     */
+    private static final int MAX_ID = 31;
+
     @Override
     protected WorkIdWrapper chooseWorkId() {
-        int start = 0, end = 31;
-        return new WorkIdWrapper(getRandom(start, end), getRandom(start, end));
+        return new WorkIdWrapper(getRandom(0, MAX_ID), getRandom(0, MAX_ID));
     }
 
     /**

@@ -17,7 +17,6 @@
 
 package com.xhy.shortlink.framework.starter.distributedid.core.snowflake;
 
-import cn.hutool.core.date.SystemClock;
 import com.xhy.shortlink.framework.starter.distributedid.toolkit.SnowflakeIdUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
