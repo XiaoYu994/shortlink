@@ -15,27 +15,47 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.starter.database.handler;
+package com.xhy.shortlink.framework.starter.distributedid.core.snowflake;
 
-import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
-import com.xhy.shortlink.framework.starter.distributedid.toolkit.SnowflakeIdUtil;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * 自定义 ID 生成器
+ * 雪花算法 ID 反解析信息
  * <p>
- * 实现 MyBatis-Plus 的 IdentifierGenerator 接口，
- * 委托 SnowflakeIdUtil 静态工具类生成分布式唯一 ID
+ * 从生成的雪花 ID 中提取各组成部分，
+ * gene 字段用于基因法场景，与 sequence 共占 12 bit
  */
-public class CustomIdGenerator implements IdentifierGenerator {
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SnowflakeIdInfo {
 
     /**
-     * 通过 SnowflakeIdUtil 生成全局唯一 ID
-     *
-     * @param entity 实体对象（未使用，保留接口兼容）
-     * @return 雪花算法生成的唯一 ID
+     * 时间戳
      */
-    @Override
-    public Number nextId(Object entity) {
-        return SnowflakeIdUtil.nextId();
-    }
+    private Long timestamp;
+
+    /**
+     * 工作机器节点 ID
+     */
+    private Integer workerId;
+
+    /**
+     * 数据中心 ID
+     */
+    private Integer dataCenterId;
+
+    /**
+     * 序列号
+     */
+    private Integer sequence;
+
+    /**
+     * 业务基因，与 sequence 共占 12 bit
+     */
+    private Integer gene;
 }

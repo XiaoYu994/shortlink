@@ -1,52 +1,55 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.xhy.shortlink.framework.starter.distributedid.config;
 
-import com.xhy.shortlink.framework.starter.distributedid.core.SnowflakeIdGenerator;
-import com.xhy.shortlink.framework.starter.distributedid.core.WorkIdChoose;
-import com.xhy.shortlink.framework.starter.distributedid.handler.LocalRedisWorkIdChoose;
-import com.xhy.shortlink.framework.starter.distributedid.handler.RandomWorkIdChoose;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import com.xhy.shortlink.framework.starter.bases.ApplicationContextHolder;
+import com.xhy.shortlink.framework.starter.distributedid.core.snowflake.LocalRedisWorkIdChoose;
+import com.xhy.shortlink.framework.starter.distributedid.core.snowflake.RandomWorkIdChoose;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.annotation.Import;
 
 /**
  * 分布式 ID 自动装配配置
  * <p>
  * 装配策略：
- * 1. 若容器中存在 StringRedisTemplate，注册 LocalRedisWorkIdChoose（Redis 策略）
- * 2. 否则注册 RandomWorkIdChoose（随机策略）作为兜底
- * 3. 基于选定的 WorkIdChoose 构建 SnowflakeIdGenerator
+ * 1. 若配置了 spring.data.redis.host，注册 LocalRedisWorkIdChoose
+ * 2. 否则注册 RandomWorkIdChoose 作为兜底
  */
-@Configuration
+@Import(ApplicationContextHolder.class)
 public class DistributedIdAutoConfiguration {
 
     /**
-     * Redis 可用时注册 Redis WorkId 分配策略，优先级高于随机策略
+     * Redis 可用时注册 Redis WorkId 分配策略
      */
     @Bean
-    @Primary
-    @ConditionalOnBean(StringRedisTemplate.class)
-    public WorkIdChoose localRedisWorkIdChoose(StringRedisTemplate stringRedisTemplate) {
-        return new LocalRedisWorkIdChoose(stringRedisTemplate);
+    @ConditionalOnProperty("spring.data.redis.host")
+    public LocalRedisWorkIdChoose redisWorkIdChoose() {
+        return new LocalRedisWorkIdChoose();
     }
 
     /**
      * 兜底策略：无 Redis 时使用随机分配
      */
     @Bean
-    @ConditionalOnMissingBean
-    public WorkIdChoose randomWorkIdChoose() {
+    @ConditionalOnMissingBean(LocalRedisWorkIdChoose.class)
+    public RandomWorkIdChoose randomWorkIdChoose() {
         return new RandomWorkIdChoose();
-    }
-
-    /**
-     * 注册雪花算法 ID 生成器，通过 InitializingBean 自动完成初始化
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public SnowflakeIdGenerator snowflakeIdGenerator(WorkIdChoose workIdChoose) {
-        return new SnowflakeIdGenerator(workIdChoose);
     }
 }

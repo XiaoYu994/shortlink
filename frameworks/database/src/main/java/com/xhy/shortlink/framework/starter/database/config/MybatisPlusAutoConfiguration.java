@@ -24,7 +24,6 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.xhy.shortlink.framework.starter.database.handler.CustomIdGenerator;
 import com.xhy.shortlink.framework.starter.database.handler.MyMetaObjectHandler;
-import com.xhy.shortlink.framework.starter.distributedid.core.SnowflakeIdGenerator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -69,14 +68,13 @@ public class MybatisPlusAutoConfiguration {
     }
 
     /**
-     * 注册自定义 ID 生成器，委托 distributedid 模块的 SnowflakeIdGenerator 生成 ID
+     * 注册自定义 ID 生成器，通过 SnowflakeIdUtil 静态工具类生成 ID
      *
-     * @param snowflakeIdGenerator 雪花算法 ID 生成器
      * @return MyBatis-Plus 自定义 ID 生成器
      */
     @Bean
     @ConditionalOnMissingBean
-    public IdentifierGenerator identifierGenerator(SnowflakeIdGenerator snowflakeIdGenerator) {
-        return new CustomIdGenerator(snowflakeIdGenerator);
+    public IdentifierGenerator identifierGenerator() {
+        return new CustomIdGenerator();
     }
 }

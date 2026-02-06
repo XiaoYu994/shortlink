@@ -15,27 +15,24 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.framework.starter.database.handler;
-
-import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
-import com.xhy.shortlink.framework.starter.distributedid.toolkit.SnowflakeIdUtil;
+package com.xhy.shortlink.framework.starter.distributedid.core;
 
 /**
- * 自定义 ID 生成器
- * <p>
- * 实现 MyBatis-Plus 的 IdentifierGenerator 接口，
- * 委托 SnowflakeIdUtil 静态工具类生成分布式唯一 ID
+ * ID 生成器顶层接口
  */
-public class CustomIdGenerator implements IdentifierGenerator {
+public interface IdGenerator {
 
     /**
-     * 通过 SnowflakeIdUtil 生成全局唯一 ID
-     *
-     * @param entity 实体对象（未使用，保留接口兼容）
-     * @return 雪花算法生成的唯一 ID
+     * 生成下一个 ID
      */
-    @Override
-    public Number nextId(Object entity) {
-        return SnowflakeIdUtil.nextId();
+    default long nextId() {
+        return 0L;
+    }
+
+    /**
+     * 生成下一个字符串类型 ID
+     */
+    default String nextIdStr() {
+        return "";
     }
 }
