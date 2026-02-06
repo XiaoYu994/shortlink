@@ -41,6 +41,8 @@
         <hutool-all.version>5.8.26</hutool-all.version>
         <guava.version>33.1.0-jre</guava.version>
         <lombok.version>1.18.30</lombok.version>
+        <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
+
 
         <!-- 对象映射 -->
         <dozer-core.version>6.5.2</dozer-core.version>
@@ -183,6 +185,12 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>transmittable-thread-local</artifactId>
+                <version>${transmittable-thread-local.version}</version>
             </dependency>
 
             <!-- ========================================= -->
