@@ -21,6 +21,7 @@
         <module>database</module>
         <module>distributedid</module>
         <module>cache</module>
+        <module>idempotent</module>
     </modules>
 
 
