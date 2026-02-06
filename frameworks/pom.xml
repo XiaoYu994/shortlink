@@ -19,6 +19,7 @@
         <module>bizs</module>
         <module>common</module>
         <module>database</module>
+        <module>distributedid</module>
     </modules>
 
 

@@ -25,6 +25,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.xhy.shortlink</groupId>
+            <artifactId>shortlink-distributedid-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
