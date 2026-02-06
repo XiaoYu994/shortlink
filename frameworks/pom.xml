@@ -17,6 +17,7 @@
         <module>designpattern</module>
         <module>web</module>
         <module>bizs</module>
+        <module>common</module>
     </modules>
 
 
