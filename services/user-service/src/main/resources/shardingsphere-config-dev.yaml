@@ -1,0 +1,101 @@
+# 1. 必填：逻辑库名
+databaseName: user_db
+
+# 2. 必填：运行模式 (5.4.x 强制要求)
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+# 3. 数据源配置
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+    # HikariCP 连接池配置
+    maximumPoolSize: 20
+    minimumIdle: 5
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
+
+rules:
+  # 分片规则 (Sharding) - 使用 auto-tables 自动分片
+  - !SHARDING
+    autoTables:
+      # 用户表自动分片
+      t_user:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: user_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # 分组表自动分片
+      t_group:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: group_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+    shardingAlgorithms:
+      user_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+      group_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+    # 分布式主键生成器
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 1
+
+  # 加密规则 (Encrypt) - 5.4.1 新语法
+  - !ENCRYPT
+    tables:
+      t_user:
+        columns:
+          phone:
+            cipher:
+              name: phone
+              encryptorName: common_encryptor
+          mail:
+            cipher:
+              name: mail
+              encryptorName: common_encryptor
+
+
+    encryptors:
+      # 通用加密器（AES，可逆，用于手机号/邮箱）
+      common_encryptor:
+        type: AES
+        props:
+          aes-key-value: d6oadCl789rrb9A3GWo
+          digest-algorithm-name: SHA-1
+
+
+  # 单表加载规则
+  - !SINGLE
+    tables:
+      - "*.*"
+    defaultDataSource: ds_0
+
+props:
+  sql-show: true
