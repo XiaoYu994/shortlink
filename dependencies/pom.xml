@@ -30,6 +30,9 @@
         <!-- 缓存和分布式 -->
         <redisson.version>3.27.2</redisson.version>
 
+        <!-- 认证框架 -->
+        <sa-token.version>1.44.0</sa-token.version>
+
         <!-- 消息队列 -->
         <rocketmq-spring-boot-starter.version>2.3.0</rocketmq-spring-boot-starter.version>
 
@@ -139,6 +142,39 @@
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- ========================================= -->
+            <!-- 认证框架 Sa-Token -->
+            <!-- ========================================= -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-core</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot3-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-reactor-spring-boot3-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-redis-template</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-fastjson2</artifactId>
+                <version>${sa-token.version}</version>
             </dependency>
 
             <!-- ========================================= -->
