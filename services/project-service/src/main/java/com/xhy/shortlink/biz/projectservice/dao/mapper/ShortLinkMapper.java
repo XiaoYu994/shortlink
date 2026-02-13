@@ -15,7 +15,15 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
+
 /**
- * Database entities (DO) for short link project service.
+ * 短链接持久层
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.dao.entity;
+public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
+}
