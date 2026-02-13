@@ -15,7 +15,30 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.dto.resp;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 /**
- * Request DTOs for short link project service.
+ * 创建短链接响应参数
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.dto.req;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShortLinkCreateRespDTO {
+
+    /** 原始链接 */
+    private String originUrl;
+
+    /** 分组标识 */
+    private String gid;
+
+    /** 完整短链接 */
+    private String fullShortUrl;
+}
