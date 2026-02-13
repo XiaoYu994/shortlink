@@ -18,7 +18,6 @@
 package com.xhy.shortlink.biz.userservice.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.dev33.satoken.stp.parameter.SaLoginParameter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -140,11 +139,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (userDO == null || !passwordEncoder.matches(requestParam.getPassword(), userDO.getPassword())) {
             throw new ClientException(USER_PASSWORD_ERROR);
         }
-        StpUtil.login(userDO.getId(),
-                new SaLoginParameter()
-                        .setExtra(UserConstant.USER_ID_KEY, userDO.getId())
-                        .setExtra(UserConstant.USER_NAME_KEY, userDO.getUsername())
-                        .setExtra(UserConstant.REAL_NAME_KEY, userDO.getRealName()));
+        StpUtil.login(userDO.getId());
+        StpUtil.getSession()
+                .set(UserConstant.USER_ID_KEY, String.valueOf(userDO.getId()))
+                .set(UserConstant.USER_NAME_KEY, userDO.getUsername())
+                .set(UserConstant.REAL_NAME_KEY, userDO.getRealName());
         return new UserLoginRespDTO(StpUtil.getTokenValue());
     }
 
