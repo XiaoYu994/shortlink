@@ -15,7 +15,36 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.mq.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 /**
- * Message queue consumers for short link project service.
+ * AI 风控检测事件
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.mq.consumer;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShortLinkRiskEvent {
+
+    /** 完整短链接 */
+    private String fullShortUrl;
+
+    /** 原始链接 */
+    private String originUrl;
+
+    /** 分组标识 */
+    private String gid;
+
+    /** 用户 ID（后续发送用户通知使用） */
+    private Long userId;
+
+    /** 幂等标识 */
+    private String eventId;
+}

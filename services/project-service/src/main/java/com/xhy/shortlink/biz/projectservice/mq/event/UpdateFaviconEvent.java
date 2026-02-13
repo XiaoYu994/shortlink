@@ -15,7 +15,30 @@
  * limitations under the License.
  */
 
-/**
- * Message queue event objects for short link project service.
- */
 package com.xhy.shortlink.biz.projectservice.mq.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 更新网站图标事件（Spring Event）
+ *
+ * @author XiaoYu
+ */
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class UpdateFaviconEvent {
+
+    /** 完整短链接 */
+    private String fullShortUrl;
+
+    /** 分组标识 */
+    private String gid;
+
+    /** 原始链接（用于爬取图标） */
+    private String originUrl;
+}

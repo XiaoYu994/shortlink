@@ -15,7 +15,52 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.mq.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+
 /**
- * Message queue producers for short link project service.
+ * 过期短链接归档事件
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.mq.producer;
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class ShortLinkExpireArchiveEvent {
+
+    /**
+     * 归档阶段
+     */
+    public enum Stage {
+        /** 冻结 */
+        FREEZE,
+
+        /** 归档 */
+        ARCHIVE
+    }
+
+    /** 幂等标识 */
+    private String eventId;
+
+    /** 分组标识 */
+    private String gid;
+
+    /** 完整短链接 */
+    private String fullShortUrl;
+
+    /** 过期时间 */
+    private Date expireAt;
+
+    /** 用户 ID */
+    private Long userId;
+
+    /** 归档阶段 */
+    private Stage stage;
+}
