@@ -18,20 +18,18 @@
 package com.xhy.shortlink.gateway.filter;
 
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.xhy.shortlink.gateway.config.Config;
 import com.xhy.shortlink.gateway.dto.GatewayErrorResult;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.core.io.buffer.DataBufferFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -40,16 +38,14 @@ import java.util.List;
 import java.util.Objects;
 
 
-/*
-* SpringCloud Gateway Token拦截器
-* */
+/**
+ * SpringCloud Gateway Token拦截器
+ */
 @Component
 public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFactory<Config> {
-    private final StringRedisTemplate stringRedisTemplate;
 
-    public TokenValidateGatewayFilterFactory(StringRedisTemplate stringRedisTemplate) {
+    public TokenValidateGatewayFilterFactory() {
         super(Config.class);
-        this.stringRedisTemplate = stringRedisTemplate;
     }
     @Override
     public GatewayFilter apply(Config config) {
@@ -58,14 +54,18 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
             String requestPath = request.getPath().toString();
             String requestMethod = request.getMethod().name();
             if (!isPathInWhiteList(requestPath, requestMethod, config.getWhitePathList())) {
-                String username = request.getHeaders().getFirst("username");
-                String token = request.getHeaders().getFirst("token");
-                Object userInfo;
-                if (StringUtils.hasText(username) && StringUtils.hasText(token) && (userInfo = stringRedisTemplate.opsForHash().get("short-link:login:" + username, token)) != null) {
-                    JSONObject userInfoJsonObject = JSON.parseObject(userInfo.toString());
+                String token = request.getHeaders().getFirst("short-link");
+                Object loginId = StpUtil.getLoginIdByToken(token);
+                if (loginId != null) {
+                    var session = StpUtil.getSessionByLoginId(loginId);
+                    String userId = String.valueOf(session.get("userId"));
+                    String username = String.valueOf(session.get("username"));
+                    String realName = String.valueOf(session.get("realName"));
                     ServerHttpRequest.Builder builder = exchange.getRequest().mutate().headers(httpHeaders -> {
-                        httpHeaders.set("userId", userInfoJsonObject.getString("id"));
-                        httpHeaders.set("realName", URLEncoder.encode(userInfoJsonObject.getString("realName"), StandardCharsets.UTF_8));
+                        httpHeaders.set("userId", userId);
+                        httpHeaders.set("username", URLEncoder.encode(username, StandardCharsets.UTF_8));
+                        httpHeaders.set("realName", URLEncoder.encode(realName, StandardCharsets.UTF_8));
+                        httpHeaders.set("token", token);
                     });
                     return chain.filter(exchange.mutate().request(builder.build()).build());
                 }
@@ -84,9 +84,9 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
         };
     }
 
-    /*
-    * 判断请求是否在白名单之中，并且由于登录请求和修改请求用的是同一个路径，这里直接对登录请求放行
-    * */
+    /**
+     * 判断请求是否在白名单之中，并且由于登录请求和修改请求用的是同一个路径，这里直接对登录请求放行
+     */
     private boolean isPathInWhiteList(String requestPath, String requestMethod, List<String> whitePathList) {
         return (!CollectionUtils.isEmpty(whitePathList) && whitePathList.stream().anyMatch(requestPath::startsWith)) || (Objects.equals(requestPath, "/api/short-link/admin/v1/user") && Objects.equals(requestMethod, "POST"));
     }

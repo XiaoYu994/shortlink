@@ -31,9 +31,15 @@ public enum BaseErrorCode implements IErrorCode {
     USER_NAME_EXIST_ERROR("A000111", "用户名已存在"),
     USER_NAME_SENSITIVE_ERROR("A000112", "用户名包含敏感词"),
     USER_NAME_SPECIAL_CHARACTER_ERROR("A000113", "用户名包含特殊字符"),
+    USER_EXIST_ERROR("A000114", "用户不存在"),
+    USER_NAME_ERROR("A000115", "用户名不存在"),
+    USER_LOGIN_ERROR("A000116", "登录失败"),
+    USER_NOT_LOGIN_ERROR("A000117", "用户未登录"),
     PASSWORD_VERIFY_ERROR("A000120", "密码校验失败"),
     PASSWORD_SHORT_ERROR("A000121", "密码长度不够"),
+    USER_PASSWORD_ERROR("A000122", "密码错误"),
     PHONE_VERIFY_ERROR("A000151", "手机格式校验失败"),
+    MAIL_VERIFY_ERROR("A000152", "邮箱格式校验失败"),
 
     // ========== 二级宏观错误码 系统请求缺少幂等Token ==========
     IDEMPOTENT_TOKEN_NULL_ERROR("A000200", "幂等Token为空"),
@@ -41,6 +47,7 @@ public enum BaseErrorCode implements IErrorCode {
 
     // ========== 一级宏观错误码 系统执行出错 ==========
     SERVICE_ERROR("B000001", "系统执行出错"),
+    NETWORK_ERROR("B000002", "网络繁忙，请稍后再试"),
     // ========== 二级宏观错误码 系统执行超时 ==========
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),
 

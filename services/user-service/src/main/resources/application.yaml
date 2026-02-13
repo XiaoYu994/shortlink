@@ -1,0 +1,57 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: shortlink-user-service
+  datasource:
+    # ShardingSphere 对 Driver 自定义，实现分库分表等隐藏逻辑
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    # ShardingSphere 配置文件路径
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-${database.env:dev}.yaml
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: xhy_redis
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+      password: nacos
+      username: nacos
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler # 分页插件
+
+
+sa-token:
+  token-style: simple-uuid
+  token-name: short-link
+  timeout: 1800
+  # 允许并发登录 不会顶号
+  is-concurrent: true
+  is-share: true
+  is-read-header: true
+  is-read-cookie: false
+  is-print: false
+
+framework:
+  fastjson:
+    safe-mode: true
+  cache:
+    redis:
+      bloom-filter:
+        user-register:
+          name: user_register_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.01
+
+short-link:
+  group:
+    max-num: 20
+
+
