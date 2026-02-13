@@ -57,12 +57,21 @@ rocketmq:
     retry-times-when-send-failed: 1
     retry-times-when-send-async-failed: 1
 
+framework:
+  cache:
+    redis:
+      bloom-filter:
+        short-link-create:
+          name: shortlink_uri_create_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.001
+
 short-link:
+  # 创建短链接 支持 bloom-filter 和  distributed-lock
+  create:
+    strategy: bloom-filter
   domain:
     default: nurl.ink:8001
-  # 消息队列的实现方式，支持Redis、RocketMQ
-  message-queue:
-    implement: RocketMQ
   cold-data:
     enabled: true
     days: 90
