@@ -19,6 +19,11 @@ package com.xhy.shortlink.biz.userservice.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xhy.shortlink.biz.userservice.dao.entity.GroupDO;
+import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupSortReqDTO;
+import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupUpdateReqDTO;
+import com.xhy.shortlink.biz.userservice.dto.resp.ShortlinkGroupRespDTO;
+
+import java.util.List;
 
 /**
  * 短链分组接口层
@@ -37,4 +42,28 @@ public interface GroupService extends IService<GroupDO> {
      * @param username 创建分组用户
      * */
     void saveGroup(String username,String groupName);
+
+    /**
+     * 查询短链接分组集合
+     * @return 分组集合
+     */
+    List<ShortlinkGroupRespDTO> listGroup();
+
+    /**
+     * 修改短链接分组名称
+     * @param requestParam 修改分组参数
+     */
+    void updateGroup(ShortlinkGroupUpdateReqDTO requestParam);
+
+    /**
+     * 删除短链接分组
+     * @param gid 分组标识
+     */
+    void deleteGroup(String gid);
+
+    /**
+     * 分组排序
+     * @param requestParam 排序参数
+     */
+    void sortGroup(List<ShortlinkGroupSortReqDTO> requestParam);
 }

@@ -19,11 +19,17 @@ package com.xhy.shortlink.biz.userservice.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhy.shortlink.biz.userservice.dao.entity.GroupDO;
 import com.xhy.shortlink.biz.userservice.dao.mapper.GroupMapper;
+import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupSortReqDTO;
+import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupUpdateReqDTO;
+import com.xhy.shortlink.biz.userservice.dto.resp.ShortlinkGroupRespDTO;
 import com.xhy.shortlink.biz.userservice.service.GroupService;
+import com.xhy.shortlink.framework.starter.common.enums.DelEnum;
+import com.xhy.shortlink.framework.starter.common.toolkit.BeanUtil;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import com.xhy.shortlink.framework.starter.distributedid.toolkit.SnowflakeIdUtil;
 import com.xhy.shortlink.framework.starter.user.core.UserContext;
@@ -38,9 +44,10 @@ import java.util.List;
 
 import static com.xhy.shortlink.biz.userservice.common.constant.RedisCacheConstant.LOCK_GROUP_CREATE_KEY;
 
-/*
-*  短链分组接口实现层
-* */
+/**
+ * 短链分组接口实现层
+ *
+ */
 @Service
 @RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
@@ -77,5 +84,53 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         } finally {
             lock.unlock();
         }
+    }
+
+    @Override
+    public List<ShortlinkGroupRespDTO> listGroup() {
+        final LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode())
+                .orderByDesc(GroupDO::getSortOrder, GroupDO::getCreateTime);
+        final List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+        if (CollUtil.isNotEmpty(groupDOList)) {
+            return BeanUtil.convert(groupDOList, ShortlinkGroupRespDTO.class);
+        }
+        // TODO 分组下面短链接的数量还没有计算
+        return List.of();
+    }
+
+    @Override
+    public void updateGroup(ShortlinkGroupUpdateReqDTO requestParam) {
+        final LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode())
+                .eq(GroupDO::getGid, requestParam.getGid())
+                .set(GroupDO::getName, requestParam.getName());
+        baseMapper.update(null,updateWrapper);
+    }
+
+    @Override
+    public void deleteGroup(String gid) {
+        final LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode())
+                .eq(GroupDO::getGid, gid);
+        final GroupDO groupDO = new GroupDO();
+        groupDO.setDelFlag(DelEnum.DELETED.getCode());
+        baseMapper.update(groupDO, updateWrapper);
+    }
+
+    @Override
+    public void sortGroup(List<ShortlinkGroupSortReqDTO> requestParam) {
+        requestParam.forEach(each -> {
+            final GroupDO groupDO = GroupDO.builder()
+                    .sortOrder(each.getSortOrder())
+                    .build();
+            baseMapper.update(groupDO, Wrappers.lambdaUpdate(GroupDO.class)
+            .eq(GroupDO::getUsername, UserContext.getUsername())
+            .eq(GroupDO::getGid, each.getGid())
+            .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode()));
+        });
     }
 }
