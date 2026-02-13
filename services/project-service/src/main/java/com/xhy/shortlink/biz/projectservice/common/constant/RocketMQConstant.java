@@ -15,7 +15,27 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.common.constant;
+
 /**
- * Common utilities and constants for short link project service.
+ * RocketMQ Topic / Group 常量
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.common;
+public final class RocketMQConstant {
+
+    private RocketMQConstant() {
+    }
+
+    /** 清除本地缓存 Topic */
+    public static final String CACHE_INVALIDATE_TOPIC = "short_link_project_cache_invalidate_topic";
+
+    /** 清除本地缓存 Tag */
+    public static final String CACHE_INVALIDATE_TAG = "invalidate";
+
+    /** AI 风控审核消息 Topic */
+    public static final String RISK_CHECK_TOPIC = "short_link_project_risk_check_topic";
+
+    /** 过期短链归档 Topic */
+    public static final String EXPIRE_ARCHIVE_TOPIC = "short_link_project_expire_archive_topic";
+}
