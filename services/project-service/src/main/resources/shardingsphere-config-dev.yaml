@@ -1,0 +1,120 @@
+# 1. 必填：逻辑库名
+databaseName: link_db
+
+# 2. 必填：运行模式
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+# 3. 数据源配置
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+    # HikariCP 连接池配置
+    maximumPoolSize: 50
+    minimumIdle: 10
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
+
+  ds_cold:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link_cold?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+    # 冷库连接池配置（较小）
+    maximumPoolSize: 20
+    minimumIdle: 5
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
+
+# 4. 分片规则
+rules:
+  # ===========================
+  # 分片规则 (Sharding) - 使用 auto-tables 自动分片
+  # ===========================
+  - !SHARDING
+    autoTables:
+      # 短链接主表（按 gid 分片）
+      t_link:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: gid
+            shardingAlgorithmName: t_link_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # 短链接路由表（按 full_short_url 分片）
+      t_link_goto:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: full_short_url
+            shardingAlgorithmName: t_link_goto_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # 分组表（按 username 分片）
+      t_group:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: t_group_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+    # 分片算法配置
+    shardingAlgorithms:
+      t_link_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+      t_link_goto_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+      t_group_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+    # 分布式主键生成器
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 1
+
+  # ===========================
+  # 单表加载规则
+  # ===========================
+  - !SINGLE
+    tables:
+      # 加载 ds_0 下所有未被分片的表
+      - "ds_0.*"
+      # 冷库专用单表
+      - "ds_cold.t_link_cold"
+      - "ds_cold.t_link_goto_cold"
+      - "ds_cold.t_link_history"
+      - "ds_cold.t_link_goto_history"
+    defaultDataSource: ds_0
+
+# 5. 属性配置
+props:
+  sql-show: true

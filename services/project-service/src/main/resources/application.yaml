@@ -1,0 +1,87 @@
+server:
+  port: 8001
+  tomcat:
+    threads:
+      max: 500       # 最大工作线程数，推荐 400-800
+      min-spare: 50  # 最小空闲线程数，推荐 50-100
+    connection-timeout: 20000
+
+spring:
+  application:
+    name: shortlink-project-service
+  datasource:
+    # ShardingSphere 对 Driver 自定义，实现分库分表等隐藏逻辑
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    # ShardingSphere 配置文件路径
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-${database.env:dev}.yaml
+  mvc:
+    view:
+      prefix: /templates/
+      suffix: .html
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: xhy_redis
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        username: nacos
+        password: nacos
+  # Spring AI Alibaba DashScope 配置
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}  # 从环境变量读取或使用默认值
+      chat:
+        options:
+          model: qwen3-max
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler # 分页插件
+    map-underscore-to-camel-case: true # 驼峰映射 默认自动开启
+  mapper-locations: classpath:mapper/*.xml
+  global-config:
+    db-config:
+      logic-delete-field: delFlag # 逻辑删除字段名
+      logic-delete-value: 1 # 逻辑已删除值
+      logic-not-delete-value: 0 # 逻辑未删除值 默认为0
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: short-link-producer-group # 必须配置一个默认的生产者组
+    send-message-timeout: 2000
+    retry-times-when-send-failed: 1
+    retry-times-when-send-async-failed: 1
+
+short-link:
+  domain:
+    default: nurl.ink:8001
+  # 消息队列的实现方式，支持Redis、RocketMQ
+  message-queue:
+    implement: RocketMQ
+  cold-data:
+    enabled: true
+    days: 90
+    batch-size: 200
+    cron: "0 30 2 * * ?"
+    rehot:
+      threshold: 1000
+  expire:
+    grace-days: 30
+  stats:
+    locale:
+      amap-key: 23ea4562d80a83d1dd47922b4913d5e0
+  goto-domain:
+    white-list:
+      enable: false
+      names: '拿个offer,知乎,掘金,博客园,github'
+      details:
+        - nageoffer.com
+        - zhihu.com
+        - juejin.cn
+        - cnblogs.com
+        - github.com
