@@ -15,24 +15,32 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.dao.entity;
+
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * 短链接业务常量
+ * 冷库短链接路由实体
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@TableName("t_link_goto_cold")
+public class ShortLinkGoToColdDO {
 
-    private ShortLinkConstant() {
-    }
+    /** ID */
+    private Long id;
 
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
+    /** 分组标识 */
+    private String gid;
 
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
-
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
+    /** 完整短链接 */
+    private String fullShortUrl;
 }

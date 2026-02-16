@@ -15,24 +15,15 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToColdDO;
 
 /**
- * 短链接业务常量
+ * 冷库短链接路由持久层
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
-
-    private ShortLinkConstant() {
-    }
-
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
-
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
-
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
+public interface ShortLinkGoToColdMapper extends BaseMapper<ShortLinkGoToColdDO> {
 }

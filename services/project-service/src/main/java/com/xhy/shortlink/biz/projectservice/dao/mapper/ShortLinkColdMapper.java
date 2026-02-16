@@ -20,9 +20,8 @@ package com.xhy.shortlink.biz.projectservice.dao.mapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.Constants;
-import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkGroupCountRespDTO;
-import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -31,35 +30,35 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * 短链接持久层
+ * 冷库短链接持久层
  *
  * @author XiaoYu
  */
-public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
+public interface ShortLinkColdMapper extends BaseMapper<ShortLinkColdDO> {
 
     /**
-     * 分组数量统计
+     * 冷库分组数量统计
      */
-    @Select("SELECT gid, count(*) as shortLinkCount FROM t_link ${ew.customSqlSegment}")
-    List<ShortLinkGroupCountRespDTO> selectGroupCount(@Param(Constants.WRAPPER) Wrapper<ShortLinkDO> wrapper);
+    @Select("SELECT gid, count(*) as shortLinkCount FROM t_link_cold ${ew.customSqlSegment}")
+    List<ShortLinkGroupCountRespDTO> selectGroupCount(@Param(Constants.WRAPPER) Wrapper<ShortLinkColdDO> wrapper);
 
     /**
-     * 统计无今日流量的链接数量（降级场景）
+     * 统计无今日流量的冷库链接数量（降级场景）
      */
     @Select("""
         SELECT COUNT(*)
-        FROM t_link
+        FROM t_link_cold
         WHERE gid = #{gid}
           AND del_flag = 0
-          AND enable_status = 0
+          AND enable_status IN (0, 3)
           AND (last_access_time < #{todayStart} OR last_access_time IS NULL)
 """)
     long countLinkFallback(@Param("gid") String gid, @Param("todayStart") Date todayStart);
 
     /**
-     * 统计数据自增，同时更新最后访问时间
+     * 冷库统计数据自增
      */
-    @Update("UPDATE t_link "
+    @Update("UPDATE t_link_cold "
             + "SET total_pv = total_pv + #{pv}, "
             + "    total_uv = total_uv + #{uv}, "
             + "    total_uip = total_uip + #{uip}, "

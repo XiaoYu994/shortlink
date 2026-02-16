@@ -18,8 +18,6 @@
 package com.xhy.shortlink.biz.projectservice.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkPageReqDTO;
@@ -32,11 +30,11 @@ import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkPageRespDTO;
 import java.util.List;
 
 /**
- * 短链接服务接口
+ * 短链接核心 CRUD 服务接口
  *
  * @author XiaoYu
  */
-public interface ShortLinkService extends IService<ShortLinkDO> {
+public interface ShortLinkCoreService {
 
     /**
      * 创建短链接

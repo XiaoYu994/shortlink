@@ -38,4 +38,13 @@ public final class RocketMQConstant {
 
     /** 过期短链归档 Topic */
     public static final String EXPIRE_ARCHIVE_TOPIC = "short_link_project_expire_archive_topic";
+
+    /** 清除本地缓存消费者组 */
+    public static final String CACHE_INVALIDATE_GROUP = "short_link_project_cache_invalidate_group";
+
+    /** AI 风控审核消费者组 */
+    public static final String RISK_CHECK_GROUP = "short_link_project_risk_check_group";
+
+    /** 过期短链归档消费者组 */
+    public static final String EXPIRE_ARCHIVE_GROUP = "short_link_project_expire_archive_group";
 }

@@ -15,24 +15,28 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.common.enums;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
- * 短链接业务常量
+ * 前端排序字段枚举
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
+@RequiredArgsConstructor
+public enum OrderTagEnum {
 
-    private ShortLinkConstant() {
-    }
+    /** 今日 PV */
+    TODAY_PV("todayPv"),
 
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
+    /** 今日 UV */
+    TODAY_UV("todayUv"),
 
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
+    /** 今日 UIP */
+    TODAY_UIP("todayUip");
 
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
+    @Getter
+    private final String value;
 }

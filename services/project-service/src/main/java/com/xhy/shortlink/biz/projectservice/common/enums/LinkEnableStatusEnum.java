@@ -41,5 +41,5 @@ public enum LinkEnableStatusEnum {
     FROZEN(3);
 
     @Getter
-    private final int enableStatus;
+    private final int code;
 }

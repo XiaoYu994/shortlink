@@ -43,4 +43,10 @@ public final class RedisKeyConstant {
 
     /** 分布式锁创建短链接 Key */
     public static final String SHORT_LINK_CREATE_LOCK_KEY = "short-link:create-lock";
+
+    /** 短链接修改分组 ID 锁前缀 Key */
+    public static final String LOCK_GID_UPDATE_KEY = "short-link:lock:update-gid:%s";
+
+    /** 统计今日 PV/UV/UIP 排行榜 Key，{%s} 使用 Hash Tag 确保 Redis Cluster 可用性 */
+    public static final String RANK_KEY = "short-link:rank:%s:{%s}:%s";
 }

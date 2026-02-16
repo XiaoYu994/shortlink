@@ -15,24 +15,27 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.dto.resp;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * 短链接业务常量
+ * 短链接分组数量查询响应参数
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShortLinkGroupCountRespDTO {
 
-    private ShortLinkConstant() {
-    }
+    /** 分组标识 */
+    private String gid;
 
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
-
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
-
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
+    /** 短链接数量 */
+    private Long shortLinkCount;
 }

@@ -15,24 +15,27 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.dto.req;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
- * 短链接业务常量
+ * 短链接分页请求参数
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class ShortLinkPageReqDTO extends Page<ShortLinkDO> {
 
-    private ShortLinkConstant() {
-    }
+    /** 分组标识 */
+    @NotBlank(message = "分组标识不能为空")
+    private String gid;
 
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
-
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
-
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
+    /** 排序标识 */
+    private String orderTag;
 }

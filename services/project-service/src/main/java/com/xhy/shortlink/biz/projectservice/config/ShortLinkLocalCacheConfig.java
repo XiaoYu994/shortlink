@@ -15,24 +15,30 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.projectservice.common.constant;
+package com.xhy.shortlink.biz.projectservice.config;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.concurrent.TimeUnit;
 
 /**
- * 短链接业务常量
+ * Caffeine 本地缓存配置
  *
  * @author XiaoYu
  */
-public final class ShortLinkConstant {
+@Configuration
+public class ShortLinkLocalCacheConfig {
 
-    private ShortLinkConstant() {
+    @Bean
+    public Cache<String, String> shortLinkCache() {
+        return Caffeine.newBuilder()
+                .initialCapacity(100)
+                .maximumSize(10000)
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .recordStats()
+                .build();
     }
-
-    /** 默认缓存有效期（毫秒），1 天 */
-    public static final long DEFAULT_CACHE_VALID_TIME = 86400000L;
-
-    /** 短链接创建前缀 */
-    public static final String HTTP_PROTOCOL = "http://";
-
-    /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
-    public static final long TODAY_EXPIRETIME = 48;
 }

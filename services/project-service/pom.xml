@@ -61,6 +61,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.xhy.shortlink</groupId>
+            <artifactId>shortlink-idempotent-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Project-specific Dependencies -->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
