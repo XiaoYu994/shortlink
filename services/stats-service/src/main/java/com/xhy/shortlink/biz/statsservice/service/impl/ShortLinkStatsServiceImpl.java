@@ -28,6 +28,8 @@ import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
 import com.xhy.shortlink.biz.statsservice.dto.req.*;
 import com.xhy.shortlink.biz.statsservice.dto.resp.*;
 import com.xhy.shortlink.biz.statsservice.service.ShortLinkStatsService;
+
+import static com.xhy.shortlink.biz.statsservice.common.constant.StatsColumnConstant.*;
 import com.xhy.shortlink.framework.starter.convention.exception.ServiceException;
 import com.xhy.shortlink.framework.starter.user.core.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -197,10 +199,10 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                             List<Map<String, Object>> uvTypeList) {
         result.getRecords().forEach(each -> each.setUvType(
                 uvTypeList.stream()
-                        .filter(uv -> Objects.equals(each.getUser(), uv.get("user")))
+                        .filter(uv -> Objects.equals(each.getUser(), uv.get(COL_USER)))
                         .findFirst()
-                        .map(uv -> uv.get("uvType").toString())
-                        .orElse("旧访客")));
+                        .map(uv -> uv.get(COL_UV_TYPE).toString())
+                        .orElse(UV_TYPE_OLD_LABEL)));
     }
 
     /**
@@ -232,19 +234,19 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
      */
     private List<ShortLinkStatsTopIpRespDTO> buildTopIpStats(List<HashMap<String, Object>> data) {
         return data.stream().map(each -> ShortLinkStatsTopIpRespDTO.builder()
-                .ip(each.get("ip").toString())
-                .cnt(Integer.parseInt(each.get("count").toString())).build()).toList();
+                .ip(each.get(COL_IP).toString())
+                .cnt(Integer.parseInt(each.get(COL_COUNT).toString())).build()).toList();
     }
 
     /**
      * 构建浏览器维度统计（含占比）
      */
     private List<ShortLinkStatsBrowserRespDTO> buildBrowserStats(List<HashMap<String, Object>> data) {
-        int sum = data.stream().mapToInt(e -> Integer.parseInt(e.get("count").toString())).sum();
+        int sum = data.stream().mapToInt(e -> Integer.parseInt(e.get(COL_COUNT).toString())).sum();
         return data.stream().map(each -> {
-            int cnt = Integer.parseInt(each.get("count").toString());
+            int cnt = Integer.parseInt(each.get(COL_COUNT).toString());
             return ShortLinkStatsBrowserRespDTO.builder()
-                    .cnt(cnt).browser(each.get("browser").toString())
+                    .cnt(cnt).browser(each.get(COL_BROWSER).toString())
                     .ratio(Math.round((double) cnt / sum * 100.0) / 100.0).build();
         }).toList();
     }
@@ -253,11 +255,11 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
      * 构建操作系统维度统计（含占比）
      */
     private List<ShortLinkStatsOsRespDTO> buildOsStats(List<HashMap<String, Object>> data) {
-        int sum = data.stream().mapToInt(e -> Integer.parseInt(e.get("count").toString())).sum();
+        int sum = data.stream().mapToInt(e -> Integer.parseInt(e.get(COL_COUNT).toString())).sum();
         return data.stream().map(each -> {
-            int cnt = Integer.parseInt(each.get("count").toString());
+            int cnt = Integer.parseInt(each.get(COL_COUNT).toString());
             return ShortLinkStatsOsRespDTO.builder()
-                    .cnt(cnt).os(each.get("os").toString())
+                    .cnt(cnt).os(each.get(COL_OS).toString())
                     .ratio(Math.round((double) cnt / sum * 100.0) / 100.0).build();
         }).toList();
     }
@@ -266,13 +268,13 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
      * 构建新旧访客类型统计（含占比）
      */
     private List<ShortLinkStatsUvRespDTO> buildUvTypeStats(HashMap<String, Object> data) {
-        int oldCnt = Integer.parseInt(data.get("oldUserCnt").toString());
-        int newCnt = Integer.parseInt(data.get("newUserCnt").toString());
+        int oldCnt = Integer.parseInt(data.get(COL_OLD_USER_CNT).toString());
+        int newCnt = Integer.parseInt(data.get(COL_NEW_USER_CNT).toString());
         int total = oldCnt + newCnt;
         return List.of(
-                ShortLinkStatsUvRespDTO.builder().uvType("newUser").cnt(newCnt)
+                ShortLinkStatsUvRespDTO.builder().uvType(UV_TYPE_NEW).cnt(newCnt)
                         .ratio(Math.round((double) newCnt / total * 100.0) / 100.0).build(),
-                ShortLinkStatsUvRespDTO.builder().uvType("oldUser").cnt(oldCnt)
+                ShortLinkStatsUvRespDTO.builder().uvType(UV_TYPE_OLD).cnt(oldCnt)
                         .ratio(Math.round((double) oldCnt / total * 100.0) / 100.0).build());
     }
 

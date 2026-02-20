@@ -50,8 +50,7 @@ import java.util.concurrent.TimeUnit;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RocketMQConstant.STATS_RECORD_GROUP;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RocketMQConstant.STATS_RECORD_TOPIC;
-import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
-import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConstant.TODAY_EXPIRETIME;
+import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConstant.*;
 
 /**
  * 短链接统计数据保存消费者
@@ -160,26 +159,26 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         String remoteAddr = statsRecord.getRemoteAddr();
 
         // IP 地理位置解析
-        String actualProvince = "未知";
-        String actualCity = "未知";
-        String adcode = "未知";
+        String actualProvince = LOCALE_UNKNOWN;
+        String actualCity = LOCALE_UNKNOWN;
+        String adcode = LOCALE_UNKNOWN;
         Map<String, Object> localeParamMap = new HashMap<>();
         localeParamMap.put("key", statsLocaleAmapKey);
         localeParamMap.put("ip", remoteAddr);
         try {
             String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap, 3000);
             JSONObject localeResultObj = JSON.parseObject(localeResultStr);
-            if ("10000".equals(localeResultObj.getString("infocode"))) {
+            if (AMAP_SUCCESS_CODE.equals(localeResultObj.getString("infocode"))) {
                 String province = localeResultObj.getString("province");
-                if (StrUtil.isNotBlank(province) && !"[]".equals(province)) {
+                if (StrUtil.isNotBlank(province) && !AMAP_EMPTY_VALUE.equals(province)) {
                     actualProvince = province;
                 }
                 String city = localeResultObj.getString("city");
-                if (StrUtil.isNotBlank(city) && !"[]".equals(city)) {
+                if (StrUtil.isNotBlank(city) && !AMAP_EMPTY_VALUE.equals(city)) {
                     actualCity = city;
                 }
                 String code = localeResultObj.getString("adcode");
-                if (StrUtil.isNotBlank(code) && !"[]".equals(code)) {
+                if (StrUtil.isNotBlank(code) && !AMAP_EMPTY_VALUE.equals(code)) {
                     adcode = code;
                 }
             }
@@ -190,7 +189,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         // 地区统计
         linkLocaleStatsMapper.shortLinkLocaleState(LinkLocaleStatsDO.builder()
                 .fullShortUrl(fullShortUrl).province(actualProvince).city(actualCity)
-                .adcode(adcode).cnt(1).country("中国").date(currentDate).build());
+                .adcode(adcode).cnt(1).country(LOCALE_COUNTRY_CN).date(currentDate).build());
 
         // OS 统计
         linkOsStatsMapper.shortLinkOsState(LinkOsStatsDO.builder()
@@ -217,7 +216,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 .fullShortUrl(fullShortUrl).ip(remoteAddr).user(statsRecord.getUv())
                 .os(statsRecord.getOs()).browser(statsRecord.getBrowser())
                 .device(statsRecord.getDevice()).network(statsRecord.getNetwork())
-                .locale(StrUtil.join("-", "中国", actualProvince, actualCity)).build());
+                .locale(StrUtil.join("-", LOCALE_COUNTRY_CN, actualProvince, actualCity)).build());
 
         // 基础访问统计
         linkAccessStatsMapper.shortLinkStats(Collections.singletonList(

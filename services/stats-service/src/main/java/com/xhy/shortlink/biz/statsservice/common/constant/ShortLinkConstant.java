@@ -30,4 +30,16 @@ public final class ShortLinkConstant {
 
     /** 高德地图 IP 定位 API */
     public static final String AMAP_REMOTE_URL = "https://restapi.amap.com/v3/ip";
+
+    /** 高德 API 成功状态码 */
+    public static final String AMAP_SUCCESS_CODE = "10000";
+
+    /** 高德 API 空值占位 */
+    public static final String AMAP_EMPTY_VALUE = "[]";
+
+    /** 默认地区值 */
+    public static final String LOCALE_UNKNOWN = "未知";
+
+    /** 默认国家 */
+    public static final String LOCALE_COUNTRY_CN = "中国";
 }
