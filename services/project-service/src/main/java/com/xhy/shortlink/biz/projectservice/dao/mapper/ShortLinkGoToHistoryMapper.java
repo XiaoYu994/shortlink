@@ -15,7 +15,15 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.dao.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToHistoryDO;
+
 /**
- * Scheduled jobs for short link project service.
+ * 历史短链接路由持久层
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.job;
+public interface ShortLinkGoToHistoryMapper extends BaseMapper<ShortLinkGoToHistoryDO> {
+}

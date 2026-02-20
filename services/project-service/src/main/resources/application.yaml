@@ -79,7 +79,6 @@ short-link:
     cron: "0 30 2 * * ?"
     rehot:
       threshold: 1000
-  expire:
     grace-days: 30
   stats:
     locale:

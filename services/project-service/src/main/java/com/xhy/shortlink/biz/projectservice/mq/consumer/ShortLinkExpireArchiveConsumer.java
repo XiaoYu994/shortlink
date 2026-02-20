@@ -17,14 +17,14 @@
 
 package com.xhy.shortlink.biz.projectservice.mq.consumer;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
 import com.xhy.shortlink.biz.projectservice.common.constant.RocketMQConstant;
 import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
-import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
-import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
-import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
-import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.dao.entity.*;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.*;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import cn.hutool.core.date.DateUtil;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,14 +47,15 @@ import java.util.UUID;
 /**
  * 过期短链接归档消费者
  * <p>
- * Phase 1 仅实现 FREEZE 阶段：将过期链接标记为冻结状态，并投递 ARCHIVE 延迟消息。
- * ARCHIVE 阶段（冷数据迁移）留给 Phase 3 实现。
+ * FREEZE 阶段：将过期链接标记为冻结状态，投递 ARCHIVE 延迟消息。
+ * ARCHIVE 阶段：宽限期结束后，将仍为冻结状态的链接迁入历史库并删除源表记录。
  *
  * @author XiaoYu
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@EnableConfigurationProperties(ColdDataProperties.class)
 @RocketMQMessageListener(
         topic = RocketMQConstant.EXPIRE_ARCHIVE_TOPIC,
         consumerGroup = RocketMQConstant.EXPIRE_ARCHIVE_GROUP
@@ -63,11 +64,13 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
 
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
+    private final ShortLinkGoToMapper shortLinkGoToMapper;
+    private final ShortLinkGoToColdMapper shortLinkGoToColdMapper;
+    private final ShortLinkHistoryMapper shortLinkHistoryMapper;
+    private final ShortLinkGoToHistoryMapper shortLinkGoToHistoryMapper;
     private final ShortLinkCacheProducer cacheProducer;
     private final ShortLinkExpireArchiveProducer expireArchiveProducer;
-
-    @Value("${short-link.expire.grace-days:30}")
-    private int graceDays;
+    private final ColdDataProperties coldDataProperties;
 
     @Override
     @Idempotent(
@@ -85,7 +88,7 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
         }
         switch (stage) {
             case FREEZE -> handleFreeze(event);
-            case ARCHIVE -> log.info("[过期归档] ARCHIVE 阶段暂未实现（Phase 3），fullShortUrl={}", event.getFullShortUrl());
+            case ARCHIVE -> handleArchive(event);
         }
     }
 
@@ -125,13 +128,10 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
         }
 
         // 清除缓存
-        try {
-            cacheProducer.sendMessage(fullShortUrl);
-        } catch (Exception e) {
-            log.error("[过期归档] 清除缓存失败，fullShortUrl={}", fullShortUrl, e);
-        }
+        clearCache(fullShortUrl);
 
-        // 投递 ARCHIVE 延迟消息（graceDays 后触发）
+        // 投递 ARCHIVE 延迟消息（宽限期后触发）
+        int graceDays = coldDataProperties.getGraceDays();
         Date archiveAt = DateUtil.offsetDay(new Date(), graceDays);
         expireArchiveProducer.sendMessage(ShortLinkExpireArchiveEvent.builder()
                 .eventId(UUID.randomUUID().toString())
@@ -143,5 +143,75 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
                 .build());
 
         log.info("[过期归档] FREEZE 完成，fullShortUrl={}，ARCHIVE 将在 {} 天后触发", fullShortUrl, graceDays);
+    }
+
+    /**
+     * 归档阶段：宽限期结束后，仍为 FROZEN 的链接迁入历史库并删除源记录
+     */
+    private void handleArchive(ShortLinkExpireArchiveEvent event) {
+        String fullShortUrl = event.getFullShortUrl();
+        String gid = event.getGid();
+
+        // 优先从热表归档
+        ShortLinkDO hotLink = shortLinkMapper.selectOne(Wrappers.<ShortLinkDO>lambdaQuery()
+                .eq(ShortLinkDO::getGid, gid)
+                .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
+                .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.FROZEN.getCode()));
+        if (hotLink != null) {
+            archiveFromHot(hotLink);
+            clearCache(fullShortUrl);
+            log.info("[过期归档] ARCHIVE 完成（热表），fullShortUrl={}", fullShortUrl);
+            return;
+        }
+
+        // 热表没有，从冷表归档
+        ShortLinkColdDO coldLink = shortLinkColdMapper.selectOne(Wrappers.<ShortLinkColdDO>lambdaQuery()
+                .eq(ShortLinkColdDO::getGid, gid)
+                .eq(ShortLinkColdDO::getFullShortUrl, fullShortUrl)
+                .eq(ShortLinkColdDO::getEnableStatus, LinkEnableStatusEnum.FROZEN.getCode()));
+        if (coldLink != null) {
+            archiveFromCold(coldLink);
+            clearCache(fullShortUrl);
+            log.info("[过期归档] ARCHIVE 完成（冷表），fullShortUrl={}", fullShortUrl);
+        }
+    }
+
+    /** 从热表归档到历史库 */
+    private void archiveFromHot(ShortLinkDO hotLink) {
+        shortLinkHistoryMapper.insert(BeanUtil.toBean(hotLink, ShortLinkHistoryDO.class));
+        ShortLinkGoToDO goTo = shortLinkGoToMapper.selectOne(Wrappers.<ShortLinkGoToDO>lambdaQuery()
+                .eq(ShortLinkGoToDO::getFullShortUrl, hotLink.getFullShortUrl()));
+        if (goTo != null) {
+            shortLinkGoToHistoryMapper.insert(BeanUtil.toBean(goTo, ShortLinkGoToHistoryDO.class));
+            shortLinkGoToMapper.delete(Wrappers.<ShortLinkGoToDO>lambdaQuery()
+                    .eq(ShortLinkGoToDO::getFullShortUrl, hotLink.getFullShortUrl()));
+        }
+        shortLinkMapper.delete(Wrappers.<ShortLinkDO>lambdaQuery()
+                .eq(ShortLinkDO::getGid, hotLink.getGid())
+                .eq(ShortLinkDO::getFullShortUrl, hotLink.getFullShortUrl()));
+    }
+
+    /** 从冷表归档到历史库 */
+    private void archiveFromCold(ShortLinkColdDO coldLink) {
+        shortLinkHistoryMapper.insert(BeanUtil.toBean(coldLink, ShortLinkHistoryDO.class));
+        ShortLinkGoToColdDO goTo = shortLinkGoToColdMapper.selectOne(Wrappers.<ShortLinkGoToColdDO>lambdaQuery()
+                .eq(ShortLinkGoToColdDO::getFullShortUrl, coldLink.getFullShortUrl()));
+        if (goTo != null) {
+            shortLinkGoToHistoryMapper.insert(BeanUtil.toBean(goTo, ShortLinkGoToHistoryDO.class));
+            shortLinkGoToColdMapper.delete(Wrappers.<ShortLinkGoToColdDO>lambdaQuery()
+                    .eq(ShortLinkGoToColdDO::getFullShortUrl, coldLink.getFullShortUrl()));
+        }
+        shortLinkColdMapper.delete(Wrappers.<ShortLinkColdDO>lambdaQuery()
+                .eq(ShortLinkColdDO::getGid, coldLink.getGid())
+                .eq(ShortLinkColdDO::getFullShortUrl, coldLink.getFullShortUrl()));
+    }
+
+    /** 清除跳转缓存并广播本地缓存失效 */
+    private void clearCache(String fullShortUrl) {
+        try {
+            cacheProducer.sendMessage(fullShortUrl);
+        } catch (Exception e) {
+            log.error("[过期归档] 清除缓存失败，fullShortUrl={}", fullShortUrl, e);
+        }
     }
 }

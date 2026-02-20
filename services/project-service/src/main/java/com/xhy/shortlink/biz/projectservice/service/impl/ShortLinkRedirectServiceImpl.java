@@ -17,10 +17,12 @@
 
 package com.xhy.shortlink.biz.projectservice.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.lang.UUID;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
 import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
@@ -46,6 +48,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -68,6 +71,7 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkCons
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@EnableConfigurationProperties(ColdDataProperties.class)
 public class ShortLinkRedirectServiceImpl {
 
     private final ShortLinkGoToMapper shortLinkGoToMapper;
@@ -79,6 +83,7 @@ public class ShortLinkRedirectServiceImpl {
     private final ShortLinkStatsProducer statsProducer;
     private final ShortLinkCacheHelper cacheHelper;
     private final Cache<String, String> shortLinkCache;
+    private final ColdDataProperties coldDataProperties;
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -162,8 +167,11 @@ public class ShortLinkRedirectServiceImpl {
             // 回源 DB 查询（热表 → 冷表）
             ShortLinkCacheObj dbObj = loadFromDb(fullShortUrl);
             if (dbObj != null) {
-                // 重建多级缓存并跳转
                 cacheHelper.rebuildCache(fullShortUrl, dbObj.getOriginUrl(), dbObj.getGid(), dbObj.getValidDate());
+                // 冷表命中时累加回温计数，达到阈值则迁回热表
+                if (dbObj.isFromCold()) {
+                    tryRehot(fullShortUrl, dbObj.getGid());
+                }
                 executeRedirect(fullShortUrl, dbObj, request, response);
             } else {
                 // DB 也不存在，写入空值缓存防止后续穿透
@@ -202,7 +210,7 @@ public class ShortLinkRedirectServiceImpl {
                     .eq(ShortLinkColdDO::getGid, coldGoToDO.getGid())
                     .eq(ShortLinkColdDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getCode()));
             if (coldDO != null && isNotExpired(coldDO.getValidDate())) {
-                return new ShortLinkCacheObj(coldDO.getOriginUrl(), coldDO.getGid(), coldDO.getValidDate());
+                return new ShortLinkCacheObj(coldDO.getOriginUrl(), coldDO.getGid(), coldDO.getValidDate(), true);
             }
         }
         return null;
@@ -220,6 +228,45 @@ public class ShortLinkRedirectServiceImpl {
     /** 判断链接是否未过期：validDate 为 null 表示永久有效 */
     private boolean isNotExpired(Date validDate) {
         return validDate == null || validDate.after(new Date());
+    }
+
+    /** 冷链接回温：累加访问计数，达到阈值时迁回热表 */
+    private void tryRehot(String fullShortUrl, String gid) {
+        try {
+            String key = String.format(SHORT_LINK_COLD_REHOT_KEY, fullShortUrl);
+            Long count = stringRedisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1) {
+                stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+            }
+            if (count != null && count >= coldDataProperties.getRehot().getThreshold()) {
+                rehotColdLink(fullShortUrl, gid);
+                stringRedisTemplate.delete(key);
+            }
+        } catch (Exception e) {
+            log.error("[回温] 失败，fullShortUrl={}", fullShortUrl, e);
+        }
+    }
+
+    /** 将冷表链接迁回热表 */
+    private void rehotColdLink(String fullShortUrl, String gid) {
+        ShortLinkColdDO coldDO = shortLinkColdMapper.selectOne(Wrappers.lambdaQuery(ShortLinkColdDO.class)
+                .eq(ShortLinkColdDO::getGid, gid)
+                .eq(ShortLinkColdDO::getFullShortUrl, fullShortUrl));
+        if (coldDO == null) {
+            return;
+        }
+        shortLinkMapper.insert(BeanUtil.toBean(coldDO, ShortLinkDO.class));
+        ShortLinkGoToColdDO goToCold = shortLinkGoToColdMapper.selectOne(Wrappers.lambdaQuery(ShortLinkGoToColdDO.class)
+                .eq(ShortLinkGoToColdDO::getFullShortUrl, fullShortUrl));
+        if (goToCold != null) {
+            shortLinkGoToMapper.insert(BeanUtil.toBean(goToCold, ShortLinkGoToDO.class));
+            shortLinkGoToColdMapper.delete(Wrappers.lambdaQuery(ShortLinkGoToColdDO.class)
+                    .eq(ShortLinkGoToColdDO::getFullShortUrl, fullShortUrl));
+        }
+        shortLinkColdMapper.delete(Wrappers.lambdaQuery(ShortLinkColdDO.class)
+                .eq(ShortLinkColdDO::getGid, gid)
+                .eq(ShortLinkColdDO::getFullShortUrl, fullShortUrl));
+        log.info("[回温] 完成，fullShortUrl={}", fullShortUrl);
     }
 
     /**
@@ -304,5 +351,11 @@ public class ShortLinkRedirectServiceImpl {
         private String gid;
         /** 有效期，null 表示永久有效 */
         private Date validDate;
+        /** 是否来自冷表查询 */
+        private boolean fromCold;
+
+        ShortLinkCacheObj(String originUrl, String gid, Date validDate) {
+            this(originUrl, gid, validDate, false);
+        }
     }
 }

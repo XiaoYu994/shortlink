@@ -52,4 +52,7 @@ public final class RedisKeyConstant {
 
     /** 短链接 UV 去重 Set Key */
     public static final String SHORT_LINK_STATS_UV_KEY = "short-link:stats:uv:";
+
+    /** 冷链接回温计数器 Key */
+    public static final String SHORT_LINK_COLD_REHOT_KEY = "short-link:cold:rehot:%s";
 }
