@@ -15,6 +15,7 @@
         <module>user-service</module>
         <module>project-service</module>
         <module>stats-service</module>
+        <module>risk-service</module>
     </modules>
 
 
