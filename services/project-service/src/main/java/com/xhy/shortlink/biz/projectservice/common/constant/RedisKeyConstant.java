@@ -49,4 +49,7 @@ public final class RedisKeyConstant {
 
     /** 统计今日 PV/UV/UIP 排行榜 Key，{%s} 使用 Hash Tag 确保 Redis Cluster 可用性 */
     public static final String RANK_KEY = "short-link:rank:%s:{%s}:%s";
+
+    /** 短链接 UV 去重 Set Key */
+    public static final String SHORT_LINK_STATS_UV_KEY = "short-link:stats:uv:";
 }

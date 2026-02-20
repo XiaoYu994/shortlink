@@ -15,7 +15,34 @@
  * limitations under the License.
  */
 
+package com.xhy.shortlink.biz.projectservice.mq.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+
 /**
- * Utility classes for short link project service.
+ * 短链接统计数据记录事件
+ *
+ * @author XiaoYu
  */
-package com.xhy.shortlink.biz.projectservice.toolkit;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShortLinkStatsRecordEvent {
+
+    private String fullShortUrl;
+    private String remoteAddr;
+    private String os;
+    private String browser;
+    private String device;
+    private String network;
+    private String uv;
+    private String gid;
+    private Date currentDate;
+    private String eventId;
+}

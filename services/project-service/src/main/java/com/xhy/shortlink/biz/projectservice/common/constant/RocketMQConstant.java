@@ -47,4 +47,10 @@ public final class RocketMQConstant {
 
     /** 过期短链归档消费者组 */
     public static final String EXPIRE_ARCHIVE_GROUP = "short_link_project_expire_archive_group";
+
+    /** 统计数据记录 Topic */
+    public static final String STATS_RECORD_TOPIC = "short_link_project_stats_record_topic";
+
+    /** 统计数据记录消费者组（供 stats-service 使用） */
+    public static final String STATS_RECORD_GROUP = "short_link_project_stats_record_group";
 }

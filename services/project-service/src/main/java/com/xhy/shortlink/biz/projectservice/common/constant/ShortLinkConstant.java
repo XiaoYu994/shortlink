@@ -35,4 +35,10 @@ public final class ShortLinkConstant {
 
     /** Redis ZSet 数据过期时间（小时），业务周期 24h + 缓冲容错 24h */
     public static final long TODAY_EXPIRETIME = 48;
+
+    /** UV Cookie 有效期（秒），30 天 */
+    public static final int DEFAULT_COOKIE_VALID_TIME = 60 * 60 * 24 * 30;
+
+    /** 短链接不存在时的跳转页面 */
+    public static final String PAGE_NOT_FOUND = "/page/notfound";
 }

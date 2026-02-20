@@ -68,6 +68,18 @@ public class ShortLinkCacheHelper {
     }
 
     /**
+     * 重建多级缓存：写入 L1 Caffeine + L2 Redis（跳转回源时调用）
+     */
+    public void rebuildCache(String fullShortUrl, String originUrl, String gid, Date validDate) {
+        String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
+        long validTimeStamp = (validDate != null) ? validDate.getTime() : -1;
+        String cacheValue = String.format("%d|%s|%s", validTimeStamp, originUrl, gid);
+        long initialTTL = LinkUtil.getLinkCacheValidTime(validDate);
+        stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
+        shortLinkCache.put(key, cacheValue);
+    }
+
+    /**
      * 清除本地 Caffeine 缓存（由 MQ 广播消费者调用）
      */
     public void evictLocalCache(String fullShortUrl) {

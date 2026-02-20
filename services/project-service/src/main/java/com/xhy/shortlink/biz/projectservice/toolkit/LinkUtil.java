@@ -18,7 +18,9 @@
 package com.xhy.shortlink.biz.projectservice.toolkit;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.useragent.UserAgentUtil;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
 import java.util.Date;
@@ -72,5 +74,86 @@ public final class LinkUtil {
         } catch (Exception ignored) {
         }
         return domain;
+    }
+
+    /**
+     * 获取用户真实 IP
+     */
+    public static String getActualIp(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+        return ipAddress;
+    }
+
+    /**
+     * 获取用户访问操作系统
+     */
+    public static String getOs(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent.toLowerCase().contains("windows")) {
+            return "Windows";
+        } else if (userAgent.toLowerCase().contains("mac")) {
+            return "Mac OS";
+        } else if (userAgent.toLowerCase().contains("linux")) {
+            return "Linux";
+        } else if (userAgent.toLowerCase().contains("android")) {
+            return "Android";
+        } else if (userAgent.toLowerCase().contains("iphone") || userAgent.toLowerCase().contains("ipad")) {
+            return "iOS";
+        } else {
+            return "Unknown";
+        }
+    }
+
+    /**
+     * 获取用户访问浏览器
+     */
+    public static String getBrowser(HttpServletRequest request) {
+        String browser = UserAgentUtil.parse(request.getHeader("User-Agent")).getBrowser().toString();
+        if (StrUtil.isEmpty(browser)) {
+            return "未知";
+        }
+        return browser;
+    }
+
+    /**
+     * 获取用户访问设备
+     */
+    public static String getDevice(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent.toLowerCase().contains("mobile")) {
+            return "Mobile";
+        }
+        return "PC";
+    }
+
+    /**
+     * 获取用户访问网络
+     */
+    public static String getNetwork(HttpServletRequest request) {
+        String ua = request.getHeader("User-Agent");
+        if (ua == null) return "Unknown";
+        String uaUpper = ua.toUpperCase();
+        if (uaUpper.contains("WIFI")) {
+            return "WIFI";
+        }
+        if (uaUpper.contains("MOBILE") || uaUpper.contains("ANDROID") || uaUpper.contains("IPHONE")) {
+            return "Mobile";
+        }
+        return "WIFI";
     }
 }
