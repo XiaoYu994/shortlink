@@ -19,6 +19,8 @@ package com.xhy.shortlink.biz.projectservice.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,14 +32,18 @@ import java.util.concurrent.TimeUnit;
  * @author XiaoYu
  */
 @Configuration
+@RequiredArgsConstructor
+@EnableConfigurationProperties(ShortLinkCacheProperties.class)
 public class ShortLinkLocalCacheConfig {
+
+    private final ShortLinkCacheProperties cacheProperties;
 
     @Bean
     public Cache<String, String> shortLinkCache() {
         return Caffeine.newBuilder()
-                .initialCapacity(100)
-                .maximumSize(10000)
-                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .initialCapacity(cacheProperties.getInitialCapacity())
+                .maximumSize(cacheProperties.getMaximumSize())
+                .expireAfterWrite(cacheProperties.getExpireAfterWrite(), TimeUnit.MINUTES)
                 .recordStats()
                 .build();
     }

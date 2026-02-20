@@ -29,6 +29,7 @@ import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.biz.projectservice.service.impl.ShortLinkRedirectServiceImpl;
 import com.xhy.shortlink.framework.starter.convention.result.Result;
+import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.web.Results;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
@@ -62,6 +63,7 @@ public class ShortLinkController {
     /**
      * 创建短链接
      */
+    @Idempotent(message = "短链接正在创建中，请勿重复提交")
     @PostMapping("/api/short-link/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody @Valid ShortLinkCreateReqDTO requestParam) {
         return Results.success(shortLinkCoreService.createShortLink(requestParam));
