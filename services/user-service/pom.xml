@@ -12,6 +12,14 @@
     <artifactId>shortlink-user-service</artifactId>
 
     <dependencies>
+        <!-- API Contract -->
+        <dependency>
+            <groupId>com.xhy.shortlink</groupId>
+            <artifactId>shortlink-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Internal Starters -->
         <dependency>
             <groupId>com.xhy.shortlink</groupId>
             <artifactId>shortlink-common-spring-boot-starter</artifactId>
@@ -77,6 +85,16 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
     </dependencies>
 

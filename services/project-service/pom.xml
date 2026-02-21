@@ -12,6 +12,13 @@
     <artifactId>shortlink-project-service</artifactId>
 
     <dependencies>
+        <!-- API Contract -->
+        <dependency>
+            <groupId>com.xhy.shortlink</groupId>
+            <artifactId>shortlink-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Internal Starters -->
         <dependency>
             <groupId>com.xhy.shortlink</groupId>

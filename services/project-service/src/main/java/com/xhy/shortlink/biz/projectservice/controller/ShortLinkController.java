@@ -18,14 +18,14 @@
 package com.xhy.shortlink.biz.projectservice.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkBatchCreateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkCreateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkPageReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkUpdateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkBatchCreateRespDTO;
-import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkCreateRespDTO;
-import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkGroupCountRespDTO;
-import com.xhy.shortlink.biz.projectservice.dto.resp.ShortLinkPageRespDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkBatchCreateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkCreateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkPageReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkBatchCreateRespDTO;
+import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkCreateRespDTO;
+import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
+import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.biz.projectservice.service.impl.ShortLinkRedirectServiceImpl;
 import com.xhy.shortlink.framework.starter.convention.result.Result;

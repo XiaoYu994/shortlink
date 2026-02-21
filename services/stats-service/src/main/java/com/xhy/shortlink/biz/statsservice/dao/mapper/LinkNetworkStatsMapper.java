@@ -19,8 +19,8 @@ package com.xhy.shortlink.biz.statsservice.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkNetworkStatsDO;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsGroupReqDTO;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -32,39 +32,44 @@ import java.util.List;
  */
 public interface LinkNetworkStatsMapper extends BaseMapper<LinkNetworkStatsDO> {
 
-    @Insert("INSERT INTO t_link_network_stats (full_short_url, date, cnt, network, create_time, update_time, del_flag) " +
-            "VALUES( #{linkNetworkStats.fullShortUrl}, #{linkNetworkStats.date}, #{linkNetworkStats.cnt}, #{linkNetworkStats.network}, NOW(), NOW(), 0) " +
-            "ON DUPLICATE KEY UPDATE cnt = cnt + VALUES(cnt),update_time = NOW();")
+    /**
+     * 新增或累加网络类型访问统计
+     */
+    @Insert("""
+            INSERT INTO t_link_network_stats (full_short_url, date, cnt, network, create_time, update_time, del_flag)
+            VALUES (#{linkNetworkStats.fullShortUrl}, #{linkNetworkStats.date}, #{linkNetworkStats.cnt}, #{linkNetworkStats.network}, NOW(), NOW(), 0)
+            ON DUPLICATE KEY UPDATE cnt = cnt + VALUES(cnt), update_time = NOW()
+            """)
     void shortLinkNetworkState(@Param("linkNetworkStats") LinkNetworkStatsDO linkNetworkStatsDO);
 
-    @Select("SELECT " +
-            "    tlns.network, " +
-            "    SUM(tlns.cnt) AS cnt " +
-            "FROM " +
-            "    t_link tl INNER JOIN " +
-            "    t_link_network_stats tlns ON tl.full_short_url = tlns.full_short_url " +
-            "WHERE " +
-            "    tlns.full_short_url = #{param.fullShortUrl} " +
-            "    AND tl.gid = #{param.gid} " +
-            "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = #{param.enableStatus} " +
-            "    AND tlns.date BETWEEN #{param.startDate} and #{param.endDate} " +
-            "GROUP BY " +
-            "    tlns.full_short_url, tl.gid, tlns.network;")
+    /**
+     * 根据短链接查询指定日期范围内的网络类型统计
+     */
+    @Select("""
+            SELECT tlns.network, SUM(tlns.cnt) AS cnt
+            FROM t_link tl
+            INNER JOIN t_link_network_stats tlns ON tl.full_short_url = tlns.full_short_url
+            WHERE tlns.full_short_url = #{param.fullShortUrl}
+              AND tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = #{param.enableStatus}
+              AND tlns.date BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tlns.full_short_url, tl.gid, tlns.network
+            """)
     List<LinkNetworkStatsDO> listNetworkStatsByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
 
-    @Select("SELECT " +
-            "    tlns.network, " +
-            "    SUM(tlns.cnt) AS cnt " +
-            "FROM " +
-            "    t_link tl INNER JOIN " +
-            "    t_link_network_stats tlns ON tl.full_short_url = tlns.full_short_url " +
-            "WHERE " +
-            "    tl.gid = #{param.gid} " +
-            "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = '0' " +
-            "    AND tlns.date BETWEEN #{param.startDate} and #{param.endDate} " +
-            "GROUP BY " +
-            "    tl.gid, tlns.network;")
+    /**
+     * 根据分组查询指定日期范围内的网络类型统计
+     */
+    @Select("""
+            SELECT tlns.network, SUM(tlns.cnt) AS cnt
+            FROM t_link tl
+            INNER JOIN t_link_network_stats tlns ON tl.full_short_url = tlns.full_short_url
+            WHERE tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = '0'
+              AND tlns.date BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tl.gid, tlns.network
+            """)
     List<LinkNetworkStatsDO> listNetworkStatsByShortLinkGroup(@Param("param") ShortLinkStatsGroupReqDTO requestParam);
 }

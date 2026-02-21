@@ -27,7 +27,10 @@ import com.xhy.shortlink.biz.userservice.dao.mapper.GroupMapper;
 import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupSortReqDTO;
 import com.xhy.shortlink.biz.userservice.dto.req.ShortlinkGroupUpdateReqDTO;
 import com.xhy.shortlink.biz.userservice.dto.resp.ShortlinkGroupRespDTO;
+import com.xhy.shortlink.biz.userservice.remote.ShortLinkRemoteService;
+import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.biz.userservice.service.GroupService;
+import com.xhy.shortlink.biz.userservice.toolkit.ResultUtils;
 import com.xhy.shortlink.framework.starter.common.enums.DelEnum;
 import com.xhy.shortlink.framework.starter.common.toolkit.BeanUtil;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
@@ -52,6 +55,7 @@ import static com.xhy.shortlink.biz.userservice.common.constant.RedisCacheConsta
 @RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
     private final RedissonClient redissonClient;
+    private final ShortLinkRemoteService shortLinkRemoteService;
 
     @Value("${short-link.group.max-num}")
     private Integer groupMaxNum;
@@ -93,11 +97,17 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getCreateTime);
         final List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        if (CollUtil.isNotEmpty(groupDOList)) {
-            return BeanUtil.convert(groupDOList, ShortlinkGroupRespDTO.class);
+        if (CollUtil.isEmpty(groupDOList)) {
+            return List.of();
         }
-        // TODO 分组下面短链接的数量还没有计算
-        return List.of();
+        List<ShortlinkGroupRespDTO> result = BeanUtil.convert(groupDOList, ShortlinkGroupRespDTO.class);
+        List<String> gidList = result.stream().map(ShortlinkGroupRespDTO::getGid).toList();
+        List<ShortLinkGroupCountRespDTO> countList = ResultUtils.check(shortLinkRemoteService.listGroupShortLinkCount(gidList));
+        result.forEach(each -> countList.stream()
+                .filter(count -> each.getGid().equals(count.getGid()))
+                .findFirst()
+                .ifPresent(count -> each.setShortLinkCount(count.getShortLinkCount())));
+        return result;
     }
 
     @Override

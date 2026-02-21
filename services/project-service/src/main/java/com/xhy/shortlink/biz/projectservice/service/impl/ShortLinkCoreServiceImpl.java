@@ -24,23 +24,23 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkBatchCreateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkCreateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkPageReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
+import com.xhy.shortlink.biz.api.project.dto.resp.*;
 import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.projectservice.common.enums.OrderTagEnum;
 import com.xhy.shortlink.biz.projectservice.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.biz.projectservice.config.GotoDomainWhiteListConfiguration;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
-import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToColdDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkBatchCreateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkCreateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkPageReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.req.ShortLinkUpdateReqDTO;
-import com.xhy.shortlink.biz.projectservice.dto.resp.*;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkRiskEvent;
@@ -74,7 +74,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkConstant.HTTP_PROTOCOL;
@@ -241,17 +240,17 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
                 .groupBy(ShortLinkColdDO::getGid);
         List<ShortLinkGroupCountRespDTO> coldCounts = shortLinkColdMapper.selectGroupCount(coldWrapper);
         // 合并热库+冷库
-        Map<String, Long> countMap = new HashMap<>();
+        Map<String, Integer> countMap = new HashMap<>();
         for (ShortLinkGroupCountRespDTO dto : hotCounts) {
             countMap.put(dto.getGid(), dto.getShortLinkCount());
         }
         for (ShortLinkGroupCountRespDTO dto : coldCounts) {
-            countMap.merge(dto.getGid(), dto.getShortLinkCount(), Long::sum);
+            countMap.merge(dto.getGid(), dto.getShortLinkCount(), Integer::sum);
         }
         return requestParam.stream()
                 .map(gid -> ShortLinkGroupCountRespDTO.builder()
                         .gid(gid)
-                        .shortLinkCount(countMap.getOrDefault(gid, 0L))
+                        .shortLinkCount(countMap.getOrDefault(gid, 0))
                         .build())
                 .toList();
     }
@@ -586,7 +585,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     private Comparator<ShortLinkPageRespDTO> buildOrderComparator(String orderTag) {
         if (CharSequenceUtil.equals(orderTag, "totalPv")) {
             return Comparator.comparing((ShortLinkPageRespDTO dto) ->
-                    Optional.ofNullable(dto.getTotalPv()).orElse(0L)).reversed()
+                    Optional.ofNullable(dto.getTotalPv()).orElse(0)).reversed()
                     .thenComparing(dto -> Optional.ofNullable(dto.getCreateTime()).orElse(new Date(0)),
                             Comparator.reverseOrder());
         }

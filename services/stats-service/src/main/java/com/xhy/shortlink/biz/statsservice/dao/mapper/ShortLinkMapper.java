@@ -27,13 +27,18 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
 
-    @Update("UPDATE t_link "
-            + "SET total_pv = total_pv + #{pv}, "
-            + "    total_uv = total_uv + #{uv}, "
-            + "    total_uip = total_uip + #{uip}, "
-            + "    last_access_time = NOW() "
-            + "WHERE gid = #{gid} "
-            + "  AND full_short_url = #{fullShortUrl}")
+    /**
+     * 自增短链接统计数据（PV/UV/UIP），同时更新最后访问时间
+     */
+    @Update("""
+            UPDATE t_link
+            SET total_pv = total_pv + #{pv},
+                total_uv = total_uv + #{uv},
+                total_uip = total_uip + #{uip},
+                last_access_time = NOW()
+            WHERE gid = #{gid}
+              AND full_short_url = #{fullShortUrl}
+            """)
     int incrementStats(@Param("gid") String gid,
                        @Param("fullShortUrl") String fullShortUrl,
                        @Param("pv") int pv,

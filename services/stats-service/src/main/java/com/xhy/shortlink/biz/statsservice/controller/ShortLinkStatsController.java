@@ -18,12 +18,12 @@
 package com.xhy.shortlink.biz.statsservice.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsAccessRecordReqDTO;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsGroupReqDTO;
-import com.xhy.shortlink.biz.statsservice.dto.req.ShortLinkStatsReqDTO;
-import com.xhy.shortlink.biz.statsservice.dto.resp.ShortLinkStatsAccessRecordRespDTO;
-import com.xhy.shortlink.biz.statsservice.dto.resp.ShortLinkStatsRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsAccessRecordRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsRespDTO;
 import com.xhy.shortlink.biz.statsservice.service.ShortLinkStatsService;
 import com.xhy.shortlink.framework.starter.convention.result.Result;
 import com.xhy.shortlink.framework.starter.web.Results;

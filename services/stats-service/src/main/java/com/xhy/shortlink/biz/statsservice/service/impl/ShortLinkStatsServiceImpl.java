@@ -25,8 +25,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xhy.shortlink.biz.statsservice.dao.entity.*;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
-import com.xhy.shortlink.biz.statsservice.dto.req.*;
-import com.xhy.shortlink.biz.statsservice.dto.resp.*;
+import com.xhy.shortlink.biz.api.stats.dto.req.*;
+import com.xhy.shortlink.biz.api.stats.dto.resp.*;
 import com.xhy.shortlink.biz.statsservice.service.ShortLinkStatsService;
 
 import static com.xhy.shortlink.biz.statsservice.common.constant.StatsColumnConstant.*;
