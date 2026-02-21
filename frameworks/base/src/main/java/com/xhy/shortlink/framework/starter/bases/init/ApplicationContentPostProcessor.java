@@ -35,7 +35,7 @@ public class ApplicationContentPostProcessor implements ApplicationListener<Appl
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        if (executeOnlyOnce.compareAndSet(false, true)) {
+        if (!executeOnlyOnce.compareAndSet(false, true)) {
             return;
         }
         // 发布自定义的初始化事件

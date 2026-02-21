@@ -12,7 +12,12 @@
     <artifactId>shortlink-services</artifactId>
     <packaging>pom</packaging>
     <modules>
+        <module>shortlink-api</module>
         <module>user-service</module>
+        <module>project-service</module>
+        <module>stats-service</module>
+        <module>risk-service</module>
+        <module>gateway-service</module>
     </modules>
 
 
