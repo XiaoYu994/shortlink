@@ -109,6 +109,9 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             String pvRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_PV.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().incrementScore(pvRankKey, fullShortUrl, 1);
+            if (stringRedisTemplate.getExpire(pvRankKey) == -1) {
+                stringRedisTemplate.expire(pvRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
+            }
 
             String todayUvHllKey = String.format(TODAY_UV_HLL_KEY, fullShortUrl, todayStr);
             Long uvAddedToday = stringRedisTemplate.opsForHyperLogLog()
@@ -120,6 +123,9 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             String uvRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_UV.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().add(uvRankKey, fullShortUrl, todayUvCount);
+            if (stringRedisTemplate.getExpire(uvRankKey) == -1) {
+                stringRedisTemplate.expire(uvRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
+            }
 
             String totalUvHllKey = String.format(TOTAL_UV_HLL_KEY, fullShortUrl);
             Long uvAddedTotal = stringRedisTemplate.opsForHyperLogLog()
@@ -135,6 +141,9 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             String uipRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_UIP.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().add(uipRankKey, fullShortUrl, todayUipCount);
+            if (stringRedisTemplate.getExpire(uipRankKey) == -1) {
+                stringRedisTemplate.expire(uipRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
+            }
 
             String totalUipHllKey = String.format(TOTAL_UIP_HLL_KEY, fullShortUrl);
             Long uipAddedTotal = stringRedisTemplate.opsForHyperLogLog()

@@ -19,10 +19,11 @@ package com.xhy.shortlink.biz.projectservice.dao.mapper;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
-import org.apache.ibatis.annotations.Delete;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkRecycleBinPageReqDTO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -59,16 +60,36 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
     /**
      * 统计数据自增，同时更新最后访问时间
      */
-    @Update("UPDATE t_link "
-            + "SET total_pv = total_pv + #{pv}, "
-            + "    total_uv = total_uv + #{uv}, "
-            + "    total_uip = total_uip + #{uip}, "
-            + "    last_access_time = NOW() "
-            + "WHERE gid = #{gid} "
-            + "  AND full_short_url = #{fullShortUrl}")
+    @Update("""
+            UPDATE t_link
+            SET total_pv = total_pv + #{pv},
+                total_uv = total_uv + #{uv},
+                total_uip = total_uip + #{uip},
+                last_access_time = NOW()
+            WHERE gid = #{gid}
+              AND full_short_url = #{fullShortUrl}
+            """)
     int incrementStats(@Param("gid") String gid,
                        @Param("fullShortUrl") String fullShortUrl,
                        @Param("pv") int pv,
                        @Param("uv") int uv,
                        @Param("uip") int uip);
+
+    /**
+     * 分页查询回收站短链接（支持 gidList 过滤和排序）
+     */
+    @Select("<script>" +
+            "SELECT * FROM t_link " +
+            "WHERE enable_status IN (1, 2) AND del_flag = 0 " +
+            "<if test='param.gidList != null and param.gidList.size() > 0'>" +
+            "AND gid IN <foreach collection='param.gidList' item='gid' open='(' separator=',' close=')'>#{gid}</foreach> " +
+            "</if>" +
+            "<choose>" +
+            "<when test=\"param.orderTag == 'totalPv'\">ORDER BY total_pv DESC</when>" +
+            "<when test=\"param.orderTag == 'totalUv'\">ORDER BY total_uv DESC</when>" +
+            "<when test=\"param.orderTag == 'totalUip'\">ORDER BY total_uip DESC</when>" +
+            "<otherwise>ORDER BY create_time DESC</otherwise>" +
+            "</choose>" +
+            "</script>")
+    IPage<ShortLinkDO> pageRecycleBinLink(@Param("param") ShortLinkRecycleBinPageReqDTO requestParam);
 }

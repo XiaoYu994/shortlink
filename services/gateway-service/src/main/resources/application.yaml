@@ -1,0 +1,28 @@
+server:
+  port: 8000
+spring:
+  application:
+    name: shortlink-gateway-service
+  profiles:
+    active: dev
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: xhy_redis
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        username: nacos
+        password: nacos
+
+sa-token:
+  token-style: simple-uuid
+  token-name: short-link
+  timeout: 1800
+  is-concurrent: true
+  is-share: true
+  is-read-header: true
+  is-read-cookie: false
+  is-print: false

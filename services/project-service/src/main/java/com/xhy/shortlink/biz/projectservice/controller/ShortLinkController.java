@@ -27,6 +27,7 @@ import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkPageRespDTO;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
+import com.xhy.shortlink.biz.projectservice.service.UrlTitleService;
 import com.xhy.shortlink.biz.projectservice.service.impl.ShortLinkRedirectServiceImpl;
 import com.xhy.shortlink.framework.starter.convention.result.Result;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
@@ -50,6 +51,7 @@ public class ShortLinkController {
 
     private final ShortLinkCoreService shortLinkCoreService;
     private final ShortLinkRedirectServiceImpl shortLinkRedirectService;
+    private final UrlTitleService urlTitleService;
 
     /**
      * 短链接跳转
@@ -100,5 +102,13 @@ public class ShortLinkController {
     @GetMapping("/api/short-link/v1/count")
     public Result<List<ShortLinkGroupCountRespDTO>> listGroupShortLinkCount(@RequestParam("gidList") List<String> requestParam) {
         return Results.success(shortLinkCoreService.listGroupShortLinkCount(requestParam));
+    }
+
+    /**
+     * 获取网页标题
+     */
+    @GetMapping("/api/short-link/v1/title")
+    public Result<String> getUrlTitle(@RequestParam("url") String url) {
+        return Results.success(urlTitleService.getPageTitle(url));
     }
 }
