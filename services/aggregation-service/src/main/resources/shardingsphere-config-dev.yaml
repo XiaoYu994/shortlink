@@ -1,74 +1,146 @@
-# 数据源集合
+# 聚合服务 ShardingSphere 配置 - 合并 user-service 和 project-service
+# 1. 必填：逻辑库名
+databaseName: aggregation_db
+
+# 2. 必填：运行模式
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+# 3. 数据源配置
 dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: root
     password: root
+    maximumPoolSize: 50
+    minimumIdle: 10
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
+
+  ds_cold:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link_cold?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+    maximumPoolSize: 20
+    minimumIdle: 5
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+    connectionTestQuery: SELECT 1
 
 rules:
+  # 分片规则 - 合并 user-service 和 project-service
   - !SHARDING
-    tables:
+    autoTables:
+      # user-service: 用户表
       t_user:
-        actualDataNodes: ds_0.t_user_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: username
-            shardingAlgorithmName: user_table_hash_mod
+            shardingAlgorithmName: user_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # user-service + project-service: 分组表（两个服务配置相同）
       t_group:
-        actualDataNodes: ds_0.t_group_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: username
-            shardingAlgorithmName: group_table_hash_mod
+            shardingAlgorithmName: group_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # project-service: 短链接主表
       t_link:
-        actualDataNodes: ds_0.t_link_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: gid
-            shardingAlgorithmName: link_table_hash_mod
+            shardingAlgorithmName: link_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # project-service: 短链接路由表
       t_link_goto:
-        actualDataNodes: ds_0.t_link_goto_${0..15}
-        tableStrategy:
+        actualDataSources: ds_0
+        shardingStrategy:
           standard:
             shardingColumn: full_short_url
-            shardingAlgorithmName: linkGoto_table_hash_mod
+            shardingAlgorithmName: link_goto_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
     shardingAlgorithms:
-      user_table_hash_mod:
+      user_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
-      group_table_hash_mod:
+
+      group_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
-      link_table_hash_mod:
+
+      link_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
-      linkGoto_table_hash_mod:
+
+      link_goto_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
+
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 1
+
+  # 加密规则 - user-service 的 t_user 加密
   - !ENCRYPT
     tables:
       t_user:
         columns:
           phone:
-            cipherColumn: phone
-            encryptorName: common_encryptor
+            cipher:
+              name: phone
+              encryptorName: common_encryptor
           mail:
-            cipherColumn: mail
-            encryptorName: common_encryptor
-#          password:
-#            cipherColumn: password
-#            encryptorName: common_encryptor
-        queryWithCipherColumn: true
+            cipher:
+              name: mail
+              encryptorName: common_encryptor
+
     encryptors:
       common_encryptor:
         type: AES
         props:
           aes-key-value: d6oadCl789rrb9A3GWo
+          digest-algorithm-name: SHA-1
+
+  # 单表加载规则
+  - !SINGLE
+    tables:
+      - "ds_0.*"
+      - "ds_cold.t_link_cold"
+      - "ds_cold.t_link_goto_cold"
+      - "ds_cold.t_link_history"
+      - "ds_cold.t_link_goto_history"
+    defaultDataSource: ds_0
+
 props:
   sql-show: true

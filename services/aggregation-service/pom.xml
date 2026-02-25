@@ -12,7 +12,7 @@
     <artifactId>aggregation-service</artifactId>
 
     <dependencies>
-        <!-- 依赖新的微服务模块 -->
+        <!-- 只聚合需要同步调用的服务 -->
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>user-service</artifactId>
@@ -22,18 +22,6 @@
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>project-service</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>stats-service</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>risk-service</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

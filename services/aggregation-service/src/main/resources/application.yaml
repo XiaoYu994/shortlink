@@ -1,5 +1,10 @@
 server:
   port: 8003
+  tomcat:
+    threads:
+      max: 500
+      min-spare: 50
+    connection-timeout: 20000
 
 spring:
   application:
@@ -9,7 +14,7 @@ spring:
     url: jdbc:shardingsphere:classpath:shardingsphere-config-${database.env:dev}.yaml
   data:
     redis:
-      host: 172.28.64.14
+      host: 127.0.0.1
       port: 6379
       password: xhy_redis
   mvc:
@@ -19,27 +24,32 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 122.51.107.126:8848
+        server-addr: 127.0.0.1:8848
         username: nacos
-        password: dA8UJZMYb.KI3szlG4nz3KJKAD4uwK2
+        password: nacos
 
-aggregation:
-  remote-url: http://127.0.0.1:${server.port}
-
+# user-service 业务配置
 short-link:
   group:
     max-num: 20
-  flow-limit:
-    enable: true
-    time-window: 1
-    max-access-count: 20
+  # project-service 业务配置
+  cache:
+    local:
+      initial-capacity: 100
+      maximum-size: 10000
+      expire-after-write: 30
+  create:
+    strategy: bloom-filter
   domain:
     default: nurl.ink:8003
-  message-queue:
-    implement: RocketMQ
-  stats:
-    locale:
-      amap-key: 23ea4562d80a83d1dd47922b4913d5e0
+  cold-data:
+    enabled: true
+    days: 90
+    batch-size: 200
+    cron: "0 30 2 * * ?"
+    rehot:
+      threshold: 1000
+    grace-days: 30
   goto-domain:
     white-list:
       enable: false

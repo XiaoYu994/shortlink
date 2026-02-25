@@ -22,20 +22,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
-/** 聚合服务启动类 */
+/** 聚合服务启动类 - 聚合 user-service 和 project-service */
 @EnableDiscoveryClient
 @SpringBootApplication(scanBasePackages = {
         "com.xhy.shortlink.biz.userservice",
         "com.xhy.shortlink.biz.projectservice",
-        "com.xhy.shortlink.biz.statsservice",
-        "com.xhy.shortlink.biz.riskservice",
         "com.xhy.shortlink.biz.aggregationservice"
 })
 @MapperScan(value = {
         "com.xhy.shortlink.biz.userservice.dao.mapper",
-        "com.xhy.shortlink.biz.projectservice.dao.mapper",
-        "com.xhy.shortlink.biz.statsservice.dao.mapper",
-        "com.xhy.shortlink.biz.riskservice.dao.mapper"
+        "com.xhy.shortlink.biz.projectservice.dao.mapper"
 })
 public class AggregationServiceApplication {
     public static void main(String[] args) {
