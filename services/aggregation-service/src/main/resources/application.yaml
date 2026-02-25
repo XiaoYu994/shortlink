@@ -1,0 +1,75 @@
+server:
+  port: 8003
+
+spring:
+  application:
+    name: shortlink-aggregation-service
+  datasource:
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-${database.env:dev}.yaml
+  data:
+    redis:
+      host: 172.28.64.14
+      port: 6379
+      password: xhy_redis
+  mvc:
+    view:
+      prefix: /templates/
+      suffix: .html
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 122.51.107.126:8848
+        username: nacos
+        password: dA8UJZMYb.KI3szlG4nz3KJKAD4uwK2
+
+aggregation:
+  remote-url: http://127.0.0.1:${server.port}
+
+short-link:
+  group:
+    max-num: 20
+  flow-limit:
+    enable: true
+    time-window: 1
+    max-access-count: 20
+  domain:
+    default: nurl.ink:8003
+  message-queue:
+    implement: RocketMQ
+  stats:
+    locale:
+      amap-key: 23ea4562d80a83d1dd47922b4913d5e0
+  goto-domain:
+    white-list:
+      enable: false
+      names: '拿个offer,知乎,掘金,博客园,github'
+      details:
+        - nageoffer.com
+        - zhihu.com
+        - juejin.cn
+        - cnblogs.com
+        - github.com
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
+    map-underscore-to-camel-case: true
+  mapper-locations: classpath:mapper/*.xml
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: short-link_project-service_stats-save_pg
+    topic: short-link_project-service_topic
+    send-message-timeout: 2000
+    retry-times-when-send-failed: 1
+    retry-times-when-send-async-failed: 1
+  consumer:
+    group: short-link_project-service_stats-save_cg

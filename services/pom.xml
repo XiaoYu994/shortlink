@@ -18,6 +18,7 @@
         <module>stats-service</module>
         <module>risk-service</module>
         <module>gateway-service</module>
+        <module>aggregation-service</module>
     </modules>
 
 
