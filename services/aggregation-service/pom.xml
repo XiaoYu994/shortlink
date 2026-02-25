@@ -9,7 +9,7 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>aggregation-service</artifactId>
+    <artifactId>shortlink-aggregation-service</artifactId>
 
     <dependencies>
         <!-- 只聚合需要同步调用的服务 -->
