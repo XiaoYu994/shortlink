@@ -15,13 +15,13 @@
         <!-- 只聚合需要同步调用的服务 -->
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>user-service</artifactId>
+            <artifactId>shortlink-user-service</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>project-service</artifactId>
+            <artifactId>shortlink-project-service</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
