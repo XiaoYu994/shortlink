@@ -19,6 +19,7 @@ package com.xhy.shortlink.biz.riskservice.mq.consumer;
 
 import com.xhy.shortlink.biz.riskservice.dao.entity.UserNotificationDO;
 import com.xhy.shortlink.biz.riskservice.dao.mapper.UserNotificationMapper;
+import com.xhy.shortlink.biz.riskservice.metrics.RiskMetrics;
 import com.xhy.shortlink.biz.riskservice.mq.event.ShortLinkViolationEvent;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.idempotent.enums.IdempotentSceneEnum;
@@ -31,6 +32,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.time.Duration;
 
 import static com.xhy.shortlink.biz.riskservice.common.constant.RocketMQConstant.NOTIFY_GROUP;
 import static com.xhy.shortlink.biz.riskservice.common.constant.RocketMQConstant.NOTIFY_TOPIC;
@@ -47,6 +49,7 @@ import static com.xhy.shortlink.biz.riskservice.common.constant.RocketMQConstant
 public class ShortLinkViolationNotifyConsumer implements RocketMQListener<ShortLinkViolationEvent> {
 
     private final UserNotificationMapper userNotificationMapper;
+    private final RiskMetrics riskMetrics;
 
     @Override
     @Idempotent(
@@ -57,22 +60,29 @@ public class ShortLinkViolationNotifyConsumer implements RocketMQListener<ShortL
             keyTimeout = 7200
     )
     public void onMessage(ShortLinkViolationEvent event) {
-        log.info("收到违规通知任务: {}", event.getFullShortUrl());
+        long startNanos = System.nanoTime();
         try {
-            userNotificationMapper.insert(UserNotificationDO.builder()
-                    .userId(event.getUserId())
-                    .type(1)
-                    .title("短链接封禁提醒")
-                    .eventId(event.getEventId())
-                    .content(String.format(
-                            "您的短链接 %s 因 [%s] 被系统检测为违规，现已封禁。",
-                            event.getFullShortUrl(), event.getReason()))
-                    .readFlag(0)
-                    .createTime(new Date())
-                    .build());
-            log.info("已生成站内信通知");
-        } catch (DuplicateKeyException e) {
-            log.warn("数据库已存在该通知，忽略。eventId: {}", event.getEventId());
+            log.info("收到违规通知任务: {}", event.getFullShortUrl());
+            try {
+                userNotificationMapper.insert(UserNotificationDO.builder()
+                        .userId(event.getUserId())
+                        .type(1)
+                        .title("短链接封禁提醒")
+                        .eventId(event.getEventId())
+                        .content(String.format(
+                                "您的短链接 %s 因 [%s] 被系统检测为违规，现已封禁。",
+                                event.getFullShortUrl(), event.getReason()))
+                        .readFlag(0)
+                        .createTime(new Date())
+                        .build());
+                log.info("已生成站内信通知");
+            } catch (DuplicateKeyException e) {
+                log.warn("数据库已存在该通知，忽略。eventId: {}", event.getEventId());
+            }
+            riskMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
+        } catch (RuntimeException ex) {
+            riskMetrics.recordConsumeFailure(Duration.ofNanos(System.nanoTime() - startNanos));
+            throw ex;
         }
     }
 }

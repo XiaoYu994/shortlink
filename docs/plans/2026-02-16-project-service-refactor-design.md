@@ -558,7 +558,8 @@ services/project-service/src/main/java/com/xhy/shortlink/biz/projectservice/
 | Phase 3 — ColdData 冷热数据优化 | ✅ 已完成 | `65c2b2e`~`141d8c5` | 2026-02-19 ~ 2026-02-20 |
 | Phase 4a — Stats Service | ✅ 已完成 | `b060e43`~`4bc437a` | 2026-02-20 |
 | Phase 4b — Risk Service | ✅ 已完成 | `355edde` | 2026-02-20 |
-| Phase 5a — User-Service 补全 | ⬜ 未开始 | — | — |
-| Phase 5b — Gateway-Service 迁移 | ⬜ 未开始 | — | — |
-| Phase 5c — 路由配置对齐 | ⬜ 未开始 | — | — |
-| Phase 6 — 测试、文档、Aggregation | ⬜ 未开始 | — | — |
+| Phase 5a — User-Service 补全 | ✅ 已完成 | `3f37bd8` | 2026-02-21 |
+| Phase 5b — Gateway-Service 迁移 | ✅ 已完成 | `65b02d6` | 2026-02-21 |
+| Phase 5c — 路由配置对齐 | ✅ 已完成 | `65b02d6` | 2026-02-21 |
+| Phase 6 — 测试、文档、Aggregation | 🟨 进行中 | `5f7f298`~`756da33` | 2026-02-25 ~ 2026-03-02 |
+| Phase 7 — 发布、验收、监控落地 | 🟨 进行中 | `working tree` | 2026-03-02 |

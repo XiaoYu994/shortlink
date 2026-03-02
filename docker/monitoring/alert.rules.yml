@@ -1,0 +1,47 @@
+groups:
+  - name: shortlink-alerts
+    rules:
+      - alert: ServiceDown
+        expr: up{job="shortlink-services"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service down"
+          description: "{{ $labels.instance }} has been down for more than 2 minutes."
+
+      - alert: HighHttp5xxRate
+        expr: |
+          (
+            sum by (instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum by (instance) (rate(http_server_requests_seconds_count[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx rate"
+          description: "{{ $labels.instance }} has >5% 5xx ratio in last 5 minutes."
+
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (instance, le) (rate(http_server_requests_seconds_bucket[5m]))
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P95 latency"
+          description: "{{ $labels.instance }} HTTP P95 latency is above 500ms."
+
+      - alert: RocketMQConsumerFailureSpike
+        expr: increase(shortlink_mq_consume_failure_total[10m]) > 20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RocketMQ consume failures spiking"
+          description: "{{ $labels.instance }} has more than 20 MQ consume failures in 10 minutes."

@@ -26,6 +26,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.biz.statsservice.common.enums.OrderTagEnum;
 import com.xhy.shortlink.biz.statsservice.dao.entity.*;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
+import com.xhy.shortlink.biz.statsservice.metrics.StatsMetrics;
 import com.xhy.shortlink.biz.statsservice.mq.event.ShortLinkStatsRecordEvent;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.idempotent.enums.IdempotentSceneEnum;
@@ -45,6 +46,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static com.xhy.shortlink.biz.statsservice.common.constant.RedisKeyConstant.*;
@@ -73,6 +75,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final StatsMetrics statsMetrics;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -86,7 +89,14 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             keyTimeout = 7200
     )
     public void onMessage(ShortLinkStatsRecordEvent event) {
-        actualSaveShortLinkStats(event);
+        long startNanos = System.nanoTime();
+        try {
+            actualSaveShortLinkStats(event);
+            statsMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
+        } catch (RuntimeException ex) {
+            statsMetrics.recordConsumeFailure(Duration.ofNanos(System.nanoTime() - startNanos));
+            throw ex;
+        }
     }
 
     private void actualSaveShortLinkStats(ShortLinkStatsRecordEvent statsRecord) {

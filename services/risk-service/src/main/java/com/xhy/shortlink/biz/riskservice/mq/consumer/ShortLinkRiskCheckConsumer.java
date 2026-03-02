@@ -22,6 +22,7 @@ import com.xhy.shortlink.biz.riskservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.riskservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.riskservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.riskservice.dto.resp.ShortLinkRiskCheckRespDTO;
+import com.xhy.shortlink.biz.riskservice.metrics.RiskMetrics;
 import com.xhy.shortlink.biz.riskservice.mq.event.ShortLinkRiskEvent;
 import com.xhy.shortlink.biz.riskservice.mq.event.ShortLinkViolationEvent;
 import com.xhy.shortlink.biz.riskservice.service.UrlRiskControlService;
@@ -37,6 +38,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.UUID;
 
 import static com.xhy.shortlink.biz.riskservice.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
@@ -57,6 +59,7 @@ public class ShortLinkRiskCheckConsumer implements RocketMQListener<ShortLinkRis
     private final ShortLinkMapper shortLinkMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final RocketMQTemplate rocketMQTemplate;
+    private final RiskMetrics riskMetrics;
 
     @Override
     @Idempotent(
@@ -67,26 +70,34 @@ public class ShortLinkRiskCheckConsumer implements RocketMQListener<ShortLinkRis
             keyTimeout = 7200
     )
     public void onMessage(ShortLinkRiskEvent event) {
-        log.info("开始对短链接进行 AI 风控审核: {}", event.getFullShortUrl());
+        long startNanos = System.nanoTime();
+        try {
+            log.info("开始对短链接进行 AI 风控审核: {}", event.getFullShortUrl());
 
-        // 已封禁则跳过，节省 AI Token
-        ShortLinkDO linkDO = shortLinkMapper.selectOne(
-                Wrappers.lambdaQuery(ShortLinkDO.class)
-                        .eq(ShortLinkDO::getGid, event.getGid())
-                        .eq(ShortLinkDO::getFullShortUrl, event.getFullShortUrl())
-                        .select(ShortLinkDO::getEnableStatus));
-        if (linkDO != null && linkDO.getEnableStatus() == LinkEnableStatusEnum.BANNED.getCode()) {
-            log.info("该链接已被封禁，跳过 AI 检测: {}", event.getFullShortUrl());
-            return;
-        }
+            // 已封禁则跳过，节省 AI Token
+            ShortLinkDO linkDO = shortLinkMapper.selectOne(
+                    Wrappers.lambdaQuery(ShortLinkDO.class)
+                            .eq(ShortLinkDO::getGid, event.getGid())
+                            .eq(ShortLinkDO::getFullShortUrl, event.getFullShortUrl())
+                            .select(ShortLinkDO::getEnableStatus));
+            if (linkDO != null && linkDO.getEnableStatus() == LinkEnableStatusEnum.BANNED.getCode()) {
+                log.info("该链接已被封禁，跳过 AI 检测: {}", event.getFullShortUrl());
+                riskMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
+                return;
+            }
 
-        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(event.getOriginUrl());
-        if (!result.isSafe()) {
-            log.warn("发现违规链接！URL: {}, 类型: {}", event.getFullShortUrl(), result.getRiskType());
-            disableLink(event);
-            sendViolationNotification(event, result.getSummary());
-        } else {
-            log.info("AI 审核通过: {}", event.getFullShortUrl());
+            ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(event.getOriginUrl());
+            if (!result.isSafe()) {
+                log.warn("发现违规链接！URL: {}, 类型: {}", event.getFullShortUrl(), result.getRiskType());
+                disableLink(event);
+                sendViolationNotification(event, result.getSummary());
+            } else {
+                log.info("AI 审核通过: {}", event.getFullShortUrl());
+            }
+            riskMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
+        } catch (RuntimeException ex) {
+            riskMetrics.recordConsumeFailure(Duration.ofNanos(System.nanoTime() - startNanos));
+            throw ex;
         }
     }
 

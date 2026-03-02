@@ -42,6 +42,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
+import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkRiskEvent;
 import com.xhy.shortlink.biz.projectservice.mq.event.UpdateFaviconEvent;
@@ -104,6 +105,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     private final AbstractStrategyChoose abstractStrategyChoose;
     private final PlatformTransactionManager transactionManager;
     private final DefaultRedisScript<Long> statsRankMigrateScript;
+    private final ShortLinkMetrics shortLinkMetrics;
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -114,66 +116,72 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
-        verificationWhitelist(requestParam.getOriginUrl());
-        // 策略模式选择方式生成短链接
-        String suffix = abstractStrategyChoose.chooseAndExecuteResp(
-                createStrategy, requestParam.getOriginUrl() + "|" + defaultDomain);
-        String fullShortUrl = defaultDomain + "/" + suffix;
-        ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .gid(requestParam.getGid())
-                .createdType(requestParam.getCreatedType())
-                .domain(defaultDomain)
-                .description(requestParam.getDescription())
-                .validDateType(requestParam.getValidDateType())
-                .validDate(requestParam.getValidDate())
-                .fullShortUrl(fullShortUrl)
-                .originUrl(requestParam.getOriginUrl())
-                .shortUri(suffix)
-                .build();
-        ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
-                .gid(shortLinkDO.getGid())
-                .fullShortUrl(shortLinkDO.getFullShortUrl())
-                .build();
         try {
-            shortLinkMapper.insert(shortLinkDO);
-            shortLinkGoToMapper.insert(shortLinkGoToDO);
-        } catch (DuplicateKeyException e) {
-            if (!cacheHelper.bloomFilterContains(fullShortUrl)) {
-                cacheHelper.addToBloomFilter(fullShortUrl);
-            }
-            throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
-        }
-        // 缓存预热
-        cacheHelper.warmUp(shortLinkDO.getFullShortUrl(), shortLinkDO.getOriginUrl(),
-                shortLinkDO.getGid(), shortLinkDO.getValidDate());
-        // 异步抓取图标
-        eventPublisher.publishEvent(new UpdateFaviconEvent(
-                shortLinkDO.getFullShortUrl(), shortLinkDO.getGid(), requestParam.getOriginUrl()));
-        // 发送 AI 风控审核消息
-        riskProducer.sendMessage(ShortLinkRiskEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .fullShortUrl(shortLinkDO.getFullShortUrl())
-                .originUrl(shortLinkDO.getOriginUrl())
-                .gid(shortLinkDO.getGid())
-                .userId(Long.parseLong(UserContext.getUserId()))
-                .build());
-        // 自定义有效期：发送过期归档延迟消息
-        if (Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
-                && requestParam.getValidDate() != null) {
-            expireArchiveProducer.sendMessage(ShortLinkExpireArchiveEvent.builder()
-                    .eventId(UUID.randomUUID().toString())
+            verificationWhitelist(requestParam.getOriginUrl());
+            // 策略模式选择方式生成短链接
+            String suffix = abstractStrategyChoose.chooseAndExecuteResp(
+                    createStrategy, requestParam.getOriginUrl() + "|" + defaultDomain);
+            String fullShortUrl = defaultDomain + "/" + suffix;
+            ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                    .gid(requestParam.getGid())
+                    .createdType(requestParam.getCreatedType())
+                    .domain(defaultDomain)
+                    .description(requestParam.getDescription())
+                    .validDateType(requestParam.getValidDateType())
+                    .validDate(requestParam.getValidDate())
+                    .fullShortUrl(fullShortUrl)
+                    .originUrl(requestParam.getOriginUrl())
+                    .shortUri(suffix)
+                    .build();
+            ShortLinkGoToDO shortLinkGoToDO = ShortLinkGoToDO.builder()
                     .gid(shortLinkDO.getGid())
                     .fullShortUrl(shortLinkDO.getFullShortUrl())
-                    .expireAt(requestParam.getValidDate())
+                    .build();
+            try {
+                shortLinkMapper.insert(shortLinkDO);
+                shortLinkGoToMapper.insert(shortLinkGoToDO);
+            } catch (DuplicateKeyException e) {
+                if (!cacheHelper.bloomFilterContains(fullShortUrl)) {
+                    cacheHelper.addToBloomFilter(fullShortUrl);
+                }
+                throw new ServiceException("短链接：" + fullShortUrl + " 已存在");
+            }
+            // 缓存预热
+            cacheHelper.warmUp(shortLinkDO.getFullShortUrl(), shortLinkDO.getOriginUrl(),
+                    shortLinkDO.getGid(), shortLinkDO.getValidDate());
+            // 异步抓取图标
+            eventPublisher.publishEvent(new UpdateFaviconEvent(
+                    shortLinkDO.getFullShortUrl(), shortLinkDO.getGid(), requestParam.getOriginUrl()));
+            // 发送 AI 风控审核消息
+            riskProducer.sendMessage(ShortLinkRiskEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .fullShortUrl(shortLinkDO.getFullShortUrl())
+                    .originUrl(shortLinkDO.getOriginUrl())
+                    .gid(shortLinkDO.getGid())
                     .userId(Long.parseLong(UserContext.getUserId()))
-                    .stage(ShortLinkExpireArchiveEvent.Stage.FREEZE)
                     .build());
+            // 自定义有效期：发送过期归档延迟消息
+            if (Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
+                    && requestParam.getValidDate() != null) {
+                expireArchiveProducer.sendMessage(ShortLinkExpireArchiveEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .gid(shortLinkDO.getGid())
+                        .fullShortUrl(shortLinkDO.getFullShortUrl())
+                        .expireAt(requestParam.getValidDate())
+                        .userId(Long.parseLong(UserContext.getUserId()))
+                        .stage(ShortLinkExpireArchiveEvent.Stage.FREEZE)
+                        .build());
+            }
+            shortLinkMetrics.recordCreateSuccess();
+            return ShortLinkCreateRespDTO.builder()
+                    .fullShortUrl(HTTP_PROTOCOL + shortLinkDO.getFullShortUrl())
+                    .gid(shortLinkDO.getGid())
+                    .originUrl(requestParam.getOriginUrl())
+                    .build();
+        } catch (RuntimeException ex) {
+            shortLinkMetrics.recordCreateFailure();
+            throw ex;
         }
-        return ShortLinkCreateRespDTO.builder()
-                .fullShortUrl(HTTP_PROTOCOL + shortLinkDO.getFullShortUrl())
-                .gid(shortLinkDO.getGid())
-                .originUrl(requestParam.getOriginUrl())
-                .build();
     }
 
     @Override

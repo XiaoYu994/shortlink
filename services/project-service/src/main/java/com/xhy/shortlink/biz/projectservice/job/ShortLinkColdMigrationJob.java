@@ -31,6 +31,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class ShortLinkColdMigrationJob {
     private final ShortLinkGoToColdMapper shortLinkGoToColdMapper;
     private final ShortLinkCacheProducer cacheProducer;
     private final ColdDataProperties coldDataProperties;
+    private final ShortLinkMetrics shortLinkMetrics;
 
     @Scheduled(cron = "${short-link.cold-data.cron:0 30 2 * * ?}")
     public void migrateColdLinks() {
@@ -83,6 +85,7 @@ public class ShortLinkColdMigrationJob {
             if (records == null || records.isEmpty()) {
                 break;
             }
+            shortLinkMetrics.recordColdMigrationBatch(records.size());
             for (ShortLinkDO record : records) {
                 if (migrateSingle(record)) {
                     totalMigrated++;

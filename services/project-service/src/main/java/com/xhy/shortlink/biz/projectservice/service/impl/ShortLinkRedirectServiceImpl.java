@@ -33,6 +33,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
+import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkStatsRecordEvent;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkStatsProducer;
 import com.xhy.shortlink.biz.projectservice.toolkit.LinkUtil;
@@ -53,6 +54,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -84,6 +86,7 @@ public class ShortLinkRedirectServiceImpl {
     private final ShortLinkCacheHelper cacheHelper;
     private final Cache<String, String> shortLinkCache;
     private final ColdDataProperties coldDataProperties;
+    private final ShortLinkMetrics shortLinkMetrics;
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
@@ -93,6 +96,7 @@ public class ShortLinkRedirectServiceImpl {
      */
     @SneakyThrows
     public void redirect(String shortUri, ServletRequest request, ServletResponse response) {
+        long startNanos = System.nanoTime();
         String fullShortUrl = defaultDomain + "/" + shortUri;
         // 1. 优先从 L1 Caffeine / L2 Redis 读取缓存
         ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl);
@@ -103,10 +107,11 @@ public class ShortLinkRedirectServiceImpl {
         // 2. 布隆过滤器 + 空值缓存双重防穿透
         if (isPossiblePenetration(fullShortUrl)) {
             ((HttpServletResponse) response).sendRedirect(PAGE_NOT_FOUND);
+            shortLinkMetrics.recordRedirectFailure(elapsedDuration(startNanos));
             return;
         }
         // 3. 缓存未命中且通过防穿透校验，加分布式锁回源 DB
-        processWithLock(fullShortUrl, request, response);
+        processWithLock(fullShortUrl, request, response, startNanos);
     }
 
     /**
@@ -150,7 +155,7 @@ public class ShortLinkRedirectServiceImpl {
     /**
      * 加分布式锁回源 DB，防止缓存击穿（热点 key 失效时大量请求同时穿透）
      */
-    private void processWithLock(String fullShortUrl, ServletRequest request, ServletResponse response) throws IOException {
+    private void processWithLock(String fullShortUrl, ServletRequest request, ServletResponse response, long startNanos) throws IOException {
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
@@ -162,6 +167,7 @@ public class ShortLinkRedirectServiceImpl {
             }
             if (isPossiblePenetration(fullShortUrl)) {
                 ((HttpServletResponse) response).sendRedirect(PAGE_NOT_FOUND);
+                shortLinkMetrics.recordRedirectFailure(elapsedDuration(startNanos));
                 return;
             }
             // 回源 DB 查询（热表 → 冷表）
@@ -178,6 +184,7 @@ public class ShortLinkRedirectServiceImpl {
                 String keyIsNull = String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
                 stringRedisTemplate.opsForValue().set(keyIsNull, "-", DEFAULT_CACHE_VALID_TIME_FOR_GOTO, TimeUnit.SECONDS);
                 ((HttpServletResponse) response).sendRedirect(PAGE_NOT_FOUND);
+                shortLinkMetrics.recordRedirectFailure(elapsedDuration(startNanos));
             }
         } finally {
             lock.unlock();
@@ -221,8 +228,19 @@ public class ShortLinkRedirectServiceImpl {
      */
     @SneakyThrows
     private void executeRedirect(String fullShortUrl, ShortLinkCacheObj cacheObj, ServletRequest request, ServletResponse response) {
-        statsProducer.sendMessage(buildLinkStatsRecordDTO(fullShortUrl, cacheObj.getGid(), request, response));
-        ((HttpServletResponse) response).sendRedirect(cacheObj.getOriginUrl());
+        long startNanos = System.nanoTime();
+        try {
+            statsProducer.sendMessage(buildLinkStatsRecordDTO(fullShortUrl, cacheObj.getGid(), request, response));
+            ((HttpServletResponse) response).sendRedirect(cacheObj.getOriginUrl());
+            shortLinkMetrics.recordRedirectSuccess(elapsedDuration(startNanos));
+        } catch (Exception ex) {
+            shortLinkMetrics.recordRedirectFailure(elapsedDuration(startNanos));
+            throw ex;
+        }
+    }
+
+    private Duration elapsedDuration(long startNanos) {
+        return Duration.ofNanos(System.nanoTime() - startNanos);
     }
 
     /** 判断链接是否未过期：validDate 为 null 表示永久有效 */
