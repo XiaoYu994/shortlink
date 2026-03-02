@@ -27,12 +27,18 @@
   - `ShortLinkMetricsTest`：3/3 通过
   - `StatsMetricsTest`：3/3 通过
   - `RiskMetricsTest`：3/3 通过
+- `docker/monitoring/scripts/phase7-preflight.sh --skip-endpoint-check`：通过（静态门禁）。
 
 ### 3.2 环境问题处理
 
 - 现象：环境默认代理指向 `127.0.0.1:7897`，且沙箱内 DNS 解析 `repo.maven.apache.org` 失败。
 - 处理：切换到提权网络执行 Maven，补齐缺失依赖（含 `micrometer-registry-prometheus:1.12.5`）。
 - 结果：构建链路恢复，目标服务模块可正常编译并执行测试。
+- 预检脚本修复：本地端点检查已显式禁用代理，避免 `curl` 被代理劫持导致误报。
+
+### 3.3 待完成项
+
+- `docker/monitoring/scripts/phase7-preflight.sh` 全量模式目前失败，原因为业务服务未启动（端口 `8000~8005` 不可达），不再是代理误报。
 
 ## 4. 下一步
 

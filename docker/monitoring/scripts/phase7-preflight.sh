@@ -48,12 +48,16 @@ for service in "${SERVICES[@]}"; do
   health_url="http://127.0.0.1:${port}/actuator/health"
   prometheus_url="http://127.0.0.1:${port}/actuator/prometheus"
 
-  if ! curl -fsS --max-time 3 "${health_url}" >/dev/null; then
+  if ! env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u all_proxy -u no_proxy \
+      curl -x "" --noproxy "*" -fsS --max-time 3 "${health_url}" >/dev/null; then
     echo "Health check failed: ${name} (${health_url})" >&2
     FAILED=1
   fi
 
-  if ! curl -fsS --max-time 3 "${prometheus_url}" >/dev/null; then
+  if ! env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u all_proxy -u no_proxy \
+      curl -x "" --noproxy "*" -fsS --max-time 3 "${prometheus_url}" >/dev/null; then
     echo "Prometheus endpoint check failed: ${name} (${prometheus_url})" >&2
     FAILED=1
   fi
