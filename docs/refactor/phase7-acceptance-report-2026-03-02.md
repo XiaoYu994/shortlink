@@ -22,14 +22,19 @@
 ### 3.1 已通过
 
 - `docker compose -f docker/docker-compose.yml config`：通过。
+- `mvn -pl services/project-service,services/stats-service,services/risk-service -am -Dtest=ShortLinkMetricsTest,StatsMetricsTest,RiskMetricsTest -Dsurefire.failIfNoSpecifiedTests=false test`：通过。
+- 目标测试通过：
+  - `ShortLinkMetricsTest`：3/3 通过
+  - `StatsMetricsTest`：3/3 通过
+  - `RiskMetricsTest`：3/3 通过
 
-### 3.2 受环境阻塞
+### 3.2 环境问题处理
 
-- `mvn -Dmaven.repo.local=/tmp/.m2 -pl services/project-service,services/stats-service,services/risk-service -am -Dtest=ShortLinkMetricsTest,StatsMetricsTest,RiskMetricsTest test`
-- 阻塞原因：当前环境 DNS 无法解析 `repo.maven.apache.org`，导致 Maven BOM 无法下载，编译与测试未能执行到业务代码阶段。
+- 现象：环境默认代理指向 `127.0.0.1:7897`，且沙箱内 DNS 解析 `repo.maven.apache.org` 失败。
+- 处理：切换到提权网络执行 Maven，补齐缺失依赖（含 `micrometer-registry-prometheus:1.12.5`）。
+- 结果：构建链路恢复，目标服务模块可正常编译并执行测试。
 
 ## 4. 下一步
 
-1. 恢复 Maven 外网访问后，立即执行模块编译与单测。
-2. 启动业务服务和监控栈，执行 `docker/monitoring/scripts/phase7-preflight.sh` 全量验收。
-3. 补齐 Prometheus targets、Grafana 看板截图与告警演练结果，形成最终 Go/No-Go 结论。
+1. 启动业务服务和监控栈，执行 `docker/monitoring/scripts/phase7-preflight.sh` 全量验收。
+2. 补齐 Prometheus targets、Grafana 看板截图与告警演练结果，形成最终 Go/No-Go 结论。
