@@ -28,6 +28,11 @@
   - `StatsMetricsTest`：3/3 通过
   - `RiskMetricsTest`：3/3 通过
 - `docker/monitoring/scripts/phase7-preflight.sh --skip-endpoint-check`：通过（静态门禁）。
+- 监控容器已拉起：`alertmanager/prometheus/grafana` 均为 `Up`。
+- 监控端口就绪检查：
+  - `http://127.0.0.1:9090/-/ready` -> `200`
+  - `http://127.0.0.1:3000/login` -> `200`
+  - `http://127.0.0.1:9093/-/ready` -> `200`
 
 ### 3.2 环境问题处理
 
