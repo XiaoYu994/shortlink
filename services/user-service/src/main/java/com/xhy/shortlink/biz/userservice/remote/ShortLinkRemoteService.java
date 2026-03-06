@@ -70,7 +70,7 @@ public interface ShortLinkRemoteService {
      * 查询分组下短链接数量
      */
     @GetMapping("/api/short-link/v1/count")
-    Result<List<ShortLinkGroupCountRespDTO>> listGroupShortLinkCount(@RequestParam("requestParam") List<String> requestParam);
+    Result<List<ShortLinkGroupCountRespDTO>> listGroupShortLinkCount(@RequestParam("gidList") List<String> gidList);
 
     /**
      * 获取网页标题
