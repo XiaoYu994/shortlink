@@ -23,8 +23,18 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
 import com.xhy.shortlink.biz.projectservice.common.constant.RocketMQConstant;
 import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
-import com.xhy.shortlink.biz.projectservice.dao.entity.*;
-import com.xhy.shortlink.biz.projectservice.dao.mapper.*;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToColdDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToHistoryDO;
+import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkHistoryDO;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToHistoryMapper;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkHistoryMapper;
+import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
@@ -89,6 +99,7 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
         switch (stage) {
             case FREEZE -> handleFreeze(event);
             case ARCHIVE -> handleArchive(event);
+            default -> log.warn("[过期归档] 未知阶段: {}", stage);
         }
     }
 

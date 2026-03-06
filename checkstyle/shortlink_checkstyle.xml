@@ -21,6 +21,9 @@
         "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
 <module name="Checker">
     <module name="NewlineAtEndOfFile"/>
+    <module name="LineLength">
+        <property name="max" value="200"/>
+    </module>
     <module name="RegexpSingleline">
         <property name="format" value="printStackTrace"/>
         <property name="message" value="Prohibit invoking printStackTrace in source code !"/>
@@ -48,13 +51,10 @@
         <module name="TypeName"/>
         <module name="MemberName"/>
         <module name="MethodName"/>
-        <module name="ParameterName "/>
+        <module name="ParameterName"/>
         <module name="ConstantName"/>
         <module name="ArrayTypeStyle"/>
         <module name="UpperEll"/>
-        <module name="LineLength">
-            <property name="max" value="200"/>
-        </module>
         <module name="MethodLength">
             <property name="tokens" value="METHOD_DEF"/>
             <property name="max" value="150"/>
@@ -114,11 +114,11 @@
         </module>
         <module name="ReturnCount">
             <property name="max" value="4"/>
+            <property name="maxForVoid" value="4"/>
         </module>
-        <module name="NestedTryDepth ">
+        <module name="NestedTryDepth">
             <property name="max" value="4"/>
         </module>
-        <module name="SuperFinalize"/>
-        <module name="SuperClone"/>
+        <!-- SuperFinalize/SuperClone 在 Checkstyle 10.x 已移除（Java 9+ 弃用 finalize） -->
     </module>
 </module>

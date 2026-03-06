@@ -145,10 +145,15 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     }
 
     private void applyColdOrder(LambdaQueryWrapper<ShortLinkColdDO> wrapper, String orderTag) {
-        if ("totalPv".equals(orderTag)) wrapper.orderByDesc(ShortLinkColdDO::getTotalPv);
-        else if ("totalUv".equals(orderTag)) wrapper.orderByDesc(ShortLinkColdDO::getTotalUv);
-        else if ("totalUip".equals(orderTag)) wrapper.orderByDesc(ShortLinkColdDO::getTotalUip);
-        else wrapper.orderByDesc(ShortLinkColdDO::getCreateTime);
+        if ("totalPv".equals(orderTag)) {
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalPv);
+        } else if ("totalUv".equals(orderTag)) {
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUv);
+        } else if ("totalUip".equals(orderTag)) {
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUip);
+        } else {
+            wrapper.orderByDesc(ShortLinkColdDO::getCreateTime);
+        }
     }
 
     private Comparator<ShortLinkPageRespDTO> buildComparator(String orderTag) {

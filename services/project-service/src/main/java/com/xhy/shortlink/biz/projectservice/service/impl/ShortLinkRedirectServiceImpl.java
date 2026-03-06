@@ -76,6 +76,13 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkCons
 @EnableConfigurationProperties(ColdDataProperties.class)
 public class ShortLinkRedirectServiceImpl {
 
+    /** 永久有效链接的缓存时间戳标记 */
+    private static final long PERMANENT_VALID_TIMESTAMP = -1;
+    /** 缓存值最少字段数（validTimeStamp|originUrl|gid） */
+    private static final int CACHE_VALUE_MIN_PARTS = 3;
+    /** 回温计数器过期天数 */
+    private static final int REHOT_COUNTER_EXPIRE_DAYS = 7;
+
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
@@ -254,7 +261,7 @@ public class ShortLinkRedirectServiceImpl {
             String key = String.format(SHORT_LINK_COLD_REHOT_KEY, fullShortUrl);
             Long count = stringRedisTemplate.opsForValue().increment(key);
             if (count != null && count == 1) {
-                stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+                stringRedisTemplate.expire(key, REHOT_COUNTER_EXPIRE_DAYS, TimeUnit.DAYS);
             }
             if (count != null && count >= coldDataProperties.getRehot().getThreshold()) {
                 rehotColdLink(fullShortUrl, gid);
@@ -292,20 +299,18 @@ public class ShortLinkRedirectServiceImpl {
      */
     private ShortLinkCacheObj parseCache(String composite, String key) {
         String[] split = composite.split("\\|");
-        if (split.length < 3) {
+        if (split.length < CACHE_VALUE_MIN_PARTS) {
             return null;
         }
         long validTime = Long.parseLong(split[0]);
         String originalLink = split[1];
         String gid = split[2];
-        // 有效期已过，清除 Redis 缓存
-        if (validTime != -1 && System.currentTimeMillis() > validTime) {
+        if (validTime != PERMANENT_VALID_TIMESTAMP && System.currentTimeMillis() > validTime) {
             stringRedisTemplate.delete(key);
             return null;
         }
-        // 动态续期：永久链接固定 1 天，有期限链接取剩余时间与 1 天的较小值
         long expireTime;
-        if (validTime == -1) {
+        if (validTime == PERMANENT_VALID_TIMESTAMP) {
             expireTime = TimeUnit.DAYS.toMillis(1);
         } else {
             long remainingTime = validTime - System.currentTimeMillis();
@@ -314,7 +319,7 @@ public class ShortLinkRedirectServiceImpl {
         if (expireTime > 0) {
             stringRedisTemplate.expire(key, expireTime, TimeUnit.MILLISECONDS);
         }
-        Date validDate = validTime == -1 ? null : new Date(validTime);
+        Date validDate = validTime == PERMANENT_VALID_TIMESTAMP ? null : new Date(validTime);
         return new ShortLinkCacheObj(originalLink, gid, validDate);
     }
 
