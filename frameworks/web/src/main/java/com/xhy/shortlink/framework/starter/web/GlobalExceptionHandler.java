@@ -25,9 +25,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Optional;
 
@@ -42,7 +45,7 @@ public class GlobalExceptionHandler {
      * 拦截参数验证异常
      */
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
-    public Result validExceptionHandler(HttpServletRequest request, MethodArgumentNotValidException ex) {
+    public Result<?> validExceptionHandler(HttpServletRequest request, MethodArgumentNotValidException ex) {
         BindingResult bindingResult = ex.getBindingResult();
         FieldError firstFieldError = bindingResult.getFieldErrors().stream().findFirst().orElse(null);
         String exceptionStr = Optional.ofNullable(firstFieldError)
@@ -53,10 +56,37 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 拦截请求参数缺失异常
+     */
+    @ExceptionHandler(value = MissingServletRequestParameterException.class)
+    public Result<?> missingParamHandler(HttpServletRequest request, MissingServletRequestParameterException ex) {
+        log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "缺少必要参数: " + ex.getParameterName());
+    }
+
+    /**
+     * 拦截请求方法不支持异常
+     */
+    @ExceptionHandler(value = HttpRequestMethodNotSupportedException.class)
+    public Result<?> methodNotSupportedHandler(HttpServletRequest request, HttpRequestMethodNotSupportedException ex) {
+        log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "不支持的请求方法: " + ex.getMethod());
+    }
+
+    /**
+     * 拦截静态资源不存在异常
+     */
+    @ExceptionHandler(value = NoResourceFoundException.class)
+    public Result<?> noResourceFoundHandler(HttpServletRequest request, NoResourceFoundException ex) {
+        log.warn("[{}] {} [ex] {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "请求的资源不存在");
+    }
+
+    /**
      * 拦截应用内抛出的异常
      */
     @ExceptionHandler(value = {AbstractException.class})
-    public Result abstractException(HttpServletRequest request, AbstractException ex) {
+    public Result<?> abstractException(HttpServletRequest request, AbstractException ex) {
         if (ex.getCause() != null) {
             log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), ex.toString(), ex.getCause());
             return Results.failure(ex);
@@ -69,13 +99,13 @@ public class GlobalExceptionHandler {
      * 拦截未捕获异常
      */
     @ExceptionHandler(value = Throwable.class)
-    public Result defaultErrorHandler(HttpServletRequest request, Throwable throwable) {
+    public Result<?> defaultErrorHandler(HttpServletRequest request, Throwable throwable) {
         log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), throwable.getMessage(), throwable);
         return Results.failure();
     }
 
     private String getUrl(HttpServletRequest request) {
-        if (StringUtils.isEmpty(request.getQueryString())) {
+        if (!StringUtils.hasLength(request.getQueryString())) {
             return request.getRequestURL().toString();
         }
         return request.getRequestURL().toString() + "?" + request.getQueryString();
