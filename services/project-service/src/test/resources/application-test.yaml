@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: shortlink-project-service-test
+
+  datasource:
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-test.yaml
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 短链接配置
+short-link:
+  domain:
+    default: nurl.ink:8001
+
+  message-queue:
+    implement: Redis
+
+  cold-data:
+    enabled: false

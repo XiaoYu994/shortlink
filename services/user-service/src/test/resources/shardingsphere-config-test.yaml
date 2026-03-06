@@ -1,0 +1,73 @@
+# Test environment ShardingSphere configuration (with sharding)
+databaseName: user_db_test
+
+# Standalone mode for testing
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+# Data source configuration
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/link?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: root
+    maximumPoolSize: 10
+    minimumIdle: 2
+    connectionTimeout: 30000
+
+rules:
+  # Sharding rule - same as production
+  - !SHARDING
+    autoTables:
+      # User table sharding
+      t_user:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: user_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # Group table sharding
+      t_group:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: group_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+    shardingAlgorithms:
+      user_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+      group_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 16
+
+    # Distributed ID generator
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 99
+
+  # Single table rule for other tables
+  - !SINGLE
+    tables:
+      - "*.*"
+    defaultDataSource: ds_0
+
+props:
+  sql-show: true

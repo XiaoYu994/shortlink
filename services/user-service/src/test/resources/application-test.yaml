@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: shortlink-user-service-test
+  datasource:
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-test.yaml
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: xhy_redis
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: token
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-log: false
