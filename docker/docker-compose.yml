@@ -1,5 +1,59 @@
 name: "RocketMq"
 services:
+  # 0. 基础依赖（MySQL / Redis / Nacos）
+  mysql:
+    image: mysql:8.4
+    container_name: shortlink-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=link
+      - TZ=Asia/Shanghai
+    ports:
+      - 3306:3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init/01-init-link.sh:/docker-entrypoint-initdb.d/01-init-link.sh:ro
+      - ../resources/database/link.sql:/opt/bootstrap/link.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -uroot -proot --silent || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rocketmq
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: shortlink-redis
+    command: [ "redis-server", "--requirepass", "xhy_redis", "--appendonly", "yes" ]
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - rocketmq
+
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: shortlink-nacos
+    environment:
+      - MODE=standalone
+      - PREFER_HOST_MODE=hostname
+      - NACOS_AUTH_ENABLE=false
+      - JVM_XMS=256m
+      - JVM_XMX=256m
+      - JVM_XMN=128m
+    ports:
+      - 8848:8848
+    volumes:
+      - nacos_data:/home/nacos/data
+      - nacos_logs:/home/nacos/logs
+    networks:
+      - rocketmq
+
   # 1. NameServer 服务
   namesrv:
     image: apache/rocketmq:5.3.0
@@ -120,6 +174,10 @@ configs:
       timerMaxDelaySec = 31536000
 
 volumes:
+  mysql_data:
+  redis_data:
+  nacos_data:
+  nacos_logs:
   namesrv_logs:
   namesrv_store:
   broker_logs:
