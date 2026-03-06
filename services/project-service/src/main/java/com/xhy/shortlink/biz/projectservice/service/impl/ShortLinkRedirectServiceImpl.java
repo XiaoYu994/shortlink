@@ -101,7 +101,7 @@ public class ShortLinkRedirectServiceImpl {
         // 1. 优先从 L1 Caffeine / L2 Redis 读取缓存
         ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl);
         if (cacheObj != null) {
-            executeRedirect(fullShortUrl, cacheObj, request, response);
+            executeRedirect(fullShortUrl, cacheObj, request, response, startNanos);
             return;
         }
         // 2. 布隆过滤器 + 空值缓存双重防穿透
@@ -162,7 +162,7 @@ public class ShortLinkRedirectServiceImpl {
             // Double-Check：获锁后再查一次缓存，可能已被其他线程重建
             ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl);
             if (cacheObj != null) {
-                executeRedirect(fullShortUrl, cacheObj, request, response);
+                executeRedirect(fullShortUrl, cacheObj, request, response, startNanos);
                 return;
             }
             if (isPossiblePenetration(fullShortUrl)) {
@@ -178,7 +178,7 @@ public class ShortLinkRedirectServiceImpl {
                 if (dbObj.isFromCold()) {
                     tryRehot(fullShortUrl, dbObj.getGid());
                 }
-                executeRedirect(fullShortUrl, dbObj, request, response);
+                executeRedirect(fullShortUrl, dbObj, request, response, startNanos);
             } else {
                 // DB 也不存在，写入空值缓存防止后续穿透
                 String keyIsNull = String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
@@ -227,8 +227,8 @@ public class ShortLinkRedirectServiceImpl {
      * 执行跳转：异步发送统计事件 → 302 重定向到原始链接
      */
     @SneakyThrows
-    private void executeRedirect(String fullShortUrl, ShortLinkCacheObj cacheObj, ServletRequest request, ServletResponse response) {
-        long startNanos = System.nanoTime();
+    private void executeRedirect(String fullShortUrl, ShortLinkCacheObj cacheObj, ServletRequest request,
+                                 ServletResponse response, long startNanos) {
         try {
             statsProducer.sendMessage(buildLinkStatsRecordDTO(fullShortUrl, cacheObj.getGid(), request, response));
             ((HttpServletResponse) response).sendRedirect(cacheObj.getOriginUrl());
