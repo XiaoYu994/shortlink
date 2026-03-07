@@ -21,6 +21,8 @@ import com.xhy.shortlink.biz.riskservice.dao.entity.UserNotificationDO;
 import com.xhy.shortlink.biz.riskservice.dao.mapper.UserNotificationMapper;
 import com.xhy.shortlink.biz.riskservice.metrics.RiskMetrics;
 import com.xhy.shortlink.biz.riskservice.mq.event.ShortLinkViolationEvent;
+import com.xhy.shortlink.biz.riskservice.mq.event.UserNotificationCreatedEvent;
+import com.xhy.shortlink.biz.riskservice.mq.producer.UserNotificationCreatedProducer;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.idempotent.enums.IdempotentSceneEnum;
 import com.xhy.shortlink.framework.starter.idempotent.enums.IdempotentTypeEnum;
@@ -49,6 +51,7 @@ import static com.xhy.shortlink.biz.riskservice.common.constant.RocketMQConstant
 public class ShortLinkViolationNotifyConsumer implements RocketMQListener<ShortLinkViolationEvent> {
 
     private final UserNotificationMapper userNotificationMapper;
+    private final UserNotificationCreatedProducer userNotificationCreatedProducer;
     private final RiskMetrics riskMetrics;
 
     @Override
@@ -64,7 +67,7 @@ public class ShortLinkViolationNotifyConsumer implements RocketMQListener<ShortL
         try {
             log.info("收到违规通知任务: {}", event.getFullShortUrl());
             try {
-                userNotificationMapper.insert(UserNotificationDO.builder()
+                UserNotificationDO notificationDO = UserNotificationDO.builder()
                         .userId(event.getUserId())
                         .type(1)
                         .title("短链接封禁提醒")
@@ -74,6 +77,16 @@ public class ShortLinkViolationNotifyConsumer implements RocketMQListener<ShortL
                                 event.getFullShortUrl(), event.getReason()))
                         .readFlag(0)
                         .createTime(new Date())
+                        .build();
+                userNotificationMapper.insert(notificationDO);
+                userNotificationCreatedProducer.sendMessage(UserNotificationCreatedEvent.builder()
+                        .notificationId(notificationDO.getId())
+                        .userId(notificationDO.getUserId())
+                        .type(notificationDO.getType())
+                        .title(notificationDO.getTitle())
+                        .content(notificationDO.getContent())
+                        .readFlag(notificationDO.getReadFlag())
+                        .createTime(notificationDO.getCreateTime())
                         .build());
                 log.info("已生成站内信通知");
             } catch (DuplicateKeyException e) {

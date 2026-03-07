@@ -26,3 +26,6 @@ sa-token:
   is-share: false
   token-style: uuid
   is-log: false
+
+rocketmq:
+  name-server: 127.0.0.1:9876

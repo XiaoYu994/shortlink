@@ -33,6 +33,7 @@
                 href="http://shortlink.nageoffer.com"
             >演示环境</a
             > -->
+            <NotificationBell />
             <el-dropdown>
               <div class="block">
                 <span
@@ -82,6 +83,7 @@
 
 <script setup>
 import {getCurrentInstance, onMounted, ref} from 'vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 import {useRouter} from 'vue-router'
 import {getToken, getUsername, removeKey, removeUsername} from '@/core/auth.js'
 import {ElMessage} from 'element-plus'

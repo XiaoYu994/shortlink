@@ -2,6 +2,15 @@ spring:
   cloud:
     gateway:
       routes:
+        - id: shortlink-user-notification-ws
+          uri: lb:ws://shortlink-user-service
+          predicates:
+            - Path=/api/short-link/admin/v1/notification/ws
+          filters:
+            - name: TokenValidate
+              args:
+                whitePathList: []
+
         - id: shortlink-user-service
           uri: lb://shortlink-user-service
           predicates:

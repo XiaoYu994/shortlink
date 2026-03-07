@@ -29,6 +29,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -54,8 +55,12 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
             String requestMethod = request.getMethod().name();
             if (!isPathInWhiteList(requestPath, requestMethod, config.getWhitePathList())) {
                 String token = request.getHeaders().getFirst("short-link");
+                if (!StringUtils.hasText(token)) {
+                    token = request.getQueryParams().getFirst("token");
+                }
                 Object loginId = StpUtil.getLoginIdByToken(token);
                 if (loginId != null) {
+                    final String finalToken = token;
                     var session = StpUtil.getSessionByLoginId(loginId);
                     String userId = String.valueOf(session.get("userId"));
                     String username = String.valueOf(session.get("username"));
@@ -64,7 +69,7 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
                         httpHeaders.set("userId", userId);
                         httpHeaders.set("username", URLEncoder.encode(username, StandardCharsets.UTF_8));
                         httpHeaders.set("realName", URLEncoder.encode(realName, StandardCharsets.UTF_8));
-                        httpHeaders.set("token", token);
+                        httpHeaders.set("token", finalToken);
                     });
                     return chain.filter(exchange.mutate().request(builder.build()).build());
                 }

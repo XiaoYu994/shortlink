@@ -15,32 +15,13 @@
  * limitations under the License.
  */
 
-package com.xhy.shortlink.biz.riskservice.common.constant;
+package com.xhy.shortlink.biz.userservice.common.constant;
 
-/**
- * RocketMQ Topic / Group 常量（risk-service 使用）
- */
 public final class RocketMQConstant {
 
     private RocketMQConstant() {
     }
 
-    /** AI 风控审核消息 Topic */
-    public static final String RISK_CHECK_TOPIC = "short_link_project_risk_check_topic";
-
-    /** AI 风控审核消费者组 */
-    public static final String RISK_CHECK_GROUP = "short_link_project_risk_check_group";
-
-    /** 违规通知 Topic */
-    public static final String NOTIFY_TOPIC = "short_link_project_notify_topic";
-
-    /** 违规通知消费者组 */
-    public static final String NOTIFY_GROUP = "short_link_project_notify_group";
-
-    /** 清除本地缓存 Topic */
-    public static final String CACHE_INVALIDATE_TOPIC = "short_link_project_cache_invalidate_topic";
-
-    /** 用户通知创建 Topic */
     public static final String USER_NOTIFICATION_CREATED_TOPIC = "short_link_user_notification_created_topic";
-
+    public static final String USER_NOTIFICATION_CREATED_GROUP = "short_link_user_notification_created_group";
 }

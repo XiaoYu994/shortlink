@@ -14,7 +14,9 @@ const http = axios.create({
 // 请求拦截
 http.interceptors.request.use(
     (config) => {
-        config.headers.Token = isNotEmpty(getToken()) ? getToken() : ''
+        const token = isNotEmpty(getToken()) ? getToken() : ''
+        config.headers.Token = token
+        config.headers['short-link'] = token
         config.headers.Username = isNotEmpty(getUsername()) ? getUsername() : ''
         return config
     },
