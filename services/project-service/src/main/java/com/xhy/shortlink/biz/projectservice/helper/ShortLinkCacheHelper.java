@@ -44,6 +44,9 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConst
 @RequiredArgsConstructor
 public class ShortLinkCacheHelper {
 
+    /** 永久有效链接的缓存时间戳标记 */
+    private static final long PERMANENT_VALID_TIMESTAMP = -1;
+
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, String> shortLinkCache;
     private final RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter;
@@ -57,7 +60,7 @@ public class ShortLinkCacheHelper {
      * @param validDate    有效期（null 表示永久）
      */
     public void warmUp(String fullShortUrl, String originUrl, String gid, Date validDate) {
-        long validTimeStamp = (validDate != null) ? validDate.getTime() : -1;
+        long validTimeStamp = (validDate != null) ? validDate.getTime() : PERMANENT_VALID_TIMESTAMP;
         String cacheValue = String.format("%d|%s|%s", validTimeStamp, originUrl, gid);
         long initialTTL = LinkUtil.getLinkCacheValidTime(validDate);
         stringRedisTemplate.opsForValue().set(
@@ -72,7 +75,7 @@ public class ShortLinkCacheHelper {
      */
     public void rebuildCache(String fullShortUrl, String originUrl, String gid, Date validDate) {
         String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
-        long validTimeStamp = (validDate != null) ? validDate.getTime() : -1;
+        long validTimeStamp = (validDate != null) ? validDate.getTime() : PERMANENT_VALID_TIMESTAMP;
         String cacheValue = String.format("%d|%s|%s", validTimeStamp, originUrl, gid);
         long initialTTL = LinkUtil.getLinkCacheValidTime(validDate);
         stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);

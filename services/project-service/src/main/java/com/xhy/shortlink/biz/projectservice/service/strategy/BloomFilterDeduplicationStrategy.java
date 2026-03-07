@@ -37,6 +37,7 @@ import org.springframework.stereotype.Component;
 public class BloomFilterDeduplicationStrategy implements AbstractExecuteStrategy<String, String> {
 
     public static final String MARK = "bloom-filter";
+    private static final int MAX_GENERATE_RETRY = 10;
 
     private final RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter;
 
@@ -60,7 +61,7 @@ public class BloomFilterDeduplicationStrategy implements AbstractExecuteStrategy
         String shortUri;
         StringBuilder originUrlBuilder = new StringBuilder(originUrl);
         while (true) {
-            if (customGenerateCount > 10) {
+            if (customGenerateCount > MAX_GENERATE_RETRY) {
                 throw new ServiceException("短链接生成频繁，请稍后再试");
             }
             shortUri = HashUtil.hashToBase62(originUrlBuilder);

@@ -49,7 +49,6 @@ public class ShortLinkRiskProducer extends AbstractCommonSendProduceTemplate<Sho
                 .topic(RISK_CHECK_TOPIC)
                 .keys(messageEvent.getEventId())
                 .sendType(BaseSendExtendDTO.SendType.ASYNC)
-                .sentTimeout(2000L)
                 .build();
     }
 

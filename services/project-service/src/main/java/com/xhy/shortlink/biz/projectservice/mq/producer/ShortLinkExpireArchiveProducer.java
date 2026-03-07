@@ -52,7 +52,6 @@ public class ShortLinkExpireArchiveProducer extends AbstractCommonSendProduceTem
                 .keys(messageEvent.getEventId())
                 .delayTime(delayTime)
                 .sendType(BaseSendExtendDTO.SendType.SYNC)
-                .sentTimeout(2000L)
                 .build();
     }
 

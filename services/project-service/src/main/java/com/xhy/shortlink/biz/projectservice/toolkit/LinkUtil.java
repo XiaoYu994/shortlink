@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.Map;
 
 import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkConstant.DEFAULT_CACHE_VALID_TIME;
 
@@ -68,7 +69,7 @@ public final class LinkUtil {
             if (StrUtil.isNotBlank(host)) {
                 domain = host;
                 if (domain.startsWith("www.")) {
-                    domain = host.substring(4);
+                    domain = host.substring("www.".length());
                 }
             }
         } catch (Exception ignored) {
@@ -103,20 +104,19 @@ public final class LinkUtil {
      * 获取用户访问操作系统
      */
     public static String getOs(HttpServletRequest request) {
-        String userAgent = request.getHeader("User-Agent");
-        if (userAgent.toLowerCase().contains("windows")) {
-            return "Windows";
-        } else if (userAgent.toLowerCase().contains("mac")) {
-            return "Mac OS";
-        } else if (userAgent.toLowerCase().contains("linux")) {
-            return "Linux";
-        } else if (userAgent.toLowerCase().contains("android")) {
-            return "Android";
-        } else if (userAgent.toLowerCase().contains("iphone") || userAgent.toLowerCase().contains("ipad")) {
-            return "iOS";
-        } else {
-            return "Unknown";
-        }
+        String ua = request.getHeader("User-Agent").toLowerCase();
+        Map<String, String> osMapping = Map.of(
+                "windows", "Windows",
+                "mac", "Mac OS",
+                "linux", "Linux",
+                "android", "Android",
+                "iphone", "iOS",
+                "ipad", "iOS");
+        return osMapping.entrySet().stream()
+                .filter(entry -> ua.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse("Unknown");
     }
 
     /**
@@ -146,7 +146,9 @@ public final class LinkUtil {
      */
     public static String getNetwork(HttpServletRequest request) {
         String ua = request.getHeader("User-Agent");
-        if (ua == null) return "Unknown";
+        if (ua == null) {
+            return "Unknown";
+        }
         String uaUpper = ua.toUpperCase();
         if (uaUpper.contains("WIFI")) {
             return "WIFI";

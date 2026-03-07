@@ -43,6 +43,7 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConst
 public class DistributedLockDeduplicationStrategy implements AbstractExecuteStrategy<String, String> {
 
     public static final String MARK = "distributed-lock";
+    private static final int MAX_GENERATE_RETRY = 10;
 
     private final RedissonClient redissonClient;
     private final ShortLinkMapper shortLinkMapper;
@@ -69,7 +70,7 @@ public class DistributedLockDeduplicationStrategy implements AbstractExecuteStra
             int customGenerateCount = 0;
             String shortUri;
             while (true) {
-                if (customGenerateCount > 10) {
+                if (customGenerateCount > MAX_GENERATE_RETRY) {
                     throw new ServiceException("短链接频繁生成，请稍后再试");
                 }
                 StringBuilder originUrlBuilder = new StringBuilder(originUrl);

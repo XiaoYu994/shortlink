@@ -118,7 +118,7 @@ public abstract class AbstractCommonSendProduceTemplate<T> {
         private final BaseSendExtendDTO dto;
         private final T event;
 
-        public DefaultLogCallback(BaseSendExtendDTO dto, T event) {
+        DefaultLogCallback(BaseSendExtendDTO dto, T event) {
             this.dto = dto;
             this.event = event;
         }

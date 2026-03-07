@@ -49,7 +49,6 @@ public class ShortLinkStatsProducer extends AbstractCommonSendProduceTemplate<Sh
                 .topic(STATS_RECORD_TOPIC)
                 .keys(messageEvent.getFullShortUrl())
                 .sendType(BaseSendExtendDTO.SendType.ASYNC)
-                .sentTimeout(2000L)
                 .build();
     }
 

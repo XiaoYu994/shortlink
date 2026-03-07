@@ -78,18 +78,18 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
     /**
      * 分页查询回收站短链接（支持 gidList 过滤和排序）
      */
-    @Select("<script>" +
-            "SELECT * FROM t_link " +
-            "WHERE enable_status IN (1, 2) AND del_flag = 0 " +
-            "<if test='param.gidList != null and param.gidList.size() > 0'>" +
-            "AND gid IN <foreach collection='param.gidList' item='gid' open='(' separator=',' close=')'>#{gid}</foreach> " +
-            "</if>" +
-            "<choose>" +
-            "<when test=\"param.orderTag == 'totalPv'\">ORDER BY total_pv DESC</when>" +
-            "<when test=\"param.orderTag == 'totalUv'\">ORDER BY total_uv DESC</when>" +
-            "<when test=\"param.orderTag == 'totalUip'\">ORDER BY total_uip DESC</when>" +
-            "<otherwise>ORDER BY create_time DESC</otherwise>" +
-            "</choose>" +
-            "</script>")
+    @Select("<script>"
+            + "SELECT * FROM t_link "
+            + "WHERE enable_status IN (1, 2) AND del_flag = 0 "
+            + "<if test='param.gidList != null and param.gidList.size() > 0'>"
+            + "AND gid IN <foreach collection='param.gidList' item='gid' open='(' separator=',' close=')'>#{gid}</foreach> "
+            + "</if>"
+            + "<choose>"
+            + "<when test=\"param.orderTag == 'totalPv'\">ORDER BY total_pv DESC</when>"
+            + "<when test=\"param.orderTag == 'totalUv'\">ORDER BY total_uv DESC</when>"
+            + "<when test=\"param.orderTag == 'totalUip'\">ORDER BY total_uip DESC</when>"
+            + "<otherwise>ORDER BY create_time DESC</otherwise>"
+            + "</choose>"
+            + "</script>")
     IPage<ShortLinkDO> pageRecycleBinLink(@Param("param") ShortLinkRecycleBinPageReqDTO requestParam);
 }

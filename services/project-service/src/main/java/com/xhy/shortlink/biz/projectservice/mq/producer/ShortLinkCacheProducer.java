@@ -48,7 +48,6 @@ public class ShortLinkCacheProducer extends AbstractCommonSendProduceTemplate<St
                 .tag(CACHE_INVALIDATE_TAG)
                 .sendType(BaseSendExtendDTO.SendType.ONEWAY)
                 .keys(fullShortUrl)
-                .sentTimeout(2000L)
                 .build();
     }
 

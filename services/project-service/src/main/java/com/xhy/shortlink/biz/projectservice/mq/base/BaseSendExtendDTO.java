@@ -33,6 +33,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class BaseSendExtendDTO {
 
+    /** 默认消息发送超时时间（毫秒） */
+    public static final long DEFAULT_SEND_TIMEOUT = 2000L;
+
     /** 事件名称 */
     private String eventName;
 
@@ -47,7 +50,7 @@ public class BaseSendExtendDTO {
 
     /** 发送消息超时时间（毫秒） */
     @Builder.Default
-    private Long sentTimeout = 2000L;
+    private Long sentTimeout = DEFAULT_SEND_TIMEOUT;
 
     /** 延迟时间（毫秒） */
     private Long delayTime;

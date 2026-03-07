@@ -33,15 +33,18 @@ import java.net.SocketTimeoutException;
 @Service
 public class UrlTitleServiceImpl implements UrlTitleService {
 
+    private static final int JSOUP_TIMEOUT_MS = 5000;
+    private static final int HTTP_OK = 200;
+
     @Override
     public String getPageTitle(String url) {
         try {
             Connection.Response response = Jsoup.connect(url)
-                    .timeout(5000)
+                    .timeout(JSOUP_TIMEOUT_MS)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
                     .ignoreHttpErrors(true)
                     .execute();
-            if (response.statusCode() != 200) {
+            if (response.statusCode() != HTTP_OK) {
                 log.warn("获取标题失败，状态码: {}, URL: {}", response.statusCode(), url);
                 throw new ServiceException("无法访问该网站");
             }
