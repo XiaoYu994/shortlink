@@ -44,3 +44,5 @@ build/
 
 # Cursor AI
 .cursor/
+
+.runtime_logs/

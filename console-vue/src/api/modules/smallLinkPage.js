@@ -27,7 +27,7 @@ export default {
   editSmallLink(data) {
     return http({
       url: '/update',
-      method: 'post',
+      method: 'put',
       data
     })
   },

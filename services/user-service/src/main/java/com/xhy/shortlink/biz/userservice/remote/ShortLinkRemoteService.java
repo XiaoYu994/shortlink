@@ -26,6 +26,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -57,7 +58,7 @@ public interface ShortLinkRemoteService {
     /**
      * 修改短链接
      */
-    @PostMapping("/api/short-link/v1/update")
+    @PutMapping("/api/short-link/v1/update")
     Result<Void> updateShortLink(@RequestBody ShortLinkUpdateReqDTO requestParam);
 
     /**

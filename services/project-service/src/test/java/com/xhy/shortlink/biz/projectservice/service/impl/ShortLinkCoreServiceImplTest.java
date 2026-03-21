@@ -17,6 +17,7 @@
 
 package com.xhy.shortlink.biz.projectservice.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -27,6 +28,7 @@ import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkPageRespDTO;
+import com.xhy.shortlink.biz.projectservice.common.enums.OrderTagEnum;
 import com.xhy.shortlink.biz.projectservice.common.enums.ValidDateTypeEnum;
 import com.xhy.shortlink.biz.projectservice.config.GotoDomainWhiteListConfiguration;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
@@ -58,14 +60,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RedissonClient;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.*;
 
+import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.RANK_KEY;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -236,18 +239,21 @@ class ShortLinkCoreServiceImplTest {
     @Test
     @SuppressWarnings("unchecked")
     void fillTodayStats_withData() {
-        HashOperations<String, Object, Object> hashOps = mock(HashOperations.class);
-        when(stringRedisTemplate.opsForHash()).thenReturn(hashOps);
+        ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOps);
 
-        Map<Object, Object> entries = new HashMap<>();
-        entries.put("pv", "100");
-        entries.put("uv", "50");
-        entries.put("uip", "30");
-        when(hashOps.entries(anyString())).thenReturn(entries);
+        String today = DateUtil.today();
+        String fullShortUrl = "test.cn/abc";
+        when(zSetOps.score(String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), "g1", today), fullShortUrl))
+                .thenReturn(100D);
+        when(zSetOps.score(String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(), "g1", today), fullShortUrl))
+                .thenReturn(50D);
+        when(zSetOps.score(String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(), "g1", today), fullShortUrl))
+                .thenReturn(30D);
 
         ShortLinkPageRespDTO dto = new ShortLinkPageRespDTO();
         dto.setGid("g1");
-        dto.setFullShortUrl("test.cn/abc");
+        dto.setFullShortUrl(fullShortUrl);
         shortLinkCoreService.fillTodayStats(dto);
 
         assertEquals(100, dto.getTodayPv());
@@ -258,9 +264,9 @@ class ShortLinkCoreServiceImplTest {
     @Test
     @SuppressWarnings("unchecked")
     void fillTodayStats_emptyData() {
-        HashOperations<String, Object, Object> hashOps = mock(HashOperations.class);
-        when(stringRedisTemplate.opsForHash()).thenReturn(hashOps);
-        when(hashOps.entries(anyString())).thenReturn(Collections.emptyMap());
+        ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(zSetOps.score(anyString(), anyString())).thenReturn(null);
 
         ShortLinkPageRespDTO dto = new ShortLinkPageRespDTO();
         dto.setGid("g1");

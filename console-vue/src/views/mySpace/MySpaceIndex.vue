@@ -151,11 +151,11 @@
               <div class="times-box">
                 <div class="today-box">
                   <span>今日</span>
-                  <span>{{ scope.row.todayPv }}</span>
+                  <span>{{ scope.row.todayPv ?? 0 }}</span>
                 </div>
                 <div class="total-box">
                   <span>累计</span>
-                  <span>{{ scope.row.totalPv }}</span>
+                  <span>{{ scope.row.totalPv ?? 0 }}</span>
                 </div>
               </div>
             </template>
@@ -179,11 +179,11 @@
               <div class="times-box">
                 <div class="today-box">
                   <span>今日</span>
-                  <span>{{ scope.row.todayUv }}</span>
+                  <span>{{ scope.row.todayUv ?? 0 }}</span>
                 </div>
                 <div class="total-box">
                   <span>累计</span>
-                  <span>{{ scope.row.totalUv }}</span>
+                  <span>{{ scope.row.totalUv ?? 0 }}</span>
                 </div>
               </div>
             </template>
@@ -207,11 +207,11 @@
               <div class="times-box">
                 <div class="today-box">
                   <span>今日</span>
-                  <span>{{ scope.row.todayUip }}</span>
+                  <span>{{ scope.row.todayUip ?? 0 }}</span>
                 </div>
                 <div class="total-box">
                   <span>累计</span>
-                  <span>{{ scope.row.totalUip }}</span>
+                  <span>{{ scope.row.totalUip ?? 0 }}</span>
                 </div>
               </div>
             </template>

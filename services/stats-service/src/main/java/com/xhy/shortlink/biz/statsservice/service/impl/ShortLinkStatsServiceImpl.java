@@ -136,7 +136,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
                 .between(LinkAccessLogsDO::getCreateTime, requestParam.getStartDate(), requestParam.getEndDate())
                 .orderByDesc(LinkAccessLogsDO::getCreateTime);
-        IPage<LinkAccessLogsDO> logPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
+        IPage<LinkAccessLogsDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
+        IPage<LinkAccessLogsDO> logPage = linkAccessLogsMapper.selectPage(page, queryWrapper);
         if (CollUtil.isEmpty(logPage.getRecords())) {
             return new Page<>();
         }

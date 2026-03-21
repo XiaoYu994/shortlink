@@ -35,6 +35,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -72,7 +73,7 @@ public class ShortLinkController {
     /**
      * 修改短链接
      */
-    @PostMapping("/api/short-link/admin/v1/update")
+    @PutMapping("/api/short-link/admin/v1/update")
     public Result<Void> updateShortLink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
         ResultUtils.check(shortLinkRemoteService.updateShortLink(requestParam));
         return Results.success();

@@ -279,18 +279,21 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
     @Override
     public void fillTodayStats(ShortLinkPageRespDTO requestParam) {
-        String today = DateUtil.format(new Date(), "yyyyMMdd");
-        String rankKey = String.format(RANK_KEY, requestParam.getGid(), requestParam.getFullShortUrl(), today);
-        Map<Object, Object> entries = stringRedisTemplate.opsForHash().entries(rankKey);
-        if (entries.isEmpty()) {
-            requestParam.setTodayPv(0);
-            requestParam.setTodayUv(0);
-            requestParam.setTodayUip(0);
-        } else {
-            requestParam.setTodayPv(Integer.parseInt(entries.getOrDefault("pv", "0").toString()));
-            requestParam.setTodayUv(Integer.parseInt(entries.getOrDefault("uv", "0").toString()));
-            requestParam.setTodayUip(Integer.parseInt(entries.getOrDefault("uip", "0").toString()));
-        }
+        String today = DateUtil.today();
+        String fullShortUrl = requestParam.getFullShortUrl();
+        String gid = requestParam.getGid();
+        Double todayPv = stringRedisTemplate.opsForZSet().score(
+                String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, today),
+                fullShortUrl);
+        Double todayUv = stringRedisTemplate.opsForZSet().score(
+                String.format(RANK_KEY, OrderTagEnum.TODAY_UV.getValue(), gid, today),
+                fullShortUrl);
+        Double todayUip = stringRedisTemplate.opsForZSet().score(
+                String.format(RANK_KEY, OrderTagEnum.TODAY_UIP.getValue(), gid, today),
+                fullShortUrl);
+        requestParam.setTodayPv(Optional.ofNullable(todayPv).map(Double::intValue).orElse(0));
+        requestParam.setTodayUv(Optional.ofNullable(todayUv).map(Double::intValue).orElse(0));
+        requestParam.setTodayUip(Optional.ofNullable(todayUip).map(Double::intValue).orElse(0));
     }
 
     @Override
@@ -315,22 +318,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
                 isCold = true;
             }
         }
-        if (shortLinkDO == null) {
-            throw new ClientException("短链接记录不存在");
-        }
-        // 2. 状态安全流转
-        Integer oldStatus = shortLinkDO.getEnableStatus();
-        Integer newStatus = oldStatus;
-        if (Objects.equals(oldStatus, LinkEnableStatusEnum.ENABLE.getCode())
-                || Objects.equals(oldStatus, LinkEnableStatusEnum.FROZEN.getCode())) {
-            if (Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType())) {
-                newStatus = LinkEnableStatusEnum.ENABLE.getCode();
-            } else if (requestParam.getValidDate() != null) {
-                newStatus = requestParam.getValidDate().after(new Date())
-                        ? LinkEnableStatusEnum.ENABLE.getCode()
-                        : LinkEnableStatusEnum.FROZEN.getCode();
-            }
-        }
+        final Integer newStatus = getInteger(requestParam, shortLinkDO);
         boolean isOriginUrlChanged = !Objects.equals(shortLinkDO.getOriginUrl(), requestParam.getOriginUrl());
         boolean isGidChanged = !Objects.equals(shortLinkDO.getGid(), requestParam.getGid());
         // 3. 执行更新
@@ -415,6 +403,26 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
         } catch (Exception e) {
             log.error("修改短链接后清除缓存失败", e);
         }
+    }
+
+    private Integer getInteger(ShortLinkUpdateReqDTO requestParam, ShortLinkDO shortLinkDO) {
+        if (shortLinkDO == null) {
+            throw new ClientException("短链接记录不存在");
+        }
+        // 2. 状态安全流转
+        Integer oldStatus = shortLinkDO.getEnableStatus();
+        Integer newStatus = oldStatus;
+        if (Objects.equals(oldStatus, LinkEnableStatusEnum.ENABLE.getCode())
+                || Objects.equals(oldStatus, LinkEnableStatusEnum.FROZEN.getCode())) {
+            if (Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType())) {
+                newStatus = LinkEnableStatusEnum.ENABLE.getCode();
+            } else if (requestParam.getValidDate() != null) {
+                newStatus = requestParam.getValidDate().after(new Date())
+                        ? LinkEnableStatusEnum.ENABLE.getCode()
+                        : LinkEnableStatusEnum.FROZEN.getCode();
+            }
+        }
+        return newStatus;
     }
 
     /**
