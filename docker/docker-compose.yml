@@ -171,7 +171,7 @@ configs:
       fileReservedTime = 48
       brokerRole = ASYNC_MASTER
       flushDiskType = ASYNC_FLUSH
-      brokerIP1 = 127.0.0.1
+      brokerIP1 = rmqbroker
       # 最大延迟消息时间，默认 259200s(3天)，调整为 365 天
       timerMaxDelaySec = 31536000
 

@@ -2,7 +2,7 @@ groups:
   - name: shortlink-alerts
     rules:
       - alert: ServiceDown
-        expr: up{job="shortlink-services"} == 0
+        expr: up{job="shortlink-compose-services"} == 0
         for: 2m
         labels:
           severity: critical

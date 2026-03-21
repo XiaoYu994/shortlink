@@ -260,6 +260,31 @@ npm run dev
 
 - [docs/plans/2026-03-21-cicd-automated-deployment-implementation-plan.md](./docs/plans/2026-03-21-cicd-automated-deployment-implementation-plan.md)
 
+当前已经补齐的落地文件包括：
+
+- GitHub Actions 工作流：`.github/workflows/deploy.yml`
+- 应用层编排：`docker/docker-compose.app.yml`
+- 镜像构建文件：`docker/Dockerfile.backend`、`docker/Dockerfile.frontend`
+- 前端 Nginx 配置：`docker/nginx/default.conf`
+- 服务器初始化脚本：`deploy/setup-server.sh`
+- 应用运行环境模板：`docker/.env.example`
+
+正式启用前，需要在 GitHub 仓库 Secrets 中配置至少以下变量：
+
+- `SERVER_HOST`
+- `SERVER_USER`
+- `SERVER_SSH_KEY`
+- `GHCR_USERNAME`
+- `GHCR_TOKEN`
+- `DASHSCOPE_API_KEY`
+- `SHORT_LINK_DOMAIN_DEFAULT`
+- `SHORT_LINK_STATS_LOCALE_AMAP_KEY`
+
+如果生产环境开启 Nacos 鉴权，再补充：
+
+- `NACOS_USERNAME`
+- `NACOS_PASSWORD`
+
 这份计划明确了：
 
 - 基于 `services/*` 的正确 Maven 构建目标

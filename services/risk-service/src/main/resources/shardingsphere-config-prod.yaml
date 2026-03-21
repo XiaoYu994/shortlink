@@ -1,6 +1,5 @@
-# 聚合服务 ShardingSphere 配置 - 生产环境
 # 1. 必填：逻辑库名
-databaseName: aggregation_db
+databaseName: link_db
 
 # 2. 必填：运行模式
 mode:
@@ -37,70 +36,50 @@ dataSources:
     connectionTestQuery: SELECT 1
 
 rules:
-  # 分片规则 - 合并 user-service 和 project-service
   - !SHARDING
     autoTables:
-      # user-service: 用户表
-      t_user:
-        actualDataSources: ds_0
-        shardingStrategy:
-          standard:
-            shardingColumn: username
-            shardingAlgorithmName: user_hash_mod
-        keyGenerateStrategy:
-          column: id
-          keyGeneratorName: snowflake
-
-      # user-service + project-service: 分组表
-      t_group:
-        actualDataSources: ds_0
-        shardingStrategy:
-          standard:
-            shardingColumn: username
-            shardingAlgorithmName: group_hash_mod
-        keyGenerateStrategy:
-          column: id
-          keyGeneratorName: snowflake
-
-      # project-service: 短链接主表
       t_link:
         actualDataSources: ds_0
         shardingStrategy:
           standard:
             shardingColumn: gid
-            shardingAlgorithmName: link_hash_mod
+            shardingAlgorithmName: t_link_hash_mod
         keyGenerateStrategy:
           column: id
           keyGeneratorName: snowflake
 
-      # project-service: 短链接路由表
       t_link_goto:
         actualDataSources: ds_0
         shardingStrategy:
           standard:
             shardingColumn: full_short_url
-            shardingAlgorithmName: link_goto_hash_mod
+            shardingAlgorithmName: t_link_goto_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      t_group:
+        actualDataSources: ds_0
+        shardingStrategy:
+          standard:
+            shardingColumn: username
+            shardingAlgorithmName: t_group_hash_mod
         keyGenerateStrategy:
           column: id
           keyGeneratorName: snowflake
 
     shardingAlgorithms:
-      user_hash_mod:
+      t_link_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
 
-      group_hash_mod:
+      t_link_goto_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
 
-      link_hash_mod:
-        type: HASH_MOD
-        props:
-          sharding-count: 16
-
-      link_goto_hash_mod:
+      t_group_hash_mod:
         type: HASH_MOD
         props:
           sharding-count: 16
@@ -111,28 +90,6 @@ rules:
         props:
           worker-id: 1
 
-  # 加密规则 - user-service 的 t_user 加密
-  - !ENCRYPT
-    tables:
-      t_user:
-        columns:
-          phone:
-            cipher:
-              name: phone
-              encryptorName: common_encryptor
-          mail:
-            cipher:
-              name: mail
-              encryptorName: common_encryptor
-
-    encryptors:
-      common_encryptor:
-        type: AES
-        props:
-          aes-key-value: d6oadCl789rrb9A3GWo
-          digest-algorithm-name: SHA-1
-
-  # 单表加载规则
   - !SINGLE
     tables:
       - "ds_0.*"

@@ -46,3 +46,4 @@ build/
 .cursor/
 
 .runtime_logs/
+docker/.env

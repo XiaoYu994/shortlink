@@ -6,18 +6,18 @@ spring:
     name: shortlink-stats-service
   datasource:
     driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
-    url: jdbc:shardingsphere:classpath:shardingsphere-config-${database.env:dev}.yaml
+    url: jdbc:shardingsphere:classpath:shardingsphere-config-${DATABASE_ENV:${database.env:dev}}.yaml
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      password: xhy_redis
+      host: ${SPRING_DATA_REDIS_HOST:127.0.0.1}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:xhy_redis}
   cloud:
     nacos:
       discovery:
-        server-addr: 127.0.0.1:8848
-        username: nacos
-        password: nacos
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}
+        username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
+        password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
 
 mybatis-plus:
   configuration:
@@ -25,7 +25,7 @@ mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
 
 rocketmq:
-  name-server: 127.0.0.1:9876
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
   producer:
     group: stats-producer-group
     send-message-timeout: 2000
@@ -33,7 +33,7 @@ rocketmq:
 short-link:
   stats:
     locale:
-      amap-key: 23ea4562d80a83d1dd47922b4913d5e0
+      amap-key: ${SHORT_LINK_STATS_LOCALE_AMAP_KEY:23ea4562d80a83d1dd47922b4913d5e0}
 
 management:
   endpoints:

@@ -12,7 +12,7 @@ rule_files:
   - /etc/prometheus/alert.rules.yml
 
 scrape_configs:
-  - job_name: shortlink-services
+  - job_name: shortlink-host-services
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
@@ -22,3 +22,12 @@ scrape_configs:
           - host.docker.internal:8003
           - host.docker.internal:8004
           - host.docker.internal:8005
+
+  - job_name: shortlink-compose-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway:8000
+          - aggregation:8003
+          - stats:8004
+          - risk:8005
