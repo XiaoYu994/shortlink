@@ -4,6 +4,5 @@
 .mvn
 .trellis
 .runtime_logs
-**/target
 console-vue/node_modules
 console-vue/dist
