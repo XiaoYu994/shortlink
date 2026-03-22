@@ -60,6 +60,7 @@ services:
   namesrv:
     image: apache/rocketmq:5.3.0
     container_name: rmqnamesrv
+    user: root
     ports:
       - 9876:9876
     networks:
@@ -73,6 +74,7 @@ services:
   broker:
     image: apache/rocketmq:5.3.0
     container_name: rmqbroker
+    user: root
     ports:
       - 10909:10909
       - 10911:10911
@@ -167,6 +169,7 @@ configs:
       brokerClusterName = DefaultCluster
       brokerName = broker-a
       brokerId = 0
+      storePathRootDir = /home/rocketmq/store
       deleteWhen = 04
       fileReservedTime = 48
       brokerRole = ASYNC_MASTER

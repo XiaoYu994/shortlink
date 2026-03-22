@@ -59,6 +59,7 @@ services:
   namesrv:
     image: apache/rocketmq:5.3.0
     container_name: shortlink-namesrv
+    user: root
     restart: unless-stopped
     command: sh mqnamesrv
     volumes:
@@ -70,6 +71,7 @@ services:
   broker:
     image: apache/rocketmq:5.3.0
     container_name: shortlink-broker
+    user: root
     restart: unless-stopped
     environment:
       NAMESRV_ADDR: namesrv:9876
@@ -92,6 +94,7 @@ configs:
       brokerClusterName = DefaultCluster
       brokerName = broker-a
       brokerId = 0
+      storePathRootDir = /home/rocketmq/store
       deleteWhen = 04
       fileReservedTime = 48
       brokerRole = ASYNC_MASTER
