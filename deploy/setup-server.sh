@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR=/opt/shortlink
 DOCKER_DIR="${PROJECT_DIR}/docker"
-MQ_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.deploy.yml"
+INFRA_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.deploy.yml"
 APP_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.app.yml"
 
 require_command() {
@@ -39,16 +39,42 @@ wait_for_port() {
   return 1
 }
 
-normalize_wait_host() {
-  local host=${1:-127.0.0.1}
-  case "${host}" in
-    host.docker.internal|localhost)
-      echo "127.0.0.1"
-      ;;
-    *)
-      echo "${host}"
-      ;;
-  esac
+wait_for_container_health() {
+  local container=$1
+  local retries=${2:-60}
+
+  for _ in $(seq 1 "${retries}"); do
+    local status
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "${container}" 2>/dev/null || true)
+
+    case "${status}" in
+      healthy)
+        return 0
+        ;;
+      unhealthy)
+        docker logs --tail 50 "${container}" >&2 || true
+        echo "container became unhealthy: ${container}" >&2
+        return 1
+        ;;
+    esac
+
+    sleep 2
+  done
+
+  echo "timeout waiting for container health: ${container}" >&2
+  return 1
+}
+
+ensure_container_running() {
+  local container=$1
+  local status
+
+  status=$(docker inspect --format '{{.State.Status}}' "${container}" 2>/dev/null || true)
+  if [[ "${status}" != "running" ]]; then
+    docker logs --tail 50 "${container}" >&2 || true
+    echo "container is not running: ${container}" >&2
+    return 1
+  fi
 }
 
 install_docker_if_missing
@@ -71,23 +97,29 @@ fi
 
 cd "${PROJECT_DIR}"
 
-wait_for_port "$(normalize_wait_host "${SHORTLINK_MYSQL_HOST:-127.0.0.1}")" "${SHORTLINK_MYSQL_PORT:-3306}"
-wait_for_port "$(normalize_wait_host "${SPRING_DATA_REDIS_HOST:-127.0.0.1}")" "${SPRING_DATA_REDIS_PORT:-6379}"
+docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
+docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
 
-IFS=':' read -r nacos_host nacos_port <<<"${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}"
-wait_for_port "$(normalize_wait_host "${nacos_host}")" "${nacos_port:-8848}"
-
-docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" pull
-docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" up -d
-
-wait_for_port 127.0.0.1 9876
-wait_for_port 127.0.0.1 10911
+wait_for_container_health shortlink-mysql 120
+wait_for_container_health shortlink-redis 120
+wait_for_port 127.0.0.1 8848 120
+wait_for_port 127.0.0.1 9876 120
+wait_for_port 127.0.0.1 10911 120
 
 docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
 docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
-docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" ps
+wait_for_port 127.0.0.1 80 120
+wait_for_port 127.0.0.1 8000 120
+wait_for_port 127.0.0.1 8003 120
+ensure_container_running shortlink-gateway
+ensure_container_running shortlink-aggregation
+ensure_container_running shortlink-stats
+ensure_container_running shortlink-risk
+ensure_container_running shortlink-frontend
+
+docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" ps
 docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
 
-echo "frontend: http://$(hostname -I | awk '{print $1}')"
+echo "frontend: http://$(hostname -I | awk '{print $1}')/console/"
 echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
-echo "redirect base: http://$(hostname -I | awk '{print $1}'):8003"
+echo "redirect base: http://$(hostname -I | awk '{print $1}')"
