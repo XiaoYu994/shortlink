@@ -62,6 +62,30 @@ wait_for_port() {
   return 1
 }
 
+get_container_ip() {
+  local container=$1
+  docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${container}" 2>/dev/null || true
+}
+
+wait_for_container_port() {
+  local container=$1
+  local port=$2
+  local retries=${3:-60}
+
+  for _ in $(seq 1 "${retries}"); do
+    local ip
+    ip=$(get_container_ip "${container}")
+    if [[ -n "${ip}" ]] && (echo >"/dev/tcp/${ip}/${port}") >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  docker logs --tail 50 "${container}" >&2 || true
+  echo "timeout waiting for ${container}:${port}" >&2
+  return 1
+}
+
 wait_for_container_health() {
   local container=$1
   local retries=${2:-60}
@@ -123,9 +147,9 @@ docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${IN
 
 wait_for_container_health shortlink-mysql 120
 wait_for_container_health shortlink-redis 120
-wait_for_port 127.0.0.1 8848 120
-wait_for_port 127.0.0.1 9876 120
-wait_for_port 127.0.0.1 10911 120
+wait_for_container_port shortlink-nacos 8848 120
+wait_for_container_port shortlink-namesrv 9876 120
+wait_for_container_port shortlink-broker 10911 120
 
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
