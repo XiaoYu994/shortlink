@@ -253,15 +253,102 @@ npm run dev
 
 ## 自动部署
 
-当前仓库生产侧只保留一种部署模式：**全 Docker 一键部署**。
+当前仓库的生产部署已经调整为两段式流程：
 
-推送 `main` 后，GitHub Actions 会自动完成：
+- 推送 `main`：只负责构建并推送镜像到 GHCR
+- 手动执行 `Deploy` 工作流：按需部署到服务器
 
-- Maven 构建后端 JAR
-- Node 构建前端静态资源
-- 构建并推送镜像到 GHCR
-- 通过 SSH 下发部署文件到服务器
-- 在服务器执行 `deploy/setup-server.sh`
+这样做的原因很直接：当前线上仍然是单机单实例部署，如果每次推送都自动拉起全量基础设施和应用，会把发布风险和中断窗口放大。
+
+### CI/CD 流程
+
+#### 1）自动构建镜像
+
+工作流文件：
+
+- `.github/workflows/build.yml`
+
+触发方式：
+
+- 推送到 `main`
+
+执行内容：
+
+- Maven 构建 `gateway / aggregation / stats / risk`
+- Node 构建前端 `console-vue`
+- 构建并推送以下镜像到 GHCR
+
+镜像列表：
+
+- `ghcr.io/xiaoyu994/shortlink-gateway-service`
+- `ghcr.io/xiaoyu994/shortlink-aggregation-service`
+- `ghcr.io/xiaoyu994/shortlink-stats-service`
+- `ghcr.io/xiaoyu994/shortlink-risk-service`
+- `ghcr.io/xiaoyu994/shortlink-frontend`
+
+标签策略：
+
+- `latest`
+- 当前提交 SHA
+
+#### 2）手动部署到服务器
+
+工作流文件：
+
+- `.github/workflows/deploy.yml`
+
+触发方式：
+
+- GitHub 仓库 `Actions -> Deploy -> Run workflow`
+
+可选参数：
+
+- `deploy_scope`
+- `image_tag`
+
+`deploy_scope` 说明：
+
+- `full`：首次部署或需要重建整套环境时使用，会部署基础设施和应用
+- `infra`：只维护基础设施时使用，只拉起 `MySQL / Redis / Nacos / RocketMQ`
+- `app`：日常发版使用，只更新业务应用，不动基础设施
+
+`image_tag` 说明：
+
+- 留空时默认部署当前工作流对应的提交 SHA
+- 也可以手动指定某个历史镜像标签，实现回滚或重发
+
+### 服务器执行逻辑
+
+`Deploy` 工作流会把 `docker/`、`deploy/`、`resources/database/link.sql` 下发到服务器，然后在服务器执行：
+
+```bash
+bash deploy/setup-server.sh <deploy_scope>
+```
+
+当前部署脚本支持三种模式：
+
+- `bash deploy/setup-server.sh full`
+- `bash deploy/setup-server.sh infra`
+- `bash deploy/setup-server.sh app`
+
+推荐用法：
+
+- 首次上线：`full`
+- 平时发布：`app`
+- 基础设施维护：`infra`
+
+### 这套流程解决了什么
+
+和之前“推送即全量部署”相比，现在这套方式主要减少两类问题：
+
+- 平时发版不会再顺手重建 MySQL、Redis、Nacos、RocketMQ
+- 可以手动选择镜像版本和部署时机，避免把代码提交和生产发布时间强绑定
+
+但也要明确一点：
+
+- 当前仍然不是蓝绿发布，也不是滚动发布
+- `app` 部署时依然会重建应用容器，所以会有一个短暂切换窗口
+- 只是这个中断范围被压缩到了应用层，不再每次都波及基础设施
 
 实施计划文档见：
 
@@ -269,6 +356,7 @@ npm run dev
 
 当前落地文件包括：
 
+- GitHub Actions 镜像构建：`.github/workflows/build.yml`
 - GitHub Actions 工作流：`.github/workflows/deploy.yml`
 - 生产基础设施编排：`docker/docker-compose.deploy.yml`
 - 应用层编排：`docker/docker-compose.app.yml`

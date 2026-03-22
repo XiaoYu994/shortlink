@@ -1,138 +1,43 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      deploy_scope:
+        description: 部署范围
+        required: true
+        default: app
+        type: choice
+        options:
+          - app
+          - full
+          - infra
+      image_tag:
+        description: 镜像标签，默认使用当前工作流提交 SHA
+        required: false
+        type: string
 
 permissions:
   contents: read
-  packages: write
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_OWNER: xiaoyu994
+concurrency:
+  group: shortlink-prod-deploy
+  cancel-in-progress: false
 
 jobs:
-  build-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: maven
-
-      - name: Build backend jars
-        run: >
-          mvn -pl services/aggregation-service,services/gateway-service,services/stats-service,services/risk-service
-          -am -DskipTests package
-
-      - name: Upload backend jars
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jars
-          path: |
-            services/aggregation-service/target/shortlink-aggregation-service.jar
-            services/gateway-service/target/shortlink-gateway-service.jar
-            services/stats-service/target/shortlink-stats-service.jar
-            services/risk-service/target/shortlink-risk-service.jar
-
-  build-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: npm
-          cache-dependency-path: console-vue/package-lock.json
-
-      - name: Build frontend
-        working-directory: console-vue
-        run: |
-          npm ci
-          npm run build
-
-  docker-push:
-    runs-on: ubuntu-latest
-    needs:
-      - build-backend
-      - build-frontend
-    strategy:
-      matrix:
-        include:
-          - image_name: shortlink-gateway-service
-            jar_file: services/gateway-service/target/shortlink-gateway-service.jar
-          - image_name: shortlink-aggregation-service
-            jar_file: services/aggregation-service/target/shortlink-aggregation-service.jar
-          - image_name: shortlink-stats-service
-            jar_file: services/stats-service/target/shortlink-stats-service.jar
-          - image_name: shortlink-risk-service
-            jar_file: services/risk-service/target/shortlink-risk-service.jar
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: backend-jars
-          path: services
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile.backend
-          push: true
-          build-args: |
-            JAR_FILE=${{ matrix.jar_file }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.image_name }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.image_name }}:${{ github.sha }}
-
-  docker-push-frontend:
-    runs-on: ubuntu-latest
-    needs:
-      - build-frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile.frontend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/shortlink-frontend:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/shortlink-frontend:${{ github.sha }}
-
   deploy:
     runs-on: ubuntu-latest
-    needs:
-      - docker-push
-      - docker-push-frontend
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: meta
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          if [ -z "${IMAGE_TAG}" ]; then
+            IMAGE_TAG="${GITHUB_SHA}"
+          fi
+          echo "image_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: Copy deployment bundle
         uses: appleboy/scp-action@v0.1.7
@@ -153,7 +58,7 @@ jobs:
             set -euo pipefail
             cd /opt/shortlink
             cat > docker/.env <<'EOF'
-            GHCR_IMAGE_TAG=${{ github.sha }}
+            GHCR_IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
             SPRING_PROFILES_ACTIVE=aggregation
             DATABASE_ENV=prod
             MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD || 'root' }}
@@ -165,4 +70,4 @@ jobs:
             GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}
             EOF
             chmod +x deploy/setup-server.sh
-            bash deploy/setup-server.sh
+            bash deploy/setup-server.sh "${{ inputs.deploy_scope }}"

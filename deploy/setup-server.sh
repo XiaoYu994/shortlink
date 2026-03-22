@@ -138,59 +138,86 @@ remove_containers_if_present() {
   done
 }
 
-install_docker_if_missing
-require_command docker
+setup_infra() {
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
+  remove_containers_if_present \
+    shortlink-mysql \
+    shortlink-redis \
+    shortlink-nacos \
+    shortlink-namesrv \
+    shortlink-broker
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
 
-mkdir -p "${PROJECT_DIR}/docker" "${PROJECT_DIR}/resources/database" "${PROJECT_DIR}/deploy"
+  wait_for_container_health shortlink-mysql 120
+  wait_for_container_health shortlink-redis 120
+  wait_for_container_port shortlink-nacos 8848 120
+  wait_for_container_port shortlink-namesrv 9876 120
+  wait_for_container_port shortlink-broker 10911 120
 
-if [[ ! -f "${DOCKER_DIR}/.env" ]]; then
-  echo "missing ${DOCKER_DIR}/.env" >&2
-  exit 1
-fi
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" ps
+}
 
-load_env_file "${DOCKER_DIR}/.env"
+deploy_app() {
+  if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
+    echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+  fi
 
-if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
-  echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-fi
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
+  remove_containers_if_present \
+    shortlink-gateway \
+    shortlink-aggregation \
+    shortlink-stats \
+    shortlink-risk \
+    shortlink-frontend
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
 
-cd "${PROJECT_DIR}"
+  wait_for_port 127.0.0.1 80 120
+  wait_for_port 127.0.0.1 8000 120
+  wait_for_port 127.0.0.1 8003 120
+  ensure_container_running shortlink-gateway
+  ensure_container_running shortlink-aggregation
+  ensure_container_running shortlink-stats
+  ensure_container_running shortlink-risk
+  ensure_container_running shortlink-frontend
 
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
-remove_containers_if_present \
-  shortlink-mysql \
-  shortlink-redis \
-  shortlink-nacos \
-  shortlink-namesrv \
-  shortlink-broker
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
+  docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
+  echo "frontend: http://$(hostname -I | awk '{print $1}')/console/"
+  echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
+  echo "redirect base: http://$(hostname -I | awk '{print $1}')"
+}
 
-wait_for_container_health shortlink-mysql 120
-wait_for_container_health shortlink-redis 120
-wait_for_container_port shortlink-nacos 8848 120
-wait_for_container_port shortlink-namesrv 9876 120
-wait_for_container_port shortlink-broker 10911 120
+main() {
+  local scope=${1:-full}
 
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
-remove_containers_if_present \
-  shortlink-gateway \
-  shortlink-aggregation \
-  shortlink-stats \
-  shortlink-risk \
-  shortlink-frontend
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
-wait_for_port 127.0.0.1 80 120
-wait_for_port 127.0.0.1 8000 120
-wait_for_port 127.0.0.1 8003 120
-ensure_container_running shortlink-gateway
-ensure_container_running shortlink-aggregation
-ensure_container_running shortlink-stats
-ensure_container_running shortlink-risk
-ensure_container_running shortlink-frontend
+  install_docker_if_missing
+  require_command docker
 
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" ps
-docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
+  mkdir -p "${PROJECT_DIR}/docker" "${PROJECT_DIR}/resources/database" "${PROJECT_DIR}/deploy"
 
-echo "frontend: http://$(hostname -I | awk '{print $1}')/console/"
-echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
-echo "redirect base: http://$(hostname -I | awk '{print $1}')"
+  if [[ ! -f "${DOCKER_DIR}/.env" ]]; then
+    echo "missing ${DOCKER_DIR}/.env" >&2
+    exit 1
+  fi
+
+  load_env_file "${DOCKER_DIR}/.env"
+  cd "${PROJECT_DIR}"
+
+  case "${scope}" in
+    full)
+      setup_infra
+      deploy_app
+      ;;
+    infra)
+      setup_infra
+      ;;
+    app)
+      deploy_app
+      ;;
+    *)
+      echo "usage: $0 [full|infra|app]" >&2
+      exit 1
+      ;;
+  esac
+}
+
+main "${1:-full}"
