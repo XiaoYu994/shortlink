@@ -124,6 +124,20 @@ ensure_container_running() {
   fi
 }
 
+remove_container_if_present() {
+  local container=$1
+
+  if docker inspect "${container}" >/dev/null 2>&1; then
+    docker rm -f "${container}" >/dev/null 2>&1 || true
+  fi
+}
+
+remove_containers_if_present() {
+  for container in "$@"; do
+    remove_container_if_present "${container}"
+  done
+}
+
 install_docker_if_missing
 require_command docker
 
@@ -143,6 +157,12 @@ fi
 cd "${PROJECT_DIR}"
 
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
+remove_containers_if_present \
+  shortlink-mysql \
+  shortlink-redis \
+  shortlink-nacos \
+  shortlink-namesrv \
+  shortlink-broker
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
 
 wait_for_container_health shortlink-mysql 120
@@ -152,6 +172,12 @@ wait_for_container_port shortlink-namesrv 9876 120
 wait_for_container_port shortlink-broker 10911 120
 
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
+remove_containers_if_present \
+  shortlink-gateway \
+  shortlink-aggregation \
+  shortlink-stats \
+  shortlink-risk \
+  shortlink-frontend
 docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
 wait_for_port 127.0.0.1 80 120
 wait_for_port 127.0.0.1 8000 120
