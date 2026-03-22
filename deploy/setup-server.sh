@@ -13,6 +13,29 @@ require_command() {
   fi
 }
 
+load_env_file() {
+  local env_file=$1
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "${line}" ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+
+    local key=${line%%=*}
+    local value=${line#*=}
+
+    if [[ "${key}" == "${line}" ]]; then
+      continue
+    fi
+
+    if [[ "${value}" =~ ^\".*\"$ ]] || [[ "${value}" =~ ^\'.*\'$ ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    export "${key}=${value}"
+  done < "${env_file}"
+}
+
 install_docker_if_missing() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     return
@@ -87,9 +110,7 @@ if [[ ! -f "${DOCKER_DIR}/.env" ]]; then
   exit 1
 fi
 
-set -a
-source "${DOCKER_DIR}/.env"
-set +a
+load_env_file "${DOCKER_DIR}/.env"
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
@@ -97,8 +118,8 @@ fi
 
 cd "${PROJECT_DIR}"
 
-docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
-docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" pull
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" up -d
 
 wait_for_container_health shortlink-mysql 120
 wait_for_container_health shortlink-redis 120
@@ -106,8 +127,8 @@ wait_for_port 127.0.0.1 8848 120
 wait_for_port 127.0.0.1 9876 120
 wait_for_port 127.0.0.1 10911 120
 
-docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
-docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
 wait_for_port 127.0.0.1 80 120
 wait_for_port 127.0.0.1 8000 120
 wait_for_port 127.0.0.1 8003 120
@@ -117,8 +138,8 @@ ensure_container_running shortlink-stats
 ensure_container_running shortlink-risk
 ensure_container_running shortlink-frontend
 
-docker compose --project-name shortlink -f "${INFRA_COMPOSE_FILE}" ps
-docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${INFRA_COMPOSE_FILE}" ps
+docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
 
 echo "frontend: http://$(hostname -I | awk '{print $1}')/console/"
 echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
