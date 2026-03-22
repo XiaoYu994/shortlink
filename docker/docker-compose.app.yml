@@ -3,19 +3,20 @@ services:
     image: ghcr.io/xiaoyu994/shortlink-gateway-service:${GHCR_IMAGE_TAG}
     container_name: shortlink-gateway
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
       SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD}
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}
       SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME}
       SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD}
-    depends_on:
-      - redis
-      - nacos
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - rocketmq
+      - shortlink
 
   aggregation:
     image: ghcr.io/xiaoyu994/shortlink-aggregation-service:${GHCR_IMAGE_TAG}
@@ -25,21 +26,25 @@ services:
       - "8003:8003"
     environment:
       DATABASE_ENV: ${DATABASE_ENV}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
       SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD}
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}
       SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME}
       SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD}
       ROCKETMQ_NAME_SERVER: ${ROCKETMQ_NAME_SERVER}
       SHORT_LINK_DOMAIN_DEFAULT: ${SHORT_LINK_DOMAIN_DEFAULT}
-    depends_on:
-      - mysql
-      - redis
-      - nacos
-      - namesrv
+      SHORTLINK_MYSQL_HOST: ${SHORTLINK_MYSQL_HOST}
+      SHORTLINK_MYSQL_PORT: ${SHORTLINK_MYSQL_PORT}
+      SHORTLINK_MYSQL_USERNAME: ${SHORTLINK_MYSQL_USERNAME}
+      SHORTLINK_MYSQL_PASSWORD: ${SHORTLINK_MYSQL_PASSWORD}
+      SHORTLINK_MYSQL_DATABASE: ${SHORTLINK_MYSQL_DATABASE}
+      SHORTLINK_MYSQL_COLD_DATABASE: ${SHORTLINK_MYSQL_COLD_DATABASE}
+      SPRING_DATASOURCE_URL: jdbc:shardingsphere:classpath:shardingsphere-config-prod.yaml?placeholder-type=environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - rocketmq
+      - shortlink
 
   stats:
     image: ghcr.io/xiaoyu994/shortlink-stats-service:${GHCR_IMAGE_TAG}
@@ -47,21 +52,25 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_ENV: ${DATABASE_ENV}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
       SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD}
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}
       SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME}
       SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD}
       ROCKETMQ_NAME_SERVER: ${ROCKETMQ_NAME_SERVER}
       SHORT_LINK_STATS_LOCALE_AMAP_KEY: ${SHORT_LINK_STATS_LOCALE_AMAP_KEY}
-    depends_on:
-      - mysql
-      - redis
-      - nacos
-      - namesrv
+      SHORTLINK_MYSQL_HOST: ${SHORTLINK_MYSQL_HOST}
+      SHORTLINK_MYSQL_PORT: ${SHORTLINK_MYSQL_PORT}
+      SHORTLINK_MYSQL_USERNAME: ${SHORTLINK_MYSQL_USERNAME}
+      SHORTLINK_MYSQL_PASSWORD: ${SHORTLINK_MYSQL_PASSWORD}
+      SHORTLINK_MYSQL_DATABASE: ${SHORTLINK_MYSQL_DATABASE}
+      SHORTLINK_MYSQL_COLD_DATABASE: ${SHORTLINK_MYSQL_COLD_DATABASE}
+      SPRING_DATASOURCE_URL: jdbc:shardingsphere:classpath:shardingsphere-config-prod.yaml?placeholder-type=environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - rocketmq
+      - shortlink
 
   risk:
     image: ghcr.io/xiaoyu994/shortlink-risk-service:${GHCR_IMAGE_TAG}
@@ -69,21 +78,25 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_ENV: ${DATABASE_ENV}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
       SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD}
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}
       SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME}
       SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD}
       ROCKETMQ_NAME_SERVER: ${ROCKETMQ_NAME_SERVER}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
-    depends_on:
-      - mysql
-      - redis
-      - nacos
-      - namesrv
+      SHORTLINK_MYSQL_HOST: ${SHORTLINK_MYSQL_HOST}
+      SHORTLINK_MYSQL_PORT: ${SHORTLINK_MYSQL_PORT}
+      SHORTLINK_MYSQL_USERNAME: ${SHORTLINK_MYSQL_USERNAME}
+      SHORTLINK_MYSQL_PASSWORD: ${SHORTLINK_MYSQL_PASSWORD}
+      SHORTLINK_MYSQL_DATABASE: ${SHORTLINK_MYSQL_DATABASE}
+      SHORTLINK_MYSQL_COLD_DATABASE: ${SHORTLINK_MYSQL_COLD_DATABASE}
+      SPRING_DATASOURCE_URL: jdbc:shardingsphere:classpath:shardingsphere-config-prod.yaml?placeholder-type=environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - rocketmq
+      - shortlink
 
   frontend:
     image: ghcr.io/xiaoyu994/shortlink-frontend:${GHCR_IMAGE_TAG}
@@ -94,4 +107,9 @@ services:
     depends_on:
       - gateway
     networks:
-      - rocketmq
+      - shortlink
+
+networks:
+  shortlink:
+    name: shortlink-network
+    driver: bridge

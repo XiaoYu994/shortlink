@@ -12,9 +12,9 @@ dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://mysql:3306/link?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: root
-    password: root
+    jdbcUrl: jdbc:mysql://$${SHORTLINK_MYSQL_HOST::host.docker.internal}:$${SHORTLINK_MYSQL_PORT::3306}/$${SHORTLINK_MYSQL_DATABASE::link}?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: $${SHORTLINK_MYSQL_USERNAME::root}
+    password: $${SHORTLINK_MYSQL_PASSWORD::root}
     maximumPoolSize: 50
     minimumIdle: 10
     connectionTimeout: 30000
@@ -25,9 +25,9 @@ dataSources:
   ds_cold:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://mysql:3306/link_cold?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: root
-    password: root
+    jdbcUrl: jdbc:mysql://$${SHORTLINK_MYSQL_HOST::host.docker.internal}:$${SHORTLINK_MYSQL_PORT::3306}/$${SHORTLINK_MYSQL_COLD_DATABASE::link_cold}?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: $${SHORTLINK_MYSQL_USERNAME::root}
+    password: $${SHORTLINK_MYSQL_PASSWORD::root}
     maximumPoolSize: 20
     minimumIdle: 5
     connectionTimeout: 30000

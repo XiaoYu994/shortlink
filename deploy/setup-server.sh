@@ -3,6 +3,8 @@ set -euo pipefail
 
 PROJECT_DIR=/opt/shortlink
 DOCKER_DIR="${PROJECT_DIR}/docker"
+MQ_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.deploy.yml"
+APP_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.app.yml"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -37,6 +39,18 @@ wait_for_port() {
   return 1
 }
 
+normalize_wait_host() {
+  local host=${1:-127.0.0.1}
+  case "${host}" in
+    host.docker.internal|localhost)
+      echo "127.0.0.1"
+      ;;
+    *)
+      echo "${host}"
+      ;;
+  esac
+}
+
 install_docker_if_missing
 require_command docker
 
@@ -57,15 +71,23 @@ fi
 
 cd "${PROJECT_DIR}"
 
-docker compose --project-name shortlink -f docker/docker-compose.yml up -d
+wait_for_port "$(normalize_wait_host "${SHORTLINK_MYSQL_HOST:-127.0.0.1}")" "${SHORTLINK_MYSQL_PORT:-3306}"
+wait_for_port "$(normalize_wait_host "${SPRING_DATA_REDIS_HOST:-127.0.0.1}")" "${SPRING_DATA_REDIS_PORT:-6379}"
 
-wait_for_port 127.0.0.1 3306
-wait_for_port 127.0.0.1 8848
+IFS=':' read -r nacos_host nacos_port <<<"${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}"
+wait_for_port "$(normalize_wait_host "${nacos_host}")" "${nacos_port:-8848}"
+
+docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" pull
+docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" up -d
+
 wait_for_port 127.0.0.1 9876
+wait_for_port 127.0.0.1 10911
 
-docker compose --project-name shortlink -f docker/docker-compose.yml -f docker/docker-compose.app.yml pull
-docker compose --project-name shortlink -f docker/docker-compose.yml -f docker/docker-compose.app.yml up -d
-docker compose --project-name shortlink -f docker/docker-compose.yml -f docker/docker-compose.app.yml ps
+docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" pull
+docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
+docker compose --project-name shortlink -f "${MQ_COMPOSE_FILE}" ps
+docker compose --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
 
 echo "frontend: http://$(hostname -I | awk '{print $1}')"
+echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
 echo "redirect base: http://$(hostname -I | awk '{print $1}'):8003"

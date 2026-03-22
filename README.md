@@ -250,11 +250,11 @@ npm run dev
 
 ## 自动部署规划
 
-当前仓库已经形成一版基于现状模块结构的 CI/CD 自动部署实施方案，目标是：
+当前仓库已经形成一版基于现状模块结构的 CI/CD 自动部署方案，默认采用下面这套生产拓扑：
 
 - 推送 `main` 后自动构建并推送镜像到 GHCR
-- 在云服务器上自动拉起完整业务拓扑
-- 保留当前生产所需的 `gateway-service + aggregation-service + stats-service + risk-service + console-vue`
+- 云服务器宿主机复用 `MySQL / Redis / Nacos`
+- Docker 仅启动 `RocketMQ + gateway-service + aggregation-service + stats-service + risk-service + console-vue`
 
 实施计划文档见：
 
@@ -263,6 +263,7 @@ npm run dev
 当前已经补齐的落地文件包括：
 
 - GitHub Actions 工作流：`.github/workflows/deploy.yml`
+- 生产 RocketMQ 编排：`docker/docker-compose.deploy.yml`
 - 应用层编排：`docker/docker-compose.app.yml`
 - 镜像构建文件：`docker/Dockerfile.backend`、`docker/Dockerfile.frontend`
 - 前端 Nginx 配置：`docker/nginx/default.conf`
@@ -276,22 +277,65 @@ npm run dev
 - `SERVER_SSH_KEY`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
-- `DASHSCOPE_API_KEY`
 - `SHORT_LINK_DOMAIN_DEFAULT`
+- `MYSQL_PASSWORD`
+
+按你的服务器现状，下面这些建议继续补上：
+
+- `MYSQL_HOST`，默认可不配，走 `host.docker.internal`
+- `MYSQL_PORT`
+- `MYSQL_USERNAME`
+- `MYSQL_DATABASE`
+- `MYSQL_COLD_DATABASE`
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
+- `NACOS_SERVER_ADDR`
 - `SHORT_LINK_STATS_LOCALE_AMAP_KEY`
+- `DASHSCOPE_API_KEY`
 
 如果生产环境开启 Nacos 鉴权，再补充：
 
 - `NACOS_USERNAME`
 - `NACOS_PASSWORD`
 
-这份计划明确了：
+这套自动部署现在明确的是：
 
 - 基于 `services/*` 的正确 Maven 构建目标
 - `gateway-service` 的 `aggregation` 部署 profile
 - GHCR 镜像命名与 GitHub Actions 发布流程
-- `docker-compose.yml + docker-compose.app.yml` 的部署方式
+- `docker-compose.deploy.yml + docker-compose.app.yml` 的部署方式
 - 服务端初始化、上线校验与回滚要求
+
+### 服务器部署说明
+
+这套 CI/CD 默认假设你的服务器已经在宿主机装好了：
+
+- MySQL
+- Redis
+- Nacos
+
+Docker 中只会额外起：
+
+- RocketMQ NameServer
+- RocketMQ Broker
+- gateway-service
+- aggregation-service
+- stats-service
+- risk-service
+- frontend
+
+这也是当前推荐方案。对 `4 核 4G` 的机器，不建议首发就把 `dashboard / prometheus / grafana / alertmanager` 一起常驻。
+
+宿主机上的 `MySQL / Redis / Nacos` 需要允许 Docker 容器访问，至少不能只监听 `127.0.0.1`。如果这些服务当前只绑定本机回环地址，需要改成监听宿主机地址，或者额外放通 Docker 网桥访问。
+
+### 域名说明
+
+- `SHORT_LINK_DOMAIN_DEFAULT` 必须改成你真实要对外发放的短链域名，比如 `s.example.com`
+- 控制台前端域名可以单独指向 `frontend` 容器
+- 短链跳转域名应反向代理到 `aggregation-service:8003`
+
+如果继续保留 `nurl.ink:8003`，生成出来的短链就仍然会是本地测试地址，不适合上线。
 
 ---
 

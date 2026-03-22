@@ -1,0 +1,60 @@
+services:
+  namesrv:
+    image: apache/rocketmq:5.3.0
+    container_name: shortlink-namesrv
+    restart: unless-stopped
+    ports:
+      - "9876:9876"
+    command: sh mqnamesrv
+    volumes:
+      - namesrv_logs:/home/rocketmq/logs
+      - namesrv_store:/home/rocketmq/store
+    networks:
+      - shortlink
+
+  broker:
+    image: apache/rocketmq:5.3.0
+    container_name: shortlink-broker
+    restart: unless-stopped
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    environment:
+      NAMESRV_ADDR: namesrv:9876
+      AUTO_CREATE_TOPIC_ENABLE: "true"
+    depends_on:
+      - namesrv
+    command: sh mqbroker -n namesrv:9876 -c /home/rocketmq/rocketmq-5.3.0/conf/broker.conf
+    volumes:
+      - broker_logs:/home/rocketmq/logs
+      - broker_store:/home/rocketmq/store
+    configs:
+      - source: broker_conf
+        target: /home/rocketmq/rocketmq-5.3.0/conf/broker.conf
+    networks:
+      - shortlink
+
+configs:
+  broker_conf:
+    content: |
+      brokerClusterName = DefaultCluster
+      brokerName = broker-a
+      brokerId = 0
+      deleteWhen = 04
+      fileReservedTime = 48
+      brokerRole = ASYNC_MASTER
+      flushDiskType = ASYNC_FLUSH
+      brokerIP1 = broker
+      timerMaxDelaySec = 31536000
+
+volumes:
+  namesrv_logs:
+  namesrv_store:
+  broker_logs:
+  broker_store:
+
+networks:
+  shortlink:
+    name: shortlink-network
+    driver: bridge
