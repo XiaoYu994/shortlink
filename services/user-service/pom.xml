@@ -140,6 +140,9 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <executions>
                     <execution>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
                         <goals>
                             <goal>repackage</goal>
                         </goals>

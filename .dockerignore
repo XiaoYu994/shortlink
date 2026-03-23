@@ -1,8 +1,14 @@
 .git
 .github
 .idea
-.mvn
+.vscode
 .trellis
-.runtime_logs
+.planning
+node_modules
+**/node_modules
 console-vue/node_modules
 console-vue/dist
+**/target
+tests
+docs
+*.log

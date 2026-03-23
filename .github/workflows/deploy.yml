@@ -55,7 +55,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           timeout: 2m
-          command_timeout: 40m
+          command_timeout: 90m
           script: |
             set -euo pipefail
             cd /opt/shortlink
