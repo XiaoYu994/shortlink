@@ -1,9 +1,21 @@
+FROM eclipse-temurin:17-jre-alpine AS builder
+
+WORKDIR /builder
+
+ARG JAR_FILE
+
+COPY ${JAR_FILE} application.jar
+
+# Spring Boot layered jars let Docker reuse dependency layers across services.
+RUN java -Djarmode=layertools -jar application.jar extract
+
 FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-ARG JAR_FILE
+COPY --from=builder /builder/dependencies/ ./
+COPY --from=builder /builder/snapshot-dependencies/ ./
+COPY --from=builder /builder/spring-boot-loader/ ./
+COPY --from=builder /builder/application/ ./
 
-COPY ${JAR_FILE} /app/app.jar
-
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
