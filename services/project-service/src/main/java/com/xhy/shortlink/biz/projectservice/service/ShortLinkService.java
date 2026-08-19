@@ -17,10 +17,22 @@
 
 package com.xhy.shortlink.biz.projectservice.service;
 
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+
 /**
- * 短链接核心 CRUD 服务接口（创建 + 修改 + 查询）
+ * 短链接门面：对外保持统一入口，委托给创建、修改、查询与跳转子服务
  *
  * @author XiaoYu
  */
-public interface ShortLinkCoreService extends ShortLinkCreateService, ShortLinkUpdateService, ShortLinkQueryService {
+public interface ShortLinkService extends ShortLinkCoreService {
+
+    /**
+     * 短链接跳转
+     *
+     * @param shortUri 短链 URI
+     * @param request  原始请求
+     * @param response 原始响应
+     */
+    void redirect(String shortUri, ServletRequest request, ServletResponse response);
 }

@@ -17,10 +17,19 @@
 
 package com.xhy.shortlink.biz.projectservice.service;
 
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
+
 /**
- * 短链接核心 CRUD 服务接口（创建 + 修改 + 查询）
+ * 短链接修改服务
  *
  * @author XiaoYu
  */
-public interface ShortLinkCoreService extends ShortLinkCreateService, ShortLinkUpdateService, ShortLinkQueryService {
+public interface ShortLinkUpdateService {
+
+    /**
+     * 修改短链接
+     *
+     * @param requestParam 修改短链接请求参数
+     */
+    void updateShortLink(ShortLinkUpdateReqDTO requestParam);
 }

@@ -26,9 +26,8 @@ import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkBatchCreateRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkGroupCountRespDTO;
 import com.xhy.shortlink.biz.api.project.dto.resp.ShortLinkPageRespDTO;
-import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkService;
 import com.xhy.shortlink.biz.projectservice.service.UrlTitleService;
-import com.xhy.shortlink.biz.projectservice.service.impl.ShortLinkRedirectServiceImpl;
 import com.xhy.shortlink.framework.starter.convention.result.Result;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
 import com.xhy.shortlink.framework.starter.web.Results;
@@ -55,8 +54,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ShortLinkController {
 
-    private final ShortLinkCoreService shortLinkCoreService;
-    private final ShortLinkRedirectServiceImpl shortLinkRedirectService;
+    private final ShortLinkService shortLinkService;
     private final UrlTitleService urlTitleService;
 
     /**
@@ -65,7 +63,7 @@ public class ShortLinkController {
     @GetMapping("/{short-uri}")
     public void redirect(@PathVariable("short-uri") String shortUri,
                          ServletRequest request, ServletResponse response) {
-        shortLinkRedirectService.redirect(shortUri, request, response);
+        shortLinkService.redirect(shortUri, request, response);
     }
 
     /**
@@ -74,7 +72,7 @@ public class ShortLinkController {
     @Idempotent(message = "短链接正在创建中，请勿重复提交")
     @PostMapping("/api/short-link/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody @Valid ShortLinkCreateReqDTO requestParam) {
-        return Results.success(shortLinkCoreService.createShortLink(requestParam));
+        return Results.success(shortLinkService.createShortLink(requestParam));
     }
 
     /**
@@ -82,7 +80,7 @@ public class ShortLinkController {
      */
     @PostMapping("/api/short-link/v1/create/batch")
     public Result<ShortLinkBatchCreateRespDTO> batchCreateShortLink(@RequestBody @Valid ShortLinkBatchCreateReqDTO requestParam) {
-        return Results.success(shortLinkCoreService.batchCreateShortLink(requestParam));
+        return Results.success(shortLinkService.batchCreateShortLink(requestParam));
     }
 
     /**
@@ -90,7 +88,7 @@ public class ShortLinkController {
      */
     @PutMapping("/api/short-link/v1/update")
     public Result<Void> updateShortLink(@RequestBody @Valid ShortLinkUpdateReqDTO requestParam) {
-        shortLinkCoreService.updateShortLink(requestParam);
+        shortLinkService.updateShortLink(requestParam);
         return Results.success();
     }
 
@@ -99,7 +97,7 @@ public class ShortLinkController {
      */
     @GetMapping("/api/short-link/v1/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkPageReqDTO requestParam) {
-        return Results.success(shortLinkCoreService.pageShortLink(requestParam));
+        return Results.success(shortLinkService.pageShortLink(requestParam));
     }
 
     /**
@@ -107,7 +105,7 @@ public class ShortLinkController {
      */
     @GetMapping("/api/short-link/v1/count")
     public Result<List<ShortLinkGroupCountRespDTO>> listGroupShortLinkCount(@RequestParam("gidList") List<String> requestParam) {
-        return Results.success(shortLinkCoreService.listGroupShortLinkCount(requestParam));
+        return Results.success(shortLinkService.listGroupShortLinkCount(requestParam));
     }
 
     /**

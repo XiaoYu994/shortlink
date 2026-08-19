@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkCreateReqDTO;
 import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkPageReqDTO;
 import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
@@ -40,6 +41,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkRiskProducer;
@@ -120,6 +122,8 @@ class ShortLinkCoreServiceImplTest {
     private DefaultRedisScript<Long> statsRankMigrateScript;
     @Mock
     private ShortLinkMetrics shortLinkMetrics;
+    @Mock
+    private ShortLinkColdDataService shortLinkColdDataService;
 
     @BeforeEach
     void setUp() {
@@ -323,5 +327,14 @@ class ShortLinkCoreServiceImplTest {
         when(shortLinkColdMapper.selectOne(any())).thenReturn(null);
 
         assertThrows(ClientException.class, () -> shortLinkCoreService.updateShortLink(req));
+    }
+
+    @Test
+    void batchCreateShortLink_overLimit_throwsClientException() {
+        ShortLinkBatchCreateReqDTO req = new ShortLinkBatchCreateReqDTO();
+        req.setOriginUrls(Collections.nCopies(101, "https://example.com"));
+        req.setDescription(Collections.nCopies(101, "desc"));
+
+        assertThrows(ClientException.class, () -> shortLinkCoreService.batchCreateShortLink(req));
     }
 }

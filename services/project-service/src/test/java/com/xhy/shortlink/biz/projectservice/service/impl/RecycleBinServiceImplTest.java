@@ -24,6 +24,7 @@ import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,8 @@ class RecycleBinServiceImplTest {
     @Mock
     private ShortLinkCoreService shortLinkCoreService;
     @Mock
+    private ShortLinkColdDataService shortLinkColdDataService;
+    @Mock
     private StringRedisTemplate stringRedisTemplate;
 
     @Test
@@ -67,7 +70,7 @@ class RecycleBinServiceImplTest {
 
         verify(shortLinkMapper).update(argThat(entity ->
                 entity.getEnableStatus().equals(LinkEnableStatusEnum.NOT_ENABLED.getCode())), any());
-        verify(stringRedisTemplate).delete(contains("test.cn/abc"));
+        verify(stringRedisTemplate, times(2)).delete(contains("test.cn/abc"));
     }
 
     @Test

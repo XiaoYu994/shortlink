@@ -85,9 +85,9 @@ public interface ShortLinkMapper extends BaseMapper<ShortLinkDO> {
             + "AND gid IN <foreach collection='param.gidList' item='gid' open='(' separator=',' close=')'>#{gid}</foreach> "
             + "</if>"
             + "<choose>"
-            + "<when test=\"param.orderTag == 'totalPv'\">ORDER BY total_pv DESC</when>"
-            + "<when test=\"param.orderTag == 'totalUv'\">ORDER BY total_uv DESC</when>"
-            + "<when test=\"param.orderTag == 'totalUip'\">ORDER BY total_uip DESC</when>"
+            + "<when test=\"param.orderTag == 'totalPv'\">ORDER BY total_pv DESC, create_time DESC</when>"
+            + "<when test=\"param.orderTag == 'totalUv'\">ORDER BY total_uv DESC, create_time DESC</when>"
+            + "<when test=\"param.orderTag == 'totalUip'\">ORDER BY total_uip DESC, create_time DESC</when>"
             + "<otherwise>ORDER BY create_time DESC</otherwise>"
             + "</choose>"
             + "</script>")

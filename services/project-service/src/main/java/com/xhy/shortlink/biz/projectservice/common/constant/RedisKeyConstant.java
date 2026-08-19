@@ -55,4 +55,7 @@ public final class RedisKeyConstant {
 
     /** 冷链接回温计数器 Key */
     public static final String SHORT_LINK_COLD_REHOT_KEY = "short-link:cold:rehot:%s";
+
+    /** 冷热数据迁移任务锁 */
+    public static final String SHORT_LINK_COLD_MIGRATION_LOCK_KEY = "short-link:lock:cold-migration";
 }

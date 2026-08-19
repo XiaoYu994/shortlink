@@ -53,6 +53,7 @@ import com.xhy.shortlink.biz.projectservice.mq.event.UpdateFaviconEvent;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkRiskProducer;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.biz.projectservice.toolkit.LinkUtil;
 import com.xhy.shortlink.framework.starter.common.enums.DelEnum;
@@ -68,6 +69,7 @@ import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -77,9 +79,9 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -91,7 +93,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.*;
-import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkConstant.HTTP_PROTOCOL;
 import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkConstant.TODAY_EXPIRETIME;
 
 /**
@@ -100,6 +101,7 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkCons
  * @author XiaoYu
  */
 @Slf4j
+@Primary
 @Service
 @RequiredArgsConstructor
 public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
@@ -120,12 +122,21 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     private final PlatformTransactionManager transactionManager;
     private final DefaultRedisScript<Long> statsRankMigrateScript;
     private final ShortLinkMetrics shortLinkMetrics;
+    private final ShortLinkColdDataService shortLinkColdDataService;
 
     @Value("${short-link.domain.default}")
     private String defaultDomain;
 
+    @Value("${short-link.domain.protocol:http}")
+    private String domainProtocol = "http";
+
     @Value("${short-link.create.strategy}")
     private String createStrategy;
+
+    private static final int MAX_BATCH_CREATE_SIZE = 100;
+    private static final long MAX_PAGE_SIZE = 100;
+    private static final long MAX_PAGE_CURRENT = 10_000;
+    private static final long MAX_PAGE_RECORDS = 10_000;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -188,7 +199,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
             }
             shortLinkMetrics.recordCreateSuccess();
             return ShortLinkCreateRespDTO.builder()
-                    .fullShortUrl(HTTP_PROTOCOL + shortLinkDO.getFullShortUrl())
+                    .fullShortUrl(withProtocol(shortLinkDO.getFullShortUrl()))
                     .gid(shortLinkDO.getGid())
                     .originUrl(requestParam.getOriginUrl())
                     .build();
@@ -201,21 +212,30 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     @Override
     public ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam) {
         List<String> originUrlList = requestParam.getOriginUrls();
+        if (originUrlList == null || originUrlList.isEmpty()) {
+            throw new ClientException("批量创建短链接不能为空");
+        }
+        if (originUrlList.size() > MAX_BATCH_CREATE_SIZE) {
+            throw new ClientException("批量创建短链接最多 " + MAX_BATCH_CREATE_SIZE + " 条");
+        }
         List<String> describeList = requestParam.getDescription();
+        if (describeList != null && describeList.size() != originUrlList.size()) {
+            throw new ClientException("批量创建短链接的描述数量必须与链接数量一致");
+        }
         List<ShortLinkBaseInfoRespDTO> resultList = new ArrayList<>();
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         for (int i = 0; i < originUrlList.size(); i++) {
             ShortLinkCreateReqDTO shortLinkCreateReqDTO = BeanUtil.convert(requestParam, ShortLinkCreateReqDTO.class);
             shortLinkCreateReqDTO.setOriginUrl(originUrlList.get(i));
-            shortLinkCreateReqDTO.setDescription(describeList.get(i));
+            shortLinkCreateReqDTO.setDescription(describeList == null ? null : describeList.get(i));
             try {
                 ShortLinkCreateRespDTO shortLink = transactionTemplate.execute(status -> createShortLink(shortLinkCreateReqDTO));
                 if (shortLink != null) {
                     resultList.add(ShortLinkBaseInfoRespDTO.builder()
                             .fullShortUrl(shortLink.getFullShortUrl())
                             .originUrl(shortLink.getOriginUrl())
-                            .description(describeList.get(i))
+                            .description(describeList == null ? null : describeList.get(i))
                             .build());
                 }
             } catch (Exception e) {
@@ -230,15 +250,21 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
     @Override
     public IPage<ShortLinkPageRespDTO> pageShortLink(ShortLinkPageReqDTO requestParam) {
-        // 场景 A：如果用户点击了"今日访问量/人数/IP数"排序
-        if (CharSequenceUtil.equalsAny(requestParam.getOrderTag(),
-                OrderTagEnum.TODAY_PV.getValue(),
-                OrderTagEnum.TODAY_UV.getValue(),
-                OrderTagEnum.TODAY_UIP.getValue())) {
-            return pageByRedisRank(requestParam);
+        validatePage(requestParam);
+        long startNanos = System.nanoTime();
+        try {
+            // 场景 A：如果用户点击了"今日访问量/人数/IP数"排序
+            if (CharSequenceUtil.equalsAny(requestParam.getOrderTag(),
+                    OrderTagEnum.TODAY_PV.getValue(),
+                    OrderTagEnum.TODAY_UV.getValue(),
+                    OrderTagEnum.TODAY_UIP.getValue())) {
+                return pageByRedisRank(requestParam);
+            }
+            // 场景 B：默认排序（按创建时间/总量），热库+冷库合并展示
+            return pageHotColdByOrder(requestParam);
+        } finally {
+            shortLinkMetrics.recordQueryLatency(Duration.ofNanos(System.nanoTime() - startNanos));
         }
-        // 场景 B：默认排序（按创建时间/总量），热库+冷库合并展示
-        return pageHotColdByOrder(requestParam);
     }
 
     @Override
@@ -535,7 +561,8 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
         List<ShortLinkColdDO> coldList =
                 shortLinkColdMapper.selectPage(coldPage, coldWrapper).getRecords();
 
-        List<ShortLinkPageRespDTO> merged = mergeHotColdList(hotList, coldList, req.getOrderTag(), fillToday);
+        List<ShortLinkPageRespDTO> merged = shortLinkColdDataService.mergeSorted(
+                hotList, coldList, req.getOrderTag(), dto -> applyTodayStats(dto, fillToday));
 
         int fromIndex = (int) ((current - 1) * size);
         int toIndex = (int) Math.min(fromIndex + size, merged.size());
@@ -553,11 +580,11 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
     private void applyOrder(LambdaQueryWrapper<ShortLinkDO> wrapper, String orderTag) {
         if (CharSequenceUtil.equals(orderTag, "totalPv")) {
-            wrapper.orderByDesc(ShortLinkDO::getTotalPv);
+            wrapper.orderByDesc(ShortLinkDO::getTotalPv).orderByDesc(ShortLinkDO::getCreateTime);
         } else if (CharSequenceUtil.equals(orderTag, "totalUv")) {
-            wrapper.orderByDesc(ShortLinkDO::getTotalUv);
+            wrapper.orderByDesc(ShortLinkDO::getTotalUv).orderByDesc(ShortLinkDO::getCreateTime);
         } else if (CharSequenceUtil.equals(orderTag, "totalUip")) {
-            wrapper.orderByDesc(ShortLinkDO::getTotalUip);
+            wrapper.orderByDesc(ShortLinkDO::getTotalUip).orderByDesc(ShortLinkDO::getCreateTime);
         } else {
             wrapper.orderByDesc(ShortLinkDO::getCreateTime);
         }
@@ -565,74 +592,24 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
     private void applyColdOrder(LambdaQueryWrapper<ShortLinkColdDO> wrapper, String orderTag) {
         if (CharSequenceUtil.equals(orderTag, "totalPv")) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalPv);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalPv).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else if (CharSequenceUtil.equals(orderTag, "totalUv")) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalUv);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUv).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else if (CharSequenceUtil.equals(orderTag, "totalUip")) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalUip);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUip).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else {
             wrapper.orderByDesc(ShortLinkColdDO::getCreateTime);
         }
     }
 
-    private List<ShortLinkPageRespDTO> mergeHotColdList(
-            List<ShortLinkDO> hotList,
-            List<ShortLinkColdDO> coldList,
-            String orderTag,
-            boolean fillToday) {
-        List<ShortLinkPageRespDTO> merged = new ArrayList<>();
-
-        for (ShortLinkDO hot : hotList) {
-            ShortLinkPageRespDTO dto = BeanUtil.convert(hot, ShortLinkPageRespDTO.class);
-            dto.setDomain(HTTP_PROTOCOL + dto.getDomain());
-            if (fillToday) {
-                fillTodayStats(dto);
-            } else {
-                dto.setTodayPv(0);
-                dto.setTodayUv(0);
-                dto.setTodayUip(0);
-            }
-            merged.add(dto);
+    private void applyTodayStats(ShortLinkPageRespDTO dto, boolean fillToday) {
+        if (fillToday) {
+            fillTodayStats(dto);
+            return;
         }
-
-        for (ShortLinkColdDO cold : coldList) {
-            ShortLinkPageRespDTO dto = BeanUtil.convert(cold, ShortLinkPageRespDTO.class);
-            dto.setDomain(HTTP_PROTOCOL + dto.getDomain());
-            if (fillToday) {
-                fillTodayStats(dto);
-            } else {
-                dto.setTodayPv(0);
-                dto.setTodayUv(0);
-                dto.setTodayUip(0);
-            }
-            merged.add(dto);
-        }
-
-        merged.sort(buildOrderComparator(orderTag));
-        return merged;
-    }
-
-    private Comparator<ShortLinkPageRespDTO> buildOrderComparator(String orderTag) {
-        if (CharSequenceUtil.equals(orderTag, "totalPv")) {
-            return Comparator.comparing((ShortLinkPageRespDTO dto) ->
-                    Optional.ofNullable(dto.getTotalPv()).orElse(0)).reversed()
-                    .thenComparing(dto -> Optional.ofNullable(dto.getCreateTime()).orElse(new Date(0)),
-                            Comparator.reverseOrder());
-        }
-        if (CharSequenceUtil.equals(orderTag, "totalUv")) {
-            return Comparator.comparing((ShortLinkPageRespDTO dto) ->
-                    Optional.ofNullable(dto.getTotalUv()).orElse(0)).reversed()
-                    .thenComparing(dto -> Optional.ofNullable(dto.getCreateTime()).orElse(new Date(0)),
-                            Comparator.reverseOrder());
-        }
-        if (CharSequenceUtil.equals(orderTag, "totalUip")) {
-            return Comparator.comparing((ShortLinkPageRespDTO dto) ->
-                    Optional.ofNullable(dto.getTotalUip()).orElse(0)).reversed()
-                    .thenComparing(dto -> Optional.ofNullable(dto.getCreateTime()).orElse(new Date(0)),
-                            Comparator.reverseOrder());
-        }
-        return Comparator.comparing((ShortLinkPageRespDTO dto) ->
-                Optional.ofNullable(dto.getCreateTime()).orElse(new Date(0)), Comparator.reverseOrder());
+        dto.setTodayPv(0);
+        dto.setTodayUv(0);
+        dto.setTodayUip(0);
     }
 
     private List<ShortLinkPageRespDTO> pageHotColdFallback(String gid, Date todayStart, long offset, long size) {
@@ -667,7 +644,8 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
         List<ShortLinkColdDO> coldList =
                 shortLinkColdMapper.selectPage(coldPage, coldWrapper).getRecords();
 
-        List<ShortLinkPageRespDTO> merged = mergeHotColdList(hotList, coldList, null, false);
+        List<ShortLinkPageRespDTO> merged = shortLinkColdDataService.mergeSorted(
+                hotList, coldList, null, dto -> applyTodayStats(dto, false));
 
         int fromIndex = (int) offset;
         int toIndex = (int) Math.min(fromIndex + size, merged.size());
@@ -690,7 +668,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
             if (hotLink != null) {
                 ShortLinkPageRespDTO dto = BeanUtil.convert(hotLink, ShortLinkPageRespDTO.class);
-                dto.setDomain(HTTP_PROTOCOL + dto.getDomain());
+                dto.setDomain(withProtocol(dto.getDomain()));
                 fillTodayStats(dto);
                 resultList.add(dto);
             } else {
@@ -703,7 +681,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
 
                 if (coldLink != null) {
                     ShortLinkPageRespDTO dto = BeanUtil.convert(coldLink, ShortLinkPageRespDTO.class);
-                    dto.setDomain(HTTP_PROTOCOL + dto.getDomain());
+                    dto.setDomain(withProtocol(dto.getDomain()));
                     fillTodayStats(dto);
                     resultList.add(dto);
                 }
@@ -711,6 +689,24 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
         }
 
         return resultList;
+    }
+
+    private String withProtocol(String hostOrUrl) {
+        if (CharSequenceUtil.isBlank(hostOrUrl) || hostOrUrl.contains("://")) {
+            return hostOrUrl;
+        }
+        return domainProtocol + "://" + hostOrUrl;
+    }
+
+    private void validatePage(ShortLinkPageReqDTO requestParam) {
+        if (requestParam == null || requestParam.getCurrent() < 1
+                || requestParam.getCurrent() > MAX_PAGE_CURRENT
+                || requestParam.getSize() < 1 || requestParam.getSize() > MAX_PAGE_SIZE
+                || requestParam.getCurrent() * requestParam.getSize() > MAX_PAGE_RECORDS) {
+            throw new ClientException("分页参数无效：页码范围为 1-" + MAX_PAGE_CURRENT
+                    + "，每页数量范围为 1-" + MAX_PAGE_SIZE
+                    + "，单次最多查询 " + MAX_PAGE_RECORDS + " 条");
+        }
     }
 
     private void verificationWhitelist(String originUrl) {

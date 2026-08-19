@@ -32,46 +32,72 @@ import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
+import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.service.RecycleBinService;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
-import com.xhy.shortlink.framework.starter.common.toolkit.BeanUtil;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
 import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
-import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkConstant.HTTP_PROTOCOL;
+
 
 /**
  * 回收站服务实现
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RecycleBinServiceImpl implements RecycleBinService {
+
+    private static final long MAX_PAGE_SIZE = 100;
+    private static final long MAX_PAGE_CURRENT = 10_000;
+    private static final long MAX_PAGE_RECORDS = 10_000;
 
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
     private final ShortLinkCoreService shortLinkCoreService;
+    private final ShortLinkColdDataService shortLinkColdDataService;
     private final StringRedisTemplate stringRedisTemplate;
 
+    @Autowired(required = false)
+    private ShortLinkCacheHelper cacheHelper;
+
+    @Autowired(required = false)
+    private ShortLinkCacheProducer cacheProducer;
+
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void recycleBinSave(ShortLinkRecycleBinSaveReqDTO requestParam) {
         LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, requestParam.getGid())
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                 .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getCode());
-        shortLinkMapper.update(ShortLinkDO.builder().enableStatus(LinkEnableStatusEnum.NOT_ENABLED.getCode()).build(), updateWrapper);
-        stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+        int updated = shortLinkMapper.update(ShortLinkDO.builder().enableStatus(LinkEnableStatusEnum.NOT_ENABLED.getCode()).build(), updateWrapper);
+        if (updated == 0) {
+            shortLinkColdMapper.update(ShortLinkColdDO.builder()
+                    .enableStatus(LinkEnableStatusEnum.NOT_ENABLED.getCode()).build(),
+                    Wrappers.lambdaUpdate(ShortLinkColdDO.class)
+                            .eq(ShortLinkColdDO::getGid, requestParam.getGid())
+                            .eq(ShortLinkColdDO::getFullShortUrl, requestParam.getFullShortUrl())
+                            .eq(ShortLinkColdDO::getEnableStatus, LinkEnableStatusEnum.ENABLE.getCode()));
+        }
+        clearCache(requestParam.getFullShortUrl());
     }
 
     @Override
     public IPage<ShortLinkPageRespDTO> pageShortlink(ShortLinkRecycleBinPageReqDTO requestParam) {
+        validatePage(requestParam);
         long current = requestParam.getCurrent();
         long size = requestParam.getSize();
         long need = current * size;
@@ -94,21 +120,11 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         applyColdOrder(coldWrapper, requestParam.getOrderTag());
         Page<ShortLinkColdDO> coldPage = shortLinkColdMapper.selectPage(new Page<>(1, need), coldWrapper);
 
-        List<ShortLinkPageRespDTO> merged = new ArrayList<>();
-        hotPage.getRecords().forEach(each -> {
-            ShortLinkPageRespDTO dto = BeanUtil.convert(each, ShortLinkPageRespDTO.class);
-            dto.setDomain(HTTP_PROTOCOL + each.getDomain());
-            shortLinkCoreService.fillTodayStats(dto);
-            merged.add(dto);
-        });
-        coldPage.getRecords().forEach(each -> {
-            ShortLinkPageRespDTO dto = BeanUtil.convert(each, ShortLinkPageRespDTO.class);
-            dto.setDomain(HTTP_PROTOCOL + each.getDomain());
-            shortLinkCoreService.fillTodayStats(dto);
-            merged.add(dto);
-        });
-
-        merged.sort(buildComparator(requestParam.getOrderTag()));
+        List<ShortLinkPageRespDTO> merged = shortLinkColdDataService.mergeSorted(
+                hotPage.getRecords(),
+                coldPage.getRecords(),
+                requestParam.getOrderTag(),
+                shortLinkCoreService::fillTodayStats);
         int fromIndex = (int) ((current - 1) * size);
         int toIndex = (int) Math.min(fromIndex + size, merged.size());
         List<ShortLinkPageRespDTO> pageRecords = fromIndex >= merged.size()
@@ -121,6 +137,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void recoverShortlink(ShortLinkRecycleBinRecoverReqDTO requestParam) {
         if (requestParam.getEnableStatus() == LinkEnableStatusEnum.BANNED.getCode()) {
             throw new ClientException("短链接被封禁，无法恢复，请联系客服解封后重试");
@@ -129,11 +146,20 @@ public class RecycleBinServiceImpl implements RecycleBinService {
                 .eq(ShortLinkDO::getGid, requestParam.getGid())
                 .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
                 .eq(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.NOT_ENABLED.getCode());
-        shortLinkMapper.update(ShortLinkDO.builder().enableStatus(LinkEnableStatusEnum.ENABLE.getCode()).build(), updateWrapper);
-        stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl()));
+        int updated = shortLinkMapper.update(ShortLinkDO.builder().enableStatus(LinkEnableStatusEnum.ENABLE.getCode()).build(), updateWrapper);
+        if (updated == 0) {
+            shortLinkColdMapper.update(ShortLinkColdDO.builder()
+                    .enableStatus(LinkEnableStatusEnum.ENABLE.getCode()).build(),
+                    Wrappers.lambdaUpdate(ShortLinkColdDO.class)
+                            .eq(ShortLinkColdDO::getGid, requestParam.getGid())
+                            .eq(ShortLinkColdDO::getFullShortUrl, requestParam.getFullShortUrl())
+                            .eq(ShortLinkColdDO::getEnableStatus, LinkEnableStatusEnum.NOT_ENABLED.getCode()));
+        }
+        clearCache(requestParam.getFullShortUrl());
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void removeShortlink(ShortLinkRecycleBinRemoveReqDTO requestParam) {
         LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
                 .eq(ShortLinkDO::getGid, requestParam.getGid())
@@ -141,31 +167,63 @@ public class RecycleBinServiceImpl implements RecycleBinService {
                 .in(ShortLinkDO::getEnableStatus,
                         LinkEnableStatusEnum.NOT_ENABLED.getCode(),
                         LinkEnableStatusEnum.BANNED.getCode());
-        shortLinkMapper.delete(queryWrapper);
+        int deleted = shortLinkMapper.delete(queryWrapper);
+        if (deleted == 0) {
+            shortLinkColdMapper.delete(Wrappers.lambdaQuery(ShortLinkColdDO.class)
+                    .eq(ShortLinkColdDO::getGid, requestParam.getGid())
+                    .eq(ShortLinkColdDO::getFullShortUrl, requestParam.getFullShortUrl())
+                    .in(ShortLinkColdDO::getEnableStatus,
+                            LinkEnableStatusEnum.NOT_ENABLED.getCode(),
+                            LinkEnableStatusEnum.BANNED.getCode()));
+        }
+        clearCache(requestParam.getFullShortUrl());
     }
 
     private void applyColdOrder(LambdaQueryWrapper<ShortLinkColdDO> wrapper, String orderTag) {
         if ("totalPv".equals(orderTag)) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalPv);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalPv).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else if ("totalUv".equals(orderTag)) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalUv);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUv).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else if ("totalUip".equals(orderTag)) {
-            wrapper.orderByDesc(ShortLinkColdDO::getTotalUip);
+            wrapper.orderByDesc(ShortLinkColdDO::getTotalUip).orderByDesc(ShortLinkColdDO::getCreateTime);
         } else {
             wrapper.orderByDesc(ShortLinkColdDO::getCreateTime);
         }
     }
 
-    private Comparator<ShortLinkPageRespDTO> buildComparator(String orderTag) {
-        if ("totalPv".equals(orderTag)) {
-            return Comparator.comparing((ShortLinkPageRespDTO d) -> d.getTotalPv() == null ? 0 : d.getTotalPv()).reversed();
+    private void clearCache(String fullShortUrl) {
+        // 逐个删除以兼容不同 RedisTemplate 实现，并确保一个 key 的异常不跳过另一个。
+        for (String key : List.of(
+                String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
+                String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl))) {
+            try {
+                stringRedisTemplate.delete(key);
+            } catch (Exception e) {
+                log.warn("[回收站] 清理 Redis 缓存失败，key={}", key, e);
+            }
         }
-        if ("totalUv".equals(orderTag)) {
-            return Comparator.comparing((ShortLinkPageRespDTO d) -> d.getTotalUv() == null ? 0 : d.getTotalUv()).reversed();
+        if (cacheHelper != null) {
+            cacheHelper.evictLocalCache(fullShortUrl);
         }
-        if ("totalUip".equals(orderTag)) {
-            return Comparator.comparing((ShortLinkPageRespDTO d) -> d.getTotalUip() == null ? 0 : d.getTotalUip()).reversed();
+        if (cacheProducer != null) {
+            try {
+                cacheProducer.sendMessage(fullShortUrl);
+            } catch (Exception e) {
+                // 本地缓存已经清理，后续请求仍可回源重建；记录异常便于定位广播链路故障。
+                log.warn("[回收站] 广播缓存失效消息失败，fullShortUrl={}", fullShortUrl, e);
+            }
         }
-        return Comparator.comparing(ShortLinkPageRespDTO::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder()));
     }
+
+    private void validatePage(ShortLinkRecycleBinPageReqDTO requestParam) {
+        if (requestParam == null || requestParam.getCurrent() < 1
+                || requestParam.getCurrent() > MAX_PAGE_CURRENT
+                || requestParam.getSize() < 1 || requestParam.getSize() > MAX_PAGE_SIZE
+                || requestParam.getCurrent() * requestParam.getSize() > MAX_PAGE_RECORDS) {
+            throw new ClientException("分页参数无效：页码范围为 1-" + MAX_PAGE_CURRENT
+                    + "，每页数量范围为 1-" + MAX_PAGE_SIZE
+                    + "，单次最多查询 " + MAX_PAGE_RECORDS + " 条");
+        }
+    }
+
 }

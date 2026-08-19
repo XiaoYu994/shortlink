@@ -19,15 +19,15 @@ package com.xhy.shortlink.biz.projectservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xhy.shortlink.biz.api.project.dto.req.ShortLinkUpdateReqDTO;
-import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkService;
 import com.xhy.shortlink.biz.projectservice.service.UrlTitleService;
-import com.xhy.shortlink.biz.projectservice.service.impl.ShortLinkRedirectServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -44,10 +44,7 @@ class ShortLinkControllerTest {
     private ShortLinkController shortLinkController;
 
     @Mock
-    private ShortLinkCoreService shortLinkCoreService;
-
-    @Mock
-    private ShortLinkRedirectServiceImpl shortLinkRedirectService;
+    private ShortLinkService shortLinkService;
 
     @Mock
     private UrlTitleService urlTitleService;
@@ -56,7 +53,9 @@ class ShortLinkControllerTest {
 
     @Test
     void updateShortLink_usesPut() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(shortLinkController).build();
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(shortLinkController)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter())
+                .build();
         ShortLinkUpdateReqDTO requestParam = new ShortLinkUpdateReqDTO();
         requestParam.setFullShortUrl("test.cn/abc");
         requestParam.setOriginUrl("https://example.com");
@@ -71,6 +70,6 @@ class ShortLinkControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
 
-        verify(shortLinkCoreService).updateShortLink(any(ShortLinkUpdateReqDTO.class));
+        verify(shortLinkService).updateShortLink(any(ShortLinkUpdateReqDTO.class));
     }
 }
