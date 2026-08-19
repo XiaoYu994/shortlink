@@ -45,3 +45,29 @@ groups:
         annotations:
           summary: "RocketMQ consume failures spiking"
           description: "{{ $labels.instance }} has more than 20 MQ consume failures in 10 minutes."
+
+      - alert: ColdMigrationFailureSpike
+        expr: increase(shortlink_cold_migration_failure_total[30m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cold data migration failures"
+          description: "{{ $labels.instance }} failed to migrate more than 10 cold-link records in 30 minutes."
+
+      - alert: ShortLinkCacheHitRateLow
+        expr: |
+          sum(increase(shortlink_cache_hit_total[10m]))
+            + sum(increase(shortlink_cache_miss_total[10m])) > 0
+          and
+          (
+            sum(increase(shortlink_cache_hit_total[10m]))
+            /
+            (sum(increase(shortlink_cache_hit_total[10m])) + sum(increase(shortlink_cache_miss_total[10m])))
+          ) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Short-link cache hit rate is low"
+          description: "Cache hit rate dropped below 50% in the last 10 minutes."

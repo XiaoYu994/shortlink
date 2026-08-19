@@ -59,4 +59,28 @@ class ShortLinkMetricsTest {
         double count = registry.get("shortlink_redirect_latency").timer().count();
         assertEquals(1.0, count, 0.0001);
     }
+
+    @Test
+    void shouldRecordCacheHitAndMiss() {
+        MeterRegistry registry = new SimpleMeterRegistry();
+        ShortLinkMetrics metrics = new ShortLinkMetrics(registry);
+
+        metrics.recordCacheHit();
+        metrics.recordCacheMiss();
+
+        assertEquals(1.0, registry.get("shortlink_cache_hit_total").counter().count(), 0.0001);
+        assertEquals(1.0, registry.get("shortlink_cache_miss_total").counter().count(), 0.0001);
+    }
+
+    @Test
+    void shouldRecordQueryLatencyAndColdMigrationFailure() {
+        MeterRegistry registry = new SimpleMeterRegistry();
+        ShortLinkMetrics metrics = new ShortLinkMetrics(registry);
+
+        metrics.recordQueryLatency(Duration.ofMillis(40));
+        metrics.recordColdMigrationFailure();
+
+        assertEquals(1.0, registry.get("shortlink_query_latency").timer().count(), 0.0001);
+        assertEquals(1.0, registry.get("shortlink_cold_migration_failure_total").counter().count(), 0.0001);
+    }
 }

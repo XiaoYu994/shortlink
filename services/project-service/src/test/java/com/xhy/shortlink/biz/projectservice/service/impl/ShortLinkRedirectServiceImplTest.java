@@ -18,7 +18,6 @@
 package com.xhy.shortlink.biz.projectservice.service.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkGoToColdDO;
@@ -29,6 +28,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkStatsProducer;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -84,7 +84,7 @@ class ShortLinkRedirectServiceImplTest {
     @SuppressWarnings("rawtypes")
     private Cache shortLinkCache;
     @Mock
-    private ColdDataProperties coldDataProperties;
+    private ShortLinkColdDataService shortLinkColdDataService;
     @Mock
     private ShortLinkMetrics shortLinkMetrics;
 
@@ -121,6 +121,8 @@ class ShortLinkRedirectServiceImplTest {
         verify(response).sendRedirect("https://www.example.com");
         verify(statsProducer).sendMessage(any());
         verify(shortLinkMetrics).recordRedirectSuccess(any(Duration.class));
+        verify(shortLinkMetrics).recordCacheHit();
+        verify(shortLinkMetrics, never()).recordCacheMiss();
     }
 
     @Test
@@ -226,6 +228,8 @@ class ShortLinkRedirectServiceImplTest {
 
         verify(cacheHelper).rebuildCache(eq(fullShortUrl), eq("https://www.target.com"), eq("g1"), isNull());
         verify(response).sendRedirect("https://www.target.com");
+        verify(shortLinkMetrics).recordCacheMiss();
+        verify(shortLinkMetrics, never()).recordCacheHit();
     }
 
     @Test
@@ -257,11 +261,6 @@ class ShortLinkRedirectServiceImplTest {
         coldDO.setEnableStatus(0);
         when(shortLinkColdMapper.selectOne(any())).thenReturn(coldDO);
 
-        ColdDataProperties.Rehot rehotConfig = new ColdDataProperties.Rehot();
-        rehotConfig.setThreshold(1000);
-        when(coldDataProperties.getRehot()).thenReturn(rehotConfig);
-        when(valueOps.increment(anyString())).thenReturn(1L);
-
         SetOperations<String, String> setOps = mock(SetOperations.class);
         when(stringRedisTemplate.opsForSet()).thenReturn(setOps);
         when(request.getCookies()).thenReturn(null);
@@ -271,7 +270,8 @@ class ShortLinkRedirectServiceImplTest {
 
         redirectService.redirect(shortUri, request, response);
 
-        verify(cacheHelper).rebuildCache(eq(fullShortUrl), eq("https://www.cold-target.com"), eq("g1"), isNull());
+        verify(cacheHelper).rebuildCache(eq(fullShortUrl), eq("https://www.cold-target.com"), eq("g1"), isNull(), eq(true));
+        verify(shortLinkColdDataService).tryRehot(fullShortUrl, "g1");
         verify(response).sendRedirect("https://www.cold-target.com");
     }
 

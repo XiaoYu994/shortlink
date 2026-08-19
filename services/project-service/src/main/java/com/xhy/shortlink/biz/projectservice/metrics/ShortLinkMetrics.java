@@ -33,8 +33,12 @@ public class ShortLinkMetrics {
     private final Counter redirectSuccessCounter;
     private final Counter redirectFailureCounter;
     private final Counter coldMigrationBatchCounter;
+    private final Counter coldMigrationFailureCounter;
+    private final Counter cacheHitCounter;
+    private final Counter cacheMissCounter;
     private final DistributionSummary coldMigrationItemSummary;
     private final Timer redirectLatencyTimer;
+    private final Timer queryLatencyTimer;
 
     public ShortLinkMetrics(MeterRegistry meterRegistry) {
         this.createSuccessCounter = Counter.builder("shortlink_create_success_total")
@@ -52,11 +56,24 @@ public class ShortLinkMetrics {
         this.coldMigrationBatchCounter = Counter.builder("shortlink_cold_migration_batch_total")
                 .description("Total cold migration batches")
                 .register(meterRegistry);
+        this.coldMigrationFailureCounter = Counter.builder("shortlink_cold_migration_failure_total")
+                .description("Total failed cold migration records")
+                .register(meterRegistry);
+        this.cacheHitCounter = Counter.builder("shortlink_cache_hit_total")
+                .description("Total short-link cache hits")
+                .register(meterRegistry);
+        this.cacheMissCounter = Counter.builder("shortlink_cache_miss_total")
+                .description("Total short-link cache misses")
+                .register(meterRegistry);
         this.coldMigrationItemSummary = DistributionSummary.builder("shortlink_cold_migration_items")
                 .description("Number of migrated items in each cold migration batch")
                 .register(meterRegistry);
         this.redirectLatencyTimer = Timer.builder("shortlink_redirect_latency")
                 .description("Redirect latency")
+                .publishPercentileHistogram()
+                .register(meterRegistry);
+        this.queryLatencyTimer = Timer.builder("shortlink_query_latency")
+                .description("Short-link page query latency")
                 .publishPercentileHistogram()
                 .register(meterRegistry);
     }
@@ -82,5 +99,21 @@ public class ShortLinkMetrics {
     public void recordColdMigrationBatch(int size) {
         coldMigrationBatchCounter.increment();
         coldMigrationItemSummary.record(size);
+    }
+
+    public void recordColdMigrationFailure() {
+        coldMigrationFailureCounter.increment();
+    }
+
+    public void recordCacheHit() {
+        cacheHitCounter.increment();
+    }
+
+    public void recordCacheMiss() {
+        cacheMissCounter.increment();
+    }
+
+    public void recordQueryLatency(Duration duration) {
+        queryLatencyTimer.record(duration);
     }
 }

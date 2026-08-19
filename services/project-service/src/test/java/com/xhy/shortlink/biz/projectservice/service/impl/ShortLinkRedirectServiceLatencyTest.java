@@ -18,7 +18,7 @@
 package com.xhy.shortlink.biz.projectservice.service.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
@@ -36,6 +36,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -51,6 +53,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ShortLinkRedirectServiceLatencyTest {
 
     @InjectMocks
@@ -76,7 +79,7 @@ class ShortLinkRedirectServiceLatencyTest {
     @SuppressWarnings("rawtypes")
     private Cache shortLinkCache;
     @Mock
-    private ColdDataProperties coldDataProperties;
+    private ShortLinkColdDataService shortLinkColdDataService;
     @Mock
     private ShortLinkMetrics shortLinkMetrics;
     @Mock

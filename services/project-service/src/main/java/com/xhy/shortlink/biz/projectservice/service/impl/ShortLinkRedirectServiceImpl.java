@@ -17,12 +17,10 @@
 
 package com.xhy.shortlink.biz.projectservice.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.lang.UUID;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.benmanes.caffeine.cache.Cache;
-import com.xhy.shortlink.biz.projectservice.config.ColdDataProperties;
 import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkColdDO;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
@@ -34,6 +32,7 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
+import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkStatsRecordEvent;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkStatsProducer;
 import com.xhy.shortlink.biz.projectservice.toolkit.LinkUtil;
@@ -49,11 +48,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Date;
@@ -73,16 +73,22 @@ import static com.xhy.shortlink.biz.projectservice.common.constant.ShortLinkCons
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@EnableConfigurationProperties(ColdDataProperties.class)
 public class ShortLinkRedirectServiceImpl {
 
     /** 永久有效链接的缓存时间戳标记 */
     private static final long PERMANENT_VALID_TIMESTAMP = -1;
     /** 缓存值最少字段数（validTimeStamp|originUrl|gid） */
     private static final int CACHE_VALUE_MIN_PARTS = 3;
-    /** 回温计数器过期天数 */
-    private static final int REHOT_COUNTER_EXPIRE_DAYS = 7;
-
+    /** 带 URL 编码字段的缓存格式版本。 */
+    private static final String CACHE_FORMAT_VERSION = "2";
+    private static final int CACHE_SPLIT_LIMIT = -1;
+    private static final int VERSIONED_CACHE_PARTS = 5;
+    private static final int LEGACY_CACHE_MAX_PARTS = 4;
+    private static final int VERSIONED_COLD_FLAG_INDEX = 4;
+    private static final int LEGACY_COLD_FLAG_INDEX = 3;
+    private static final int CACHE_ORIGIN_URL_INDEX = 2;
+    private static final int CACHE_GROUP_ID_INDEX = 3;
+    private static final String COLD_CACHE_FLAG = "1";
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final ShortLinkMapper shortLinkMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
@@ -92,7 +98,7 @@ public class ShortLinkRedirectServiceImpl {
     private final ShortLinkStatsProducer statsProducer;
     private final ShortLinkCacheHelper cacheHelper;
     private final Cache<String, String> shortLinkCache;
-    private final ColdDataProperties coldDataProperties;
+    private final ShortLinkColdDataService shortLinkColdDataService;
     private final ShortLinkMetrics shortLinkMetrics;
 
     @Value("${short-link.domain.default}")
@@ -106,8 +112,9 @@ public class ShortLinkRedirectServiceImpl {
         long startNanos = System.nanoTime();
         String fullShortUrl = defaultDomain + "/" + shortUri;
         // 1. 优先从 L1 Caffeine / L2 Redis 读取缓存
-        ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl);
+        ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl, true);
         if (cacheObj != null) {
+            tryRehotIfCold(fullShortUrl, cacheObj);
             executeRedirect(fullShortUrl, cacheObj, request, response, startNanos);
             return;
         }
@@ -123,28 +130,40 @@ public class ShortLinkRedirectServiceImpl {
 
     /**
      * 多级缓存读取：L1 Caffeine → L2 Redis，命中后解析并校验有效期
+     *
+     * @param recordMetrics 仅首次查找记账，锁内 double-check 不再重复打点
      */
-    private ShortLinkCacheObj getFromCache(String fullShortUrl) {
+    private ShortLinkCacheObj getFromCache(String fullShortUrl, boolean recordMetrics) {
         String key = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
-        // L1 本地缓存查询
         String composite = shortLinkCache.getIfPresent(key);
         if (CharSequenceUtil.isBlank(composite)) {
-            // L1 未命中，降级到 L2 Redis
             composite = stringRedisTemplate.opsForValue().get(key);
             if (CharSequenceUtil.isBlank(composite)) {
+                recordCacheLookup(recordMetrics, false);
                 return null;
             }
-            // 回填 L1 缓存
             shortLinkCache.put(key, composite);
         }
-        // 解析缓存值（格式：validTimeStamp|originUrl|gid），校验有效期
         ShortLinkCacheObj cacheObj = parseCache(composite, key);
         if (cacheObj == null) {
-            // 解析失败或已过期，清除两级缓存中的脏数据
             shortLinkCache.invalidate(key);
             stringRedisTemplate.delete(key);
+            recordCacheLookup(recordMetrics, false);
+            return null;
         }
+        recordCacheLookup(recordMetrics, true);
         return cacheObj;
+    }
+
+    private void recordCacheLookup(boolean recordMetrics, boolean hit) {
+        if (!recordMetrics) {
+            return;
+        }
+        if (hit) {
+            shortLinkMetrics.recordCacheHit();
+        } else {
+            shortLinkMetrics.recordCacheMiss();
+        }
     }
 
     /**
@@ -167,8 +186,9 @@ public class ShortLinkRedirectServiceImpl {
         lock.lock();
         try {
             // Double-Check：获锁后再查一次缓存，可能已被其他线程重建
-            ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl);
+            ShortLinkCacheObj cacheObj = getFromCache(fullShortUrl, false);
             if (cacheObj != null) {
+                tryRehotIfCold(fullShortUrl, cacheObj);
                 executeRedirect(fullShortUrl, cacheObj, request, response, startNanos);
                 return;
             }
@@ -180,11 +200,15 @@ public class ShortLinkRedirectServiceImpl {
             // 回源 DB 查询（热表 → 冷表）
             ShortLinkCacheObj dbObj = loadFromDb(fullShortUrl);
             if (dbObj != null) {
-                cacheHelper.rebuildCache(fullShortUrl, dbObj.getOriginUrl(), dbObj.getGid(), dbObj.getValidDate());
-                // 冷表命中时累加回温计数，达到阈值则迁回热表
                 if (dbObj.isFromCold()) {
-                    tryRehot(fullShortUrl, dbObj.getGid());
+                    cacheHelper.rebuildCache(fullShortUrl, dbObj.getOriginUrl(), dbObj.getGid(),
+                            dbObj.getValidDate(), true);
+                } else {
+                    // 保留热库回源的旧调用路径，避免无意义地改变缓存值格式。
+                    cacheHelper.rebuildCache(fullShortUrl, dbObj.getOriginUrl(), dbObj.getGid(),
+                            dbObj.getValidDate());
                 }
+                tryRehotIfCold(fullShortUrl, dbObj);
                 executeRedirect(fullShortUrl, dbObj, request, response, startNanos);
             } else {
                 // DB 也不存在，写入空值缓存防止后续穿透
@@ -255,72 +279,60 @@ public class ShortLinkRedirectServiceImpl {
         return validDate == null || validDate.after(new Date());
     }
 
-    /** 冷链接回温：累加访问计数，达到阈值时迁回热表 */
-    private void tryRehot(String fullShortUrl, String gid) {
-        try {
-            String key = String.format(SHORT_LINK_COLD_REHOT_KEY, fullShortUrl);
-            Long count = stringRedisTemplate.opsForValue().increment(key);
-            if (count != null && count == 1) {
-                stringRedisTemplate.expire(key, REHOT_COUNTER_EXPIRE_DAYS, TimeUnit.DAYS);
-            }
-            if (count != null && count >= coldDataProperties.getRehot().getThreshold()) {
-                rehotColdLink(fullShortUrl, gid);
-                stringRedisTemplate.delete(key);
-            }
-        } catch (Exception e) {
-            log.error("[回温] 失败，fullShortUrl={}", fullShortUrl, e);
-        }
-    }
-
-    /** 将冷表链接迁回热表 */
-    private void rehotColdLink(String fullShortUrl, String gid) {
-        ShortLinkColdDO coldDO = shortLinkColdMapper.selectOne(Wrappers.lambdaQuery(ShortLinkColdDO.class)
-                .eq(ShortLinkColdDO::getGid, gid)
-                .eq(ShortLinkColdDO::getFullShortUrl, fullShortUrl));
-        if (coldDO == null) {
-            return;
-        }
-        shortLinkMapper.insert(BeanUtil.toBean(coldDO, ShortLinkDO.class));
-        ShortLinkGoToColdDO goToCold = shortLinkGoToColdMapper.selectOne(Wrappers.lambdaQuery(ShortLinkGoToColdDO.class)
-                .eq(ShortLinkGoToColdDO::getFullShortUrl, fullShortUrl));
-        if (goToCold != null) {
-            shortLinkGoToMapper.insert(BeanUtil.toBean(goToCold, ShortLinkGoToDO.class));
-            shortLinkGoToColdMapper.delete(Wrappers.lambdaQuery(ShortLinkGoToColdDO.class)
-                    .eq(ShortLinkGoToColdDO::getFullShortUrl, fullShortUrl));
-        }
-        shortLinkColdMapper.delete(Wrappers.lambdaQuery(ShortLinkColdDO.class)
-                .eq(ShortLinkColdDO::getGid, gid)
-                .eq(ShortLinkColdDO::getFullShortUrl, fullShortUrl));
-        log.info("[回温] 完成，fullShortUrl={}", fullShortUrl);
-    }
-
     /**
      * 解析缓存值（格式：validTimeStamp|originUrl|gid），校验有效期并续期 Redis TTL
      */
     private ShortLinkCacheObj parseCache(String composite, String key) {
-        String[] split = composite.split("\\|");
-        if (split.length < CACHE_VALUE_MIN_PARTS) {
-            return null;
-        }
-        long validTime = Long.parseLong(split[0]);
-        String originalLink = split[1];
-        String gid = split[2];
-        if (validTime != PERMANENT_VALID_TIMESTAMP && System.currentTimeMillis() > validTime) {
+        try {
+            String[] split = composite.split("\\|", CACHE_SPLIT_LIMIT);
+            String originalLink;
+            String gid;
+            long validTime;
+            boolean fromCold;
+            if (split.length == VERSIONED_CACHE_PARTS && CACHE_FORMAT_VERSION.equals(split[0])) {
+                validTime = Long.parseLong(split[1]);
+                originalLink = URLDecoder.decode(split[CACHE_ORIGIN_URL_INDEX], StandardCharsets.UTF_8);
+                gid = URLDecoder.decode(split[CACHE_GROUP_ID_INDEX], StandardCharsets.UTF_8);
+                fromCold = COLD_CACHE_FLAG.equals(split[VERSIONED_COLD_FLAG_INDEX]);
+            } else {
+                if (split.length < CACHE_VALUE_MIN_PARTS || split.length > LEGACY_CACHE_MAX_PARTS) {
+                    return null;
+                }
+                validTime = Long.parseLong(split[0]);
+                originalLink = split[1];
+                gid = split[2];
+                fromCold = split.length == LEGACY_CACHE_MAX_PARTS
+                        && COLD_CACHE_FLAG.equals(split[LEGACY_COLD_FLAG_INDEX]);
+            }
+            if (validTime != PERMANENT_VALID_TIMESTAMP && System.currentTimeMillis() > validTime) {
+                stringRedisTemplate.delete(key);
+                return null;
+            }
+            long expireTime;
+            if (validTime == PERMANENT_VALID_TIMESTAMP) {
+                expireTime = TimeUnit.DAYS.toMillis(1);
+            } else {
+                long remainingTime = validTime - System.currentTimeMillis();
+                expireTime = Math.min(remainingTime, TimeUnit.DAYS.toMillis(1));
+            }
+            if (expireTime > 0) {
+                stringRedisTemplate.expire(key, expireTime, TimeUnit.MILLISECONDS);
+            }
+            Date validDate = validTime == PERMANENT_VALID_TIMESTAMP ? null : new Date(validTime);
+            return new ShortLinkCacheObj(originalLink, gid, validDate, fromCold);
+        } catch (IllegalArgumentException e) {
+            // Redis 中的残留/脏数据只能作为一次缓存未命中处理，不能阻断跳转请求。
+            log.warn("缓存值格式无效，key={}", key);
+            shortLinkCache.invalidate(key);
             stringRedisTemplate.delete(key);
             return null;
         }
-        long expireTime;
-        if (validTime == PERMANENT_VALID_TIMESTAMP) {
-            expireTime = TimeUnit.DAYS.toMillis(1);
-        } else {
-            long remainingTime = validTime - System.currentTimeMillis();
-            expireTime = Math.min(remainingTime, TimeUnit.DAYS.toMillis(1));
+    }
+
+    private void tryRehotIfCold(String fullShortUrl, ShortLinkCacheObj cacheObj) {
+        if (cacheObj.isFromCold()) {
+            shortLinkColdDataService.tryRehot(fullShortUrl, cacheObj.getGid());
         }
-        if (expireTime > 0) {
-            stringRedisTemplate.expire(key, expireTime, TimeUnit.MILLISECONDS);
-        }
-        Date validDate = validTime == PERMANENT_VALID_TIMESTAMP ? null : new Date(validTime);
-        return new ShortLinkCacheObj(originalLink, gid, validDate);
     }
 
     /**
