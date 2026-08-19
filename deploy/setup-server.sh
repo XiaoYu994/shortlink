@@ -172,8 +172,8 @@ deploy_app() {
   docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" up -d
 
   wait_for_port 127.0.0.1 80 120
-  wait_for_port 127.0.0.1 8000 120
-  wait_for_port 127.0.0.1 8003 120
+  wait_for_container_port shortlink-gateway 8000 120
+  wait_for_container_port shortlink-aggregation 8003 120
   ensure_container_running shortlink-gateway
   ensure_container_running shortlink-aggregation
   ensure_container_running shortlink-stats
@@ -182,7 +182,7 @@ deploy_app() {
 
   docker compose --env-file "${DOCKER_DIR}/.env" --project-name shortlink -f "${APP_COMPOSE_FILE}" ps
   echo "frontend: http://$(hostname -I | awk '{print $1}')/console/"
-  echo "gateway: http://$(hostname -I | awk '{print $1}'):8000"
+  echo "api: http://$(hostname -I | awk '{print $1}')/api/"
   echo "redirect base: http://$(hostname -I | awk '{print $1}')"
 }
 
