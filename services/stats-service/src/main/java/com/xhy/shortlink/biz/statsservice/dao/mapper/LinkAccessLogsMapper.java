@@ -21,7 +21,10 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessStatsDO;
-import com.xhy.shortlink.biz.api.stats.dto.req.*;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkUvTypeReqDTO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -146,40 +149,48 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
     /**
      * 根据用户列表查询单条短链接的访客类型（新/老访客）
      */
-    @Select("<script> " +
-            "SELECT tlal.user, " +
-            "CASE WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate} THEN '新访客' ELSE '老访客' END AS uvType " +
-            "FROM t_link tl " +
-            "INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "WHERE tlal.full_short_url = #{param.fullShortUrl} " +
-            "AND tl.gid = #{param.gid} " +
-            "AND tl.del_flag = '0' " +
-            "AND tl.enable_status = #{param.enableStatus} " +
-            "AND tlal.user IN " +
-            "<foreach item='item' index='index' collection='param.userAccessLogsList' open='(' separator=',' close=')'> " +
-            "#{item} " +
-            "</foreach> " +
-            "GROUP BY tlal.user" +
-            "</script>")
+    @Select("""
+            <script>
+            SELECT tlal.user,
+            CASE WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate}
+                 THEN '新访客' ELSE '老访客' END AS uvType
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url
+            WHERE tlal.full_short_url = #{param.fullShortUrl}
+              AND tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = #{param.enableStatus}
+              AND tlal.user IN
+            <foreach item='item' index='index' collection='param.userAccessLogsList' open='('
+                     separator=',' close=')'>
+            #{item}
+            </foreach>
+            GROUP BY tlal.user
+            </script>
+            """)
     List<Map<String, Object>> selectUvTypeByUser(@Param("param") ShortLinkUvTypeReqDTO requestParam);
 
     /**
      * 根据用户列表查询分组下的访客类型（新/老访客）
      */
-    @Select("<script> " +
-            "SELECT tlal.user, " +
-            "CASE WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate} THEN '新访客' ELSE '老访客' END AS uvType " +
-            "FROM t_link tl " +
-            "INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "WHERE tl.gid = #{param.gid} " +
-            "AND tl.del_flag = '0' " +
-            "AND tl.enable_status = #{param.enableStatus} " +
-            "AND tlal.user IN " +
-            "<foreach item='item' index='index' collection='param.userAccessLogsList' open='(' separator=',' close=')'> " +
-            "#{item} " +
-            "</foreach> " +
-            "GROUP BY tlal.user" +
-            "</script>")
+    @Select("""
+            <script>
+            SELECT tlal.user,
+            CASE WHEN MIN(tlal.create_time) BETWEEN #{param.startDate} AND #{param.endDate}
+                 THEN '新访客' ELSE '老访客' END AS uvType
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url
+            WHERE tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = #{param.enableStatus}
+              AND tlal.user IN
+            <foreach item='item' index='index' collection='param.userAccessLogsList' open='('
+                     separator=',' close=')'>
+            #{item}
+            </foreach>
+            GROUP BY tlal.user
+            </script>
+            """)
     List<Map<String, Object>> selectUvTypeByUserGruop(@Param("param") ShortLinkUvTypeReqDTO requestParam);
 
     /**

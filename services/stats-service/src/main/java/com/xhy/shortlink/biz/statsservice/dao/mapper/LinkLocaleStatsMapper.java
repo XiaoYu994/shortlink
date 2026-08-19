@@ -36,8 +36,11 @@ public interface LinkLocaleStatsMapper extends BaseMapper<LinkLocaleStatsDO> {
      * 新增或累加地区访问统计
      */
     @Insert("""
-            INSERT INTO t_link_locale_stats (full_short_url, date, cnt, country, province, city, adcode, create_time, update_time, del_flag)
-            VALUES (#{linkLocaleStats.fullShortUrl}, #{linkLocaleStats.date}, #{linkLocaleStats.cnt}, #{linkLocaleStats.country}, #{linkLocaleStats.province}, #{linkLocaleStats.city}, #{linkLocaleStats.adcode}, NOW(), NOW(), 0)
+            INSERT INTO t_link_locale_stats
+            (full_short_url, date, cnt, country, province, city, adcode, create_time, update_time, del_flag)
+            VALUES (#{linkLocaleStats.fullShortUrl}, #{linkLocaleStats.date}, #{linkLocaleStats.cnt},
+                    #{linkLocaleStats.country}, #{linkLocaleStats.province}, #{linkLocaleStats.city},
+                    #{linkLocaleStats.adcode}, NOW(), NOW(), 0)
             ON DUPLICATE KEY UPDATE cnt = cnt + VALUES(cnt), update_time = NOW()
             """)
     void shortLinkLocaleState(@Param("linkLocaleStats") LinkLocaleStatsDO linkLocaleStatsDO);

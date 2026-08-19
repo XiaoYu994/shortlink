@@ -24,8 +24,24 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.biz.statsservice.common.enums.OrderTagEnum;
-import com.xhy.shortlink.biz.statsservice.dao.entity.*;
-import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkBrowserStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkDeviceStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkLocaleStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkNetworkStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkOsStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.ShortLinkGoToDO;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessLogsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkBrowserStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkDeviceStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkLocaleStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkNetworkStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkOsStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkColdMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkGoToMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.statsservice.metrics.StatsMetrics;
 import com.xhy.shortlink.biz.statsservice.mq.event.ShortLinkStatsRecordEvent;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
@@ -62,6 +78,9 @@ import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConsta
 @RequiredArgsConstructor
 @RocketMQMessageListener(topic = STATS_RECORD_TOPIC, consumerGroup = STATS_RECORD_GROUP)
 public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkStatsRecordEvent> {
+
+    private static final long REDIS_KEY_NOT_EXISTS = -1L;
+    private static final int AMAP_REQUEST_TIMEOUT_MILLIS = 3000;
 
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
@@ -119,21 +138,21 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             String pvRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_PV.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().incrementScore(pvRankKey, fullShortUrl, 1);
-            if (stringRedisTemplate.getExpire(pvRankKey) == -1) {
+            if (stringRedisTemplate.getExpire(pvRankKey) == REDIS_KEY_NOT_EXISTS) {
                 stringRedisTemplate.expire(pvRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
 
             String todayUvHllKey = String.format(TODAY_UV_HLL_KEY, fullShortUrl, todayStr);
             Long uvAddedToday = stringRedisTemplate.opsForHyperLogLog()
                     .add(todayUvHllKey, statsRecord.getUv());
-            if (stringRedisTemplate.getExpire(todayUvHllKey) == -1) {
+            if (stringRedisTemplate.getExpire(todayUvHllKey) == REDIS_KEY_NOT_EXISTS) {
                 stringRedisTemplate.expire(todayUvHllKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
             long todayUvCount = stringRedisTemplate.opsForHyperLogLog().size(todayUvHllKey);
             String uvRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_UV.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().add(uvRankKey, fullShortUrl, todayUvCount);
-            if (stringRedisTemplate.getExpire(uvRankKey) == -1) {
+            if (stringRedisTemplate.getExpire(uvRankKey) == REDIS_KEY_NOT_EXISTS) {
                 stringRedisTemplate.expire(uvRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
 
@@ -144,14 +163,14 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
             String todayUipHllKey = String.format(TODAY_UIP_HLL_KEY, fullShortUrl, todayStr);
             Long uipAddedToday = stringRedisTemplate.opsForHyperLogLog()
                     .add(todayUipHllKey, statsRecord.getRemoteAddr());
-            if (stringRedisTemplate.getExpire(todayUipHllKey) == -1) {
+            if (stringRedisTemplate.getExpire(todayUipHllKey) == REDIS_KEY_NOT_EXISTS) {
                 stringRedisTemplate.expire(todayUipHllKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
             long todayUipCount = stringRedisTemplate.opsForHyperLogLog().size(todayUipHllKey);
             String uipRankKey = String.format(RANK_KEY,
                     OrderTagEnum.TODAY_UIP.getValue(), gid, todayStr);
             stringRedisTemplate.opsForZSet().add(uipRankKey, fullShortUrl, todayUipCount);
-            if (stringRedisTemplate.getExpire(uipRankKey) == -1) {
+            if (stringRedisTemplate.getExpire(uipRankKey) == REDIS_KEY_NOT_EXISTS) {
                 stringRedisTemplate.expire(uipRankKey, TODAY_EXPIRETIME, TimeUnit.HOURS);
             }
 
@@ -161,8 +180,8 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
 
             // 数据库统计
             saveStatsToDatabase(statsRecord, fullShortUrl, gid,
-                    uvAddedToday == 1, uipAddedToday == 1,
-                    uvAddedTotal == 1, uipAddedTotal == 1);
+                    new StatsDelta(uvAddedToday == 1, uipAddedToday == 1,
+                            uvAddedTotal == 1, uipAddedTotal == 1));
         } finally {
             rLock.unlock();
         }
@@ -170,8 +189,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
 
     private void saveStatsToDatabase(ShortLinkStatsRecordEvent statsRecord,
                                      String fullShortUrl, String gid,
-                                     boolean isTodayNewUv, boolean isTodayNewUip,
-                                     boolean isTotalNewUv, boolean isTotalNewUip) {
+                                     StatsDelta delta) {
         Date currentDate = statsRecord.getCurrentDate();
         int hour = DateUtil.hour(currentDate, true);
         int weekday = DateUtil.dayOfWeekEnum(currentDate).getIso8601Value();
@@ -185,7 +203,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         localeParamMap.put("key", statsLocaleAmapKey);
         localeParamMap.put("ip", remoteAddr);
         try {
-            String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap, 3000);
+            String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap, AMAP_REQUEST_TIMEOUT_MILLIS);
             JSONObject localeResultObj = JSON.parseObject(localeResultStr);
             if (AMAP_SUCCESS_CODE.equals(localeResultObj.getString("infocode"))) {
                 String province = localeResultObj.getString("province");
@@ -242,15 +260,20 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 LinkAccessStatsDO.builder()
                         .fullShortUrl(fullShortUrl).date(currentDate)
                         .hour(hour).weekday(weekday)
-                        .pv(1).uv(isTodayNewUv ? 1 : 0).uip(isTodayNewUip ? 1 : 0)
+                        .pv(1).uv(delta.todayNewUv() ? 1 : 0).uip(delta.todayNewUip() ? 1 : 0)
                         .build()));
 
         // 主表/冷表总数自增
         int affected = shortLinkMapper.incrementStats(gid, fullShortUrl,
-                1, isTotalNewUv ? 1 : 0, isTotalNewUip ? 1 : 0);
+                1, delta.totalNewUv() ? 1 : 0, delta.totalNewUip() ? 1 : 0);
         if (affected == 0) {
             shortLinkColdMapper.incrementStats(gid, fullShortUrl,
-                    1, isTotalNewUv ? 1 : 0, isTotalNewUip ? 1 : 0);
+                    1, delta.totalNewUv() ? 1 : 0, delta.totalNewUip() ? 1 : 0);
         }
+    }
+
+    /** 数据库统计需要的 UV/UIP 增量标记。 */
+    private record StatsDelta(boolean todayNewUv, boolean todayNewUip,
+                              boolean totalNewUv, boolean totalNewUip) {
     }
 }

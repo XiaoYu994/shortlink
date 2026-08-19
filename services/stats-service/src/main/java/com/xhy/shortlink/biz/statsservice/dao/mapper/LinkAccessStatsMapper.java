@@ -35,20 +35,22 @@ public interface LinkAccessStatsMapper extends BaseMapper<LinkAccessStatsDO> {
     /**
      * 批量新增或累加访问统计（PV/UV/UIP）
      */
-    @Insert("<script>" +
-            "INSERT INTO t_link_access_stats " +
-            "(full_short_url, date, pv, uv, uip, hour, weekday, create_time, update_time, del_flag) " +
-            "VALUES " +
-            "<foreach collection='list' item='item' separator=','> " +
-            "(#{item.fullShortUrl}, #{item.date}, #{item.pv}, #{item.uv}, #{item.uip}, " +
-            "#{item.hour}, #{item.weekday}, NOW(), NOW(), 0) " +
-            "</foreach> " +
-            "ON DUPLICATE KEY UPDATE " +
-            "pv = pv + VALUES(pv), " +
-            "uv = uv + VALUES(uv), " +
-            "uip = uip + VALUES(uip), " +
-            "update_time = NOW()" +
-            "</script>")
+    @Insert("""
+            <script>
+            INSERT INTO t_link_access_stats
+            (full_short_url, date, pv, uv, uip, hour, weekday, create_time, update_time, del_flag)
+            VALUES
+            <foreach collection='list' item='item' separator=','>
+            (#{item.fullShortUrl}, #{item.date}, #{item.pv}, #{item.uv}, #{item.uip},
+             #{item.hour}, #{item.weekday}, NOW(), NOW(), 0)
+            </foreach>
+            ON DUPLICATE KEY UPDATE
+            pv = pv + VALUES(pv),
+            uv = uv + VALUES(uv),
+            uip = uip + VALUES(uip),
+            update_time = NOW()
+            </script>
+            """)
     void shortLinkStats(@Param("list") List<LinkAccessStatsDO> list);
 
     /**

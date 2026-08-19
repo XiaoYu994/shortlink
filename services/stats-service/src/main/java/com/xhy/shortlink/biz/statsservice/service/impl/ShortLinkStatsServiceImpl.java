@@ -23,10 +23,35 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.xhy.shortlink.biz.statsservice.dao.entity.*;
-import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
-import com.xhy.shortlink.biz.api.stats.dto.req.*;
-import com.xhy.shortlink.biz.api.stats.dto.resp.*;
+import com.xhy.shortlink.biz.statsservice.dao.entity.GroupDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkDeviceStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkLocaleStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkNetworkStatsDO;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessLogsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkBrowserStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkDeviceStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkGroupMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkLocaleStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkNetworkStatsMapper;
+import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkOsStatsMapper;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkUvTypeReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsAccessDailyRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsAccessRecordRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsBrowserRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsDeviceRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsLocaleCNRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsNetworkRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsOsRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsTopIpRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsUvRespDTO;
 import com.xhy.shortlink.biz.statsservice.service.ShortLinkStatsService;
 
 import static com.xhy.shortlink.biz.statsservice.common.constant.StatsColumnConstant.*;
@@ -35,7 +60,12 @@ import com.xhy.shortlink.framework.starter.user.core.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +76,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
+
+    private static final int PERCENTAGE_SCALE = 100;
+    private static final double PERCENTAGE_MULTIPLIER = 100.0;
+    private static final int HOURS_PER_DAY = 24;
+    private static final int DAYS_PER_WEEK = 7;
 
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
@@ -70,7 +105,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         int localCntSum = localeList.stream().mapToInt(LinkLocaleStatsDO::getCnt).sum();
         localeList.forEach(each -> localeCnStats.add(ShortLinkStatsLocaleCNRespDTO.builder()
                 .cnt(each.getCnt()).locale(each.getProvince())
-                .ratio(Math.round(each.getCnt() * 1.0 / localCntSum * 100) / 100.0).build()));
+                .ratio(Math.round(each.getCnt() * 1.0 / localCntSum * PERCENTAGE_SCALE)
+                        / PERCENTAGE_MULTIPLIER).build()));
         // 小时统计
         List<Integer> hourStats = buildHourStats(linkAccessStatsMapper.listHourStatsByShortLink(requestParam));
         // 高频IP
@@ -110,7 +146,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         int localCntSum = localeList.stream().mapToInt(LinkLocaleStatsDO::getCnt).sum();
         localeList.forEach(each -> localeCnStats.add(ShortLinkStatsLocaleCNRespDTO.builder()
                 .cnt(each.getCnt()).locale(each.getProvince())
-                .ratio(Math.round(each.getCnt() * 1.0 / localCntSum * 100) / 100.0).build()));
+                .ratio(Math.round(each.getCnt() * 1.0 / localCntSum * PERCENTAGE_SCALE)
+                        / PERCENTAGE_MULTIPLIER).build()));
         List<Integer> hourStats = buildHourStats(linkAccessStatsMapper.listHourStatsByShortLinkGroup(requestParam));
         List<ShortLinkStatsTopIpRespDTO> topIpStats = buildTopIpStats(linkAccessLogsMapper.listTopIpByShortLinkGroup(requestParam));
         List<Integer> weekdayStats = buildWeekdayStats(linkAccessStatsMapper.listWeekdayStatsByShortLinkGroup(requestParam));
@@ -214,7 +251,9 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .collect(Collectors.groupingBy(LinkAccessStatsDO::getHour,
                         Collectors.summingInt(LinkAccessStatsDO::getPv)));
         List<Integer> result = new ArrayList<>();
-        for (int h = 0; h < 24; h++) result.add(hourMap.getOrDefault(h, 0));
+        for (int h = 0; h < HOURS_PER_DAY; h++) {
+            result.add(hourMap.getOrDefault(h, 0));
+        }
         return result;
     }
 
@@ -226,7 +265,9 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .collect(Collectors.groupingBy(LinkAccessStatsDO::getWeekday,
                         Collectors.summingInt(LinkAccessStatsDO::getPv)));
         List<Integer> result = new ArrayList<>();
-        for (int i = 1; i < 8; i++) result.add(weekdayMap.getOrDefault(i, 0));
+        for (int i = 1; i <= DAYS_PER_WEEK; i++) {
+            result.add(weekdayMap.getOrDefault(i, 0));
+        }
         return result;
     }
 
@@ -248,7 +289,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
             int cnt = Integer.parseInt(each.get(COL_COUNT).toString());
             return ShortLinkStatsBrowserRespDTO.builder()
                     .cnt(cnt).browser(each.get(COL_BROWSER).toString())
-                    .ratio(Math.round((double) cnt / sum * 100.0) / 100.0).build();
+                    .ratio(Math.round((double) cnt / sum * PERCENTAGE_MULTIPLIER)
+                            / PERCENTAGE_MULTIPLIER).build();
         }).toList();
     }
 
@@ -261,7 +303,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
             int cnt = Integer.parseInt(each.get(COL_COUNT).toString());
             return ShortLinkStatsOsRespDTO.builder()
                     .cnt(cnt).os(each.get(COL_OS).toString())
-                    .ratio(Math.round((double) cnt / sum * 100.0) / 100.0).build();
+                    .ratio(Math.round((double) cnt / sum * PERCENTAGE_MULTIPLIER)
+                            / PERCENTAGE_MULTIPLIER).build();
         }).toList();
     }
 
@@ -274,9 +317,11 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         int total = oldCnt + newCnt;
         return List.of(
                 ShortLinkStatsUvRespDTO.builder().uvType(UV_TYPE_NEW).cnt(newCnt)
-                        .ratio(Math.round((double) newCnt / total * 100.0) / 100.0).build(),
+                        .ratio(Math.round((double) newCnt / total * PERCENTAGE_MULTIPLIER)
+                                / PERCENTAGE_MULTIPLIER).build(),
                 ShortLinkStatsUvRespDTO.builder().uvType(UV_TYPE_OLD).cnt(oldCnt)
-                        .ratio(Math.round((double) oldCnt / total * 100.0) / 100.0).build());
+                        .ratio(Math.round((double) oldCnt / total * PERCENTAGE_MULTIPLIER)
+                                / PERCENTAGE_MULTIPLIER).build());
     }
 
     /**
@@ -286,7 +331,8 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         int sum = data.stream().mapToInt(LinkDeviceStatsDO::getCnt).sum();
         return data.stream().map(each -> ShortLinkStatsDeviceRespDTO.builder()
                 .cnt(each.getCnt()).device(each.getDevice())
-                .ratio(Math.round((double) each.getCnt() / sum * 100.0) / 100.0).build()).toList();
+                .ratio(Math.round((double) each.getCnt() / sum * PERCENTAGE_MULTIPLIER)
+                        / PERCENTAGE_MULTIPLIER).build()).toList();
     }
 
     /**
@@ -296,6 +342,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         int sum = data.stream().mapToInt(LinkNetworkStatsDO::getCnt).sum();
         return data.stream().map(each -> ShortLinkStatsNetworkRespDTO.builder()
                 .cnt(each.getCnt()).network(each.getNetwork())
-                .ratio(Math.round((double) each.getCnt() / sum * 100.0) / 100.0).build()).toList();
+                .ratio(Math.round((double) each.getCnt() / sum * PERCENTAGE_MULTIPLIER)
+                        / PERCENTAGE_MULTIPLIER).build()).toList();
     }
 }
