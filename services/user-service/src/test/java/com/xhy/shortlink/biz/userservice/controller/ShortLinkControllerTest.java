@@ -27,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -50,7 +51,9 @@ class ShortLinkControllerTest {
 
     @Test
     void updateShortLink_usesPut() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(shortLinkController).build();
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(shortLinkController)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter())
+                .build();
         when(shortLinkRemoteService.updateShortLink(any())).thenReturn(new Result<Void>().setCode("0"));
 
         ShortLinkUpdateReqDTO requestParam = new ShortLinkUpdateReqDTO();
