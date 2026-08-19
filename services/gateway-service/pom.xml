@@ -13,6 +13,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.xhy.shortlink</groupId>
+            <artifactId>shortlink-cache-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway</artifactId>
         </dependency>
