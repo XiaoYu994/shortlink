@@ -23,10 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
@@ -44,49 +48,67 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     @Value("${short-link.risk-control.jsoup-timeout:3000}")
     private int jsoupTimeout;
 
+    @Value("${spring.ai.dashscope.api-key:}")
+    private String dashscopeApiKey;
+
     private static final int MAX_ANALYSIS_CHARS = 2000;
+    private static final int MAX_REDIRECTS = 4;
+    private static final int HTTP_REDIRECT_MIN_STATUS = 300;
+    private static final int HTTP_REDIRECT_MAX_STATUS = 400;
+    private static final int HTTP_ERROR_STATUS = 400;
 
-    public UrlRiskControlServiceImpl(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder
-                .defaultSystem("""
-                        你是一个资深网络安全专家（Cybersecurity Analyst）。
-                        你的核心任务是根据用户提供的【URL特征】和【网页内容摘要】，判断该链接是否存在安全风险。
+    public UrlRiskControlServiceImpl(@Autowired(required = false) ChatClient.Builder chatClientBuilder) {
+        if (chatClientBuilder == null) {
+            this.chatClient = null;
+        } else {
+            this.chatClient = chatClientBuilder
+                    .defaultSystem("""
+                            你是一个资深网络安全专家（Cybersecurity Analyst）。
+                            你的核心任务是根据用户提供的【URL特征】和【网页内容摘要】，判断该链接是否存在安全风险。
 
-                        如果发现风险，请严格按照以下分类进行归类 (riskType)：
-                        1. PHISHING (网络钓鱼)：伪造银行、支付、社交账号登录页。
-                        2. GAMBLING (非法赌博)：涉及真钱博彩、在线赌场、六合彩。
-                        3. PORN (色情低俗)：包含露骨色情内容、招嫖信息。
-                        4. SCAM (诈骗/杀猪盘)：虚假投资、刷单、中奖欺诈、贷款诈骗。
-                        5. OTHER (其他违规)：政治敏感、暴力恐怖等。
+                            如果发现风险，请严格按照以下分类进行归类 (riskType)：
+                            1. PHISHING (网络钓鱼)：伪造银行、支付、社交账号登录页。
+                            2. GAMBLING (非法赌博)：涉及真钱博彩、在线赌场、六合彩。
+                            3. PORN (色情低俗)：包含露骨色情内容、招嫖信息。
+                            4. SCAM (诈骗/杀猪盘)：虚假投资、刷单、中奖欺诈、贷款诈骗。
+                            5. OTHER (其他违规)：政治敏感、暴力恐怖等。
 
-                        请务必以 JSON 格式输出结果。
-                        """)
-                .build();
+                            请务必以 JSON 格式输出结果。
+                            """)
+                    .build();
+        }
     }
 
     @Override
     public ShortLinkRiskCheckRespDTO checkUrlRisk(String url) {
+        ShortLinkRiskCheckRespDTO result;
         if (isWhiteList(url)) {
-            return buildSafeResponse("白名单域名");
-        }
-        if (isBlackListPattern(url)) {
-            return buildRiskResponse("PHISHING", "疑似钓鱼网址",
+            result = buildSafeResponse("白名单域名");
+        } else if (isBlackListPattern(url)) {
+            result = buildRiskResponse("PHISHING", "疑似钓鱼网址",
                     "命中本地黑名单关键词规则 (Suspicious Pattern)");
-        }
-
-        String pageContent;
-        try {
-            pageContent = fetchPageContent(url);
-        } catch (Exception e) {
-            if (isSuspiciousConnectionError(e)) {
-                log.warn("网页访问异常，结合域名特征判黑。URL: {}, Error: {}",
-                        url, e.getClass().getSimpleName());
-                return buildRiskResponse("SUSPICIOUS", "网站无法访问",
-                        "访问超时或域名不存在，疑似快闪钓鱼站");
+        } else if (chatClient == null || !StringUtils.hasText(dashscopeApiKey)) {
+            result = buildSafeResponse("未配置 AI 风控，跳过模型审核");
+        } else {
+            try {
+                String pageContent = fetchPageContent(url);
+                result = callAiSafely(url, pageContent);
+            } catch (Exception e) {
+                if (isSuspiciousConnectionError(e)) {
+                    log.warn("网页访问异常，结合域名特征判黑。URL: {}, Error: {}",
+                            url, e.getClass().getSimpleName());
+                    result = buildRiskResponse("SUSPICIOUS", "网站无法访问",
+                            "访问超时或域名不存在，疑似快闪钓鱼站");
+                } else {
+                    String warningContent = "[System Warning] Content fetch failed: " + e.getMessage();
+                    result = callAiSafely(url, warningContent);
+                }
             }
-            pageContent = "[System Warning] Content fetch failed: " + e.getMessage();
         }
+        return result;
+    }
 
+    private ShortLinkRiskCheckRespDTO callAiSafely(String url, String pageContent) {
         try {
             return callAiForAnalysis(url, pageContent);
         } catch (Exception e) {
@@ -121,17 +143,35 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     }
 
     private String fetchPageContent(String url) throws Exception {
-        Document doc = Jsoup.connect(url)
-                .timeout(jsoupTimeout)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                .followRedirects(true)
-                .get();
-        return String.format("Title: %s\nBody: %s", doc.title(), doc.body().text());
+        String currentUrl = url;
+        for (int redirectCount = 0; redirectCount < MAX_REDIRECTS; redirectCount++) {
+            URI target = validateFetchTarget(currentUrl);
+            var response = Jsoup.connect(target.toString())
+                    .timeout(jsoupTimeout)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .followRedirects(false)
+                    .execute();
+            int statusCode = response.statusCode();
+            if (statusCode >= HTTP_REDIRECT_MIN_STATUS && statusCode < HTTP_REDIRECT_MAX_STATUS) {
+                String location = response.header("location");
+                if (!StringUtils.hasText(location)) {
+                    throw new IOException("重定向缺少目标地址");
+                }
+                currentUrl = target.resolve(location).toString();
+                continue;
+            }
+            if (statusCode >= HTTP_ERROR_STATUS) {
+                throw new IOException("网页响应状态码: " + statusCode);
+            }
+            Document doc = response.parse();
+            return String.format("Title: %s\nBody: %s", doc.title(), doc.body().text());
+        }
+        throw new IOException("重定向次数过多");
     }
 
     private ShortLinkRiskCheckRespDTO handleAiException(String url, Exception e) {
         if (e.getMessage() != null && e.getMessage().contains("DataInspectionFailed")) {
-            log.warn("AI 平台内容安全风控拦截。URL: ", url);
+            log.warn("AI 平台内容安全风控拦截。URL: {}", url);
             return buildRiskResponse("HIGH_RISK", "严重违规内容",
                     "AI 平台触发内容安全风控拦截 (DataInspectionFailed)");
         }
@@ -142,7 +182,41 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     }
 
     private boolean isWhiteList(String url) {
-        return url.contains("aliyun.com") || url.contains("jd.com");
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            return host != null && (isAllowedHost(host, "aliyun.com") || isAllowedHost(host, "jd.com"));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isAllowedHost(String host, String domain) {
+        String normalizedHost = host.toLowerCase();
+        return normalizedHost.equals(domain) || normalizedHost.endsWith("." + domain);
+    }
+
+    private URI validateFetchTarget(String url) throws IOException {
+        final URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("URL 格式无效", e);
+        }
+        if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("仅支持 HTTP/HTTPS URL");
+        }
+        if (!StringUtils.hasText(uri.getHost()) || uri.getUserInfo() != null) {
+            throw new IOException("URL 主机无效");
+        }
+        for (InetAddress address : InetAddress.getAllByName(uri.getHost())) {
+            if (address.isAnyLocalAddress() || address.isLoopbackAddress()
+                    || address.isLinkLocalAddress() || address.isSiteLocalAddress()
+                    || address.isMulticastAddress()) {
+                throw new IOException("禁止访问本地网络地址");
+            }
+        }
+        return uri;
     }
 
     private boolean isBlackListPattern(String url) {
