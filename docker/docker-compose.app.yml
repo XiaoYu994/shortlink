@@ -3,9 +3,10 @@ services:
     image: ghcr.io/xiaoyu994/shortlink-gateway-service:${GHCR_IMAGE_TAG}
     container_name: shortlink-gateway
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Xms128m -Xmx256m"
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -20,9 +21,10 @@ services:
     image: ghcr.io/xiaoyu994/shortlink-aggregation-service:${GHCR_IMAGE_TAG}
     container_name: shortlink-aggregation
     restart: unless-stopped
-    ports:
-      - "8003:8003"
+    expose:
+      - "8003"
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Xms256m -Xmx768m"
       DATABASE_ENV: ${DATABASE_ENV}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -32,6 +34,7 @@ services:
       SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: nacos
       ROCKETMQ_NAME_SERVER: namesrv:9876
       SHORT_LINK_DOMAIN_DEFAULT: ${SHORT_LINK_DOMAIN_DEFAULT}
+      SHORT_LINK_DOMAIN_PROTOCOL: ${SHORT_LINK_DOMAIN_PROTOCOL:-http}
       SHORTLINK_MYSQL_HOST: mysql
       SHORTLINK_MYSQL_PORT: 3306
       SHORTLINK_MYSQL_USERNAME: root
@@ -47,6 +50,7 @@ services:
     container_name: shortlink-stats
     restart: unless-stopped
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Xms128m -Xmx384m"
       DATABASE_ENV: ${DATABASE_ENV}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -71,6 +75,7 @@ services:
     container_name: shortlink-risk
     restart: unless-stopped
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -Xms128m -Xmx384m"
       DATABASE_ENV: ${DATABASE_ENV}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379

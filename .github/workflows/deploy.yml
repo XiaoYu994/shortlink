@@ -66,6 +66,7 @@ jobs:
             MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD || 'root' }}
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || 'xhy_redis' }}
             SHORT_LINK_DOMAIN_DEFAULT=${{ secrets.SHORT_LINK_DOMAIN_DEFAULT }}
+            SHORT_LINK_DOMAIN_PROTOCOL=${{ secrets.SHORT_LINK_DOMAIN_PROTOCOL || 'http' }}
             SHORT_LINK_STATS_LOCALE_AMAP_KEY=${{ secrets.SHORT_LINK_STATS_LOCALE_AMAP_KEY }}
             DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
             GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}

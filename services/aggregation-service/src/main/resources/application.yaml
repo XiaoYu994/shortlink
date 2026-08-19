@@ -34,6 +34,7 @@ short-link:
     max-num: 20
   # project-service 业务配置
   cache:
+    ttl-jitter-ratio: 0.1
     local:
       initial-capacity: 100
       maximum-size: 10000
@@ -42,6 +43,11 @@ short-link:
     strategy: bloom-filter
   domain:
     default: "${SHORT_LINK_DOMAIN_DEFAULT:nurl.ink:8003}"
+    protocol: "${SHORT_LINK_DOMAIN_PROTOCOL:http}"
+  flow-limit:
+    enable: true
+    time-window: 1
+    max-access-count: 20
   cold-data:
     enabled: true
     days: 90

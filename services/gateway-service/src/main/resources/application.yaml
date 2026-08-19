@@ -17,6 +17,12 @@ spring:
         username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
         password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
 
+short-link:
+  flow-limit:
+    enable: true
+    time-window: 1
+    max-access-count: 20
+
 sa-token:
   token-style: simple-uuid
   token-name: short-link

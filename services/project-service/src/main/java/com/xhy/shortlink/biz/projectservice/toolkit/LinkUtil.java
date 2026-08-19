@@ -81,19 +81,7 @@ public final class LinkUtil {
      * 获取用户真实 IP
      */
     public static String getActualIp(HttpServletRequest request) {
-        String ipAddress = request.getHeader("X-Forwarded-For");
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("Proxy-Client-IP");
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
+        String ipAddress = request.getHeader("X-Real-IP");
         if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
             ipAddress = request.getRemoteAddr();
         }
@@ -104,7 +92,11 @@ public final class LinkUtil {
      * 获取用户访问操作系统
      */
     public static String getOs(HttpServletRequest request) {
-        String ua = request.getHeader("User-Agent").toLowerCase();
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null) {
+            return "Unknown";
+        }
+        String ua = userAgent.toLowerCase();
         Map<String, String> osMapping = Map.of(
                 "windows", "Windows",
                 "mac", "Mac OS",
@@ -123,7 +115,11 @@ public final class LinkUtil {
      * 获取用户访问浏览器
      */
     public static String getBrowser(HttpServletRequest request) {
-        String browser = UserAgentUtil.parse(request.getHeader("User-Agent")).getBrowser().toString();
+        String userAgent = request.getHeader("User-Agent");
+        if (StrUtil.isBlank(userAgent)) {
+            return "未知";
+        }
+        String browser = UserAgentUtil.parse(userAgent).getBrowser().toString();
         if (StrUtil.isEmpty(browser)) {
             return "未知";
         }
@@ -135,7 +131,7 @@ public final class LinkUtil {
      */
     public static String getDevice(HttpServletRequest request) {
         String userAgent = request.getHeader("User-Agent");
-        if (userAgent.toLowerCase().contains("mobile")) {
+        if (userAgent != null && userAgent.toLowerCase().contains("mobile")) {
             return "Mobile";
         }
         return "PC";
