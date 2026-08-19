@@ -28,7 +28,7 @@ import java.util.function.Supplier;
  */
 public class Singleton {
 
-    private static final ConcurrentHashMap<String,Object> SINGLE_OBJECT_POOL = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Object> SINGLE_OBJECT_POOL = new ConcurrentHashMap<>();
 
     /*
     *  获取单例对象

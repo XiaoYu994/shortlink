@@ -61,6 +61,10 @@ public final class DefaultServiceIdGenerator implements ServiceIdGenerator {
     private static final long DATA_CENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
     private static final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATA_CENTER_ID_BITS;
     private static final long DEFAULT_TWEPOCH = 1288834974657L;
+    private static final long WORKER_ID_MASK = ~(-1L << WORKER_ID_BITS);
+    private static final long DATA_CENTER_ID_MASK = ~(-1L << DATA_CENTER_ID_BITS);
+    private static final long SEQUENCE_ACTUAL_MASK = ~(-1L << SEQUENCE_ACTUAL_BITS);
+    private static final long SEQUENCE_BIZ_MASK = ~(-1L << SEQUENCE_BIZ_BITS);
 
     public DefaultServiceIdGenerator() {
         this(SEQUENCE_BIZ_BITS);
@@ -96,11 +100,11 @@ public final class DefaultServiceIdGenerator implements ServiceIdGenerator {
     @Override
     public SnowflakeIdInfo parseSnowflakeId(long snowflakeId) {
         return SnowflakeIdInfo.builder()
-                .workerId((int) ((snowflakeId >> WORKER_ID_SHIFT) & ~(-1L << WORKER_ID_BITS)))
-                .dataCenterId((int) ((snowflakeId >> DATA_CENTER_ID_SHIFT) & ~(-1L << DATA_CENTER_ID_BITS)))
+                .workerId((int) ((snowflakeId >> WORKER_ID_SHIFT) & WORKER_ID_MASK))
+                .dataCenterId((int) ((snowflakeId >> DATA_CENTER_ID_SHIFT) & DATA_CENTER_ID_MASK))
                 .timestamp((snowflakeId >> TIMESTAMP_LEFT_SHIFT) + DEFAULT_TWEPOCH)
-                .sequence((int) ((snowflakeId >> SEQUENCE_BIZ_BITS) & ~(-1L << SEQUENCE_ACTUAL_BITS)))
-                .gene((int) (snowflakeId & ~(-1L << SEQUENCE_BIZ_BITS)))
+                .sequence((int) ((snowflakeId >> SEQUENCE_BIZ_BITS) & SEQUENCE_ACTUAL_MASK))
+                .gene((int) (snowflakeId & SEQUENCE_BIZ_MASK))
                 .build();
     }
 }

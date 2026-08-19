@@ -32,9 +32,9 @@ import java.util.Optional;
 @Getter
 public abstract class AbstractException extends RuntimeException {
 
-    public final String errorCode;
+    private final String errorCode;
 
-    public final String errorMessage;
+    private final String errorMessage;
 
     public AbstractException(String message, Throwable throwable, IErrorCode errorCode) {
         super(message, throwable);

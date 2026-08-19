@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 应用初始化后置处理器，防止 Spring 事件被多次执行
  */
 @RequiredArgsConstructor
-public class ApplicationContentPostProcessor implements ApplicationListener<ApplicationReadyEvent>{
+public class ApplicationContentPostProcessor implements ApplicationListener<ApplicationReadyEvent> {
 
     private final ApplicationContext applicationContext;
     private final AtomicBoolean executeOnlyOnce = new AtomicBoolean(false);

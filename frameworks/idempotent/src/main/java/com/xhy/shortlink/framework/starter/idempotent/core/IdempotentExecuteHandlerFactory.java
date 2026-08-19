@@ -45,9 +45,13 @@ public final class IdempotentExecuteHandlerFactory {
                     case PARAM -> result = ApplicationContextHolder.getBean(IdempotentParamService.class);
                     case TOKEN -> result = ApplicationContextHolder.getBean(IdempotentTokenService.class);
                     case SPEL -> result = ApplicationContextHolder.getBean(IdempotentSpELByRestAPIExecuteHandler.class);
+                    default -> {
+                    }
                 }
             }
             case MQ -> result = ApplicationContextHolder.getBean(IdempotentSpELByMQExecuteHandler.class);
+            default -> {
+            }
         }
         if (result == null) {
             throw new IllegalArgumentException(

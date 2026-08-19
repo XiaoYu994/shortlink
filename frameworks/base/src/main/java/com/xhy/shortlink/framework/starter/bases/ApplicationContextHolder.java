@@ -31,53 +31,54 @@ import java.util.Map;
  * 在静态方法、工具类、线程中无法使用依赖注入。
  * 这个工具类提供了在任何地方获取 Spring Bean 的能力。
  */
-public class ApplicationContextHolder implements ApplicationContextAware{
+public class ApplicationContextHolder implements ApplicationContextAware {
 
-    private static ApplicationContext CONTEXT;
+    private static ApplicationContext context;
+
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
-        ApplicationContextHolder.CONTEXT = applicationContext;
+        ApplicationContextHolder.context = applicationContext;
     }
 
     /*
     *  通过类型获取容器 bean
     * */
-    public static <T> T getBean(Class<T> clazz){
-        return CONTEXT.getBean(clazz);
+    public static <T> T getBean(Class<T> clazz) {
+        return context.getBean(clazz);
     }
 
     /*
     *  通过名称获取容器 bean
     * */
-    public static Object getBean(String name){
-        return CONTEXT.getBean(name);
+    public static Object getBean(String name) {
+        return context.getBean(name);
     }
 
     /*
     *  通过名称和类型获取容器 bean
     * */
-    public static <T> T getBean(String name, Class<T> clazz){
-        return CONTEXT.getBean(name, clazz);
+    public static <T> T getBean(String name, Class<T> clazz) {
+        return context.getBean(name, clazz);
     }
 
     /*
     *  获取某个类型的所有 bean
     * */
-    public static <T> Map<String, T> getBeansOfType(Class<T> clazz){
-        return CONTEXT.getBeansOfType(clazz);
+    public static <T> Map<String, T> getBeansOfType(Class<T> clazz) {
+        return context.getBeansOfType(clazz);
     }
 
     /*
     *  查找 bean 是否有注解
     * */
-    public static <A extends Annotation> A findAnnotationOnBean(String beanName,Class<A> annotationClass){
-        return CONTEXT.findAnnotationOnBean(beanName,annotationClass);
+    public static <A extends Annotation> A findAnnotationOnBean(String beanName, Class<A> annotationClass) {
+        return context.findAnnotationOnBean(beanName, annotationClass);
     }
 
     /*
     *  获取应用程序上下文
     * */
-    public static ApplicationContext getContext(){
-        return CONTEXT;
+    public static ApplicationContext getContext() {
+        return context;
     }
 }

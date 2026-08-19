@@ -28,27 +28,27 @@ import com.xhy.shortlink.framework.starter.distributedid.handler.IdGeneratorMana
  */
 public final class SnowflakeIdUtil {
 
-    private static Snowflake SNOWFLAKE;
+    private static Snowflake snowflake;
 
     /**
      * 初始化雪花算法实例（由 AbstractWorkIdChooseTemplate 调用）
      */
     public static void initSnowflake(Snowflake snowflake) {
-        SnowflakeIdUtil.SNOWFLAKE = snowflake;
+        SnowflakeIdUtil.snowflake = snowflake;
     }
 
     /**
      * 获取雪花算法实例
      */
     public static Snowflake getInstance() {
-        return SNOWFLAKE;
+        return snowflake;
     }
 
     /**
      * 生成下一个雪花 ID
      */
     public static long nextId() {
-        return SNOWFLAKE.nextId();
+        return snowflake.nextId();
     }
 
     /**
@@ -62,14 +62,14 @@ public final class SnowflakeIdUtil {
      * 反解析雪花 ID
      */
     public static SnowflakeIdInfo parseSnowflakeId(String snowflakeId) {
-        return SNOWFLAKE.parseSnowflakeId(Long.parseLong(snowflakeId));
+        return snowflake.parseSnowflakeId(Long.parseLong(snowflakeId));
     }
 
     /**
      * 反解析雪花 ID
      */
     public static SnowflakeIdInfo parseSnowflakeId(long snowflakeId) {
-        return SNOWFLAKE.parseSnowflakeId(snowflakeId);
+        return snowflake.parseSnowflakeId(snowflakeId);
     }
 
     /**

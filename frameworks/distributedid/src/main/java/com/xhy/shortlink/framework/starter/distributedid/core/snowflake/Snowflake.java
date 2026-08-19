@@ -59,6 +59,7 @@ public class Snowflake implements Serializable, IdGenerator {
     private static final long DATA_CENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS;
     private static final long TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATA_CENTER_ID_BITS;
     private static final long SEQUENCE_MASK = ~(-1L << SEQUENCE_BITS);
+    private static final long TIMESTAMP_MASK = ~(-1L << TIMESTAMP_BITS);
 
     private final long twepoch;
     private final long workerId;
@@ -115,21 +116,21 @@ public class Snowflake implements Serializable, IdGenerator {
      * 从 ID 中提取 workerId
      */
     public long getWorkerId(long id) {
-        return id >> WORKER_ID_SHIFT & ~(-1L << WORKER_ID_BITS);
+        return id >> WORKER_ID_SHIFT & MAX_WORKER_ID;
     }
 
     /**
      * 从 ID 中提取 dataCenterId
      */
     public long getDataCenterId(long id) {
-        return id >> DATA_CENTER_ID_SHIFT & ~(-1L << DATA_CENTER_ID_BITS);
+        return id >> DATA_CENTER_ID_SHIFT & MAX_DATA_CENTER_ID;
     }
 
     /**
      * 从 ID 中提取生成时间戳
      */
     public long getGenerateDateTime(long id) {
-        return (id >> TIMESTAMP_LEFT_SHIFT & ~(-1L << TIMESTAMP_BITS)) + twepoch;
+        return (id >> TIMESTAMP_LEFT_SHIFT & TIMESTAMP_MASK) + twepoch;
     }
 
     /**
@@ -181,9 +182,9 @@ public class Snowflake implements Serializable, IdGenerator {
      */
     public SnowflakeIdInfo parseSnowflakeId(long snowflakeId) {
         return SnowflakeIdInfo.builder()
-                .sequence((int) (snowflakeId & ~(-1L << SEQUENCE_BITS)))
-                .workerId((int) ((snowflakeId >> WORKER_ID_SHIFT) & ~(-1L << WORKER_ID_BITS)))
-                .dataCenterId((int) ((snowflakeId >> DATA_CENTER_ID_SHIFT) & ~(-1L << DATA_CENTER_ID_BITS)))
+                .sequence((int) (snowflakeId & SEQUENCE_MASK))
+                .workerId((int) ((snowflakeId >> WORKER_ID_SHIFT) & MAX_WORKER_ID))
+                .dataCenterId((int) ((snowflakeId >> DATA_CENTER_ID_SHIFT) & MAX_DATA_CENTER_ID))
                 .timestamp((snowflakeId >> TIMESTAMP_LEFT_SHIFT) + twepoch)
                 .build();
     }

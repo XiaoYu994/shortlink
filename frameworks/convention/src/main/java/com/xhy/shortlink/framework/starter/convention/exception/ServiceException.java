@@ -45,9 +45,9 @@ public class ServiceException extends AbstractException {
 
     @Override
     public String toString() {
-        return "ServiceException{" +
-                "code='" + errorCode + "'," +
-                "message='" + errorMessage + "'" +
-                '}';
+        return "ServiceException{"
+                + "code='" + getErrorCode() + "',"
+                + "message='" + getErrorMessage() + "'"
+                + '}';
     }
 }

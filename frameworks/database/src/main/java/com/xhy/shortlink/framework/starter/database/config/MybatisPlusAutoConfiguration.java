@@ -37,6 +37,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MybatisPlusAutoConfiguration {
 
+    private static final long MAX_PAGE_LIMIT = 500L;
+
     /**
      * 配置 MyBatis-Plus 拦截器链：
      * 1. 添加分页插件，数据库类型为 MySQL
@@ -50,7 +52,7 @@ public class MybatisPlusAutoConfiguration {
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor(DbType.MYSQL);
-        paginationInterceptor.setMaxLimit(500L);
+        paginationInterceptor.setMaxLimit(MAX_PAGE_LIMIT);
         paginationInterceptor.setOverflow(false);
         interceptor.addInnerInterceptor(paginationInterceptor);
         return interceptor;
