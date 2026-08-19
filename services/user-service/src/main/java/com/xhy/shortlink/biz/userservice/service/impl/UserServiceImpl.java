@@ -100,7 +100,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 throw new ClientException(USER_REGISTER_ERROR);
             }
             // 创建默认分组
-            groupService.saveGroup(requestParam.getUsername(),"默认分组");
+            groupService.saveGroup(requestParam.getUsername(), "默认分组");
             // 用户名加入布隆过滤器
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

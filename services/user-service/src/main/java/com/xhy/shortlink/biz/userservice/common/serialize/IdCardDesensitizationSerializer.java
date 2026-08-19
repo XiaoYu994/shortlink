@@ -29,10 +29,14 @@ import java.io.IOException;
  */
 public class IdCardDesensitizationSerializer extends JsonSerializer<String> {
 
+    private static final int ID_CARD_PREFIX_LENGTH = 4;
+    private static final int ID_CARD_SUFFIX_LENGTH = 4;
+
     @Override
     public void serialize(String idCard, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {
         // 使用hutool工具类进行身份证号脱敏
-        String phoneDesensitization = DesensitizedUtil.idCardNum(idCard, 4, 4);
+        String phoneDesensitization = DesensitizedUtil.idCardNum(
+                idCard, ID_CARD_PREFIX_LENGTH, ID_CARD_SUFFIX_LENGTH);
         jsonGenerator.writeString(phoneDesensitization);
     }
 }

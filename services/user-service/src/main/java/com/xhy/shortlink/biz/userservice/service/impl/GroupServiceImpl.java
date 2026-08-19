@@ -117,7 +117,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getDelFlag, DelEnum.NORMAL.getCode())
                 .eq(GroupDO::getGid, requestParam.getGid())
                 .set(GroupDO::getName, requestParam.getName());
-        baseMapper.update(null,updateWrapper);
+        baseMapper.update(null, updateWrapper);
     }
 
     @Override

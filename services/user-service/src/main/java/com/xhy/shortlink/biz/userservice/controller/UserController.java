@@ -68,7 +68,7 @@ public class UserController {
      */
     @GetMapping("/api/short-link/admin/v1/user/has-username")
     public Result<Boolean> hasUsername(@RequestParam("username") String username) {
-        return Results.success(userService.hasUsername( username));
+        return Results.success(userService.hasUsername(username));
     }
 
 

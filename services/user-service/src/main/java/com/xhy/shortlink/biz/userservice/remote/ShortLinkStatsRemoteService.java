@@ -19,8 +19,12 @@ package com.xhy.shortlink.biz.userservice.remote;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xhy.shortlink.biz.userservice.config.OpenFeignConfiguration;
-import com.xhy.shortlink.biz.api.stats.dto.req.*;
-import com.xhy.shortlink.biz.api.stats.dto.resp.*;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsAccessRecordRespDTO;
+import com.xhy.shortlink.biz.api.stats.dto.resp.ShortLinkStatsRespDTO;
 import com.xhy.shortlink.framework.starter.convention.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.cloud.openfeign.SpringQueryMap;
