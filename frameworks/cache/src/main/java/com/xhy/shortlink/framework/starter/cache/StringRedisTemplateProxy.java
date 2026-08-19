@@ -106,7 +106,7 @@ public class StringRedisTemplateProxy implements DistributedCache {
         if (!CacheUtil.isNullOrBlank(result)) {
             return result;
         }
-        return loadAndSet(key, cacheLoader, timeout, timeUnit, false, null);
+        return loadAndSet(key, cacheLoader, timeout, timeUnit);
     }
 
     @Override
@@ -161,9 +161,11 @@ public class StringRedisTemplateProxy implements DistributedCache {
         lock.lock(SAFE_GET_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         try {
             // 双重检查：获取锁后再次查询缓存，减轻数据库压力
-            if (CacheUtil.isNullOrBlank(result = get(key, clazz))) {
+            result = get(key, clazz);
+            if (CacheUtil.isNullOrBlank(result)) {
                 // 回源加载，仍为空则执行缺失回调
-                if (CacheUtil.isNullOrBlank(result = loadAndSet(key, cacheLoader, timeout, timeUnit, true, bloomFilter))) {
+                result = safeLoadAndSet(key, cacheLoader, timeout, timeUnit, bloomFilter);
+                if (CacheUtil.isNullOrBlank(result)) {
                     Optional.ofNullable(cacheGetIfAbsent).ifPresent(each -> each.execute(key));
                 }
             }
@@ -212,17 +214,22 @@ public class StringRedisTemplateProxy implements DistributedCache {
         return stringRedisTemplate.countExistingKeys(Lists.newArrayList(keys));
     }
 
-    private <T> T loadAndSet(String key, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                             boolean safeFlag, RBloomFilter<String> bloomFilter) {
+    private <T> T loadAndSet(String key, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit) {
         T result = cacheLoader.load();
         if (CacheUtil.isNullOrBlank(result)) {
             return result;
         }
-        if (safeFlag) {
-            safePut(key, result, timeout, timeUnit, bloomFilter);
-        } else {
-            put(key, result, timeout, timeUnit);
+        put(key, result, timeout, timeUnit);
+        return result;
+    }
+
+    private <T> T safeLoadAndSet(String key, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
+                                 RBloomFilter<String> bloomFilter) {
+        T result = cacheLoader.load();
+        if (CacheUtil.isNullOrBlank(result)) {
+            return result;
         }
+        safePut(key, result, timeout, timeUnit, bloomFilter);
         return result;
     }
 }
