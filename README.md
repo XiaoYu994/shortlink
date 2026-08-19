@@ -1,601 +1,459 @@
 # ShortLink
 
-> 一个面向 **SaaS 场景** 的短链接平台，包含短链创建、跳转、统计分析、风控封禁、站内通知以及完整的监控与验收闭环。
+ShortLink 是一个面向 SaaS 场景的短链接平台。它提供短链的创建、跳转、统计、回收、冷热数据管理和风险控制，并配套 Vue 控制台、微服务拆分、消息驱动和可观测性配置。
 
-[![Java](https://img.shields.io/badge/Java-17-blue)](#环境要求)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.x-brightgreen)](#技术栈)
-[![Vue](https://img.shields.io/badge/Vue-3.x-42b883)](#技术栈)
-[![License](https://img.shields.io/badge/License-Apache%202.0-orange)](./format/copyright.txt)
+项目的核心目标不是只生成一个短 URL，而是覆盖短链从创建到失效、统计、封禁和恢复的完整生命周期。
 
----
+## 项目状态
 
-## 项目简介
+主线功能已经覆盖以下链路：
 
-`ShortLink` 是一个围绕“**短链接全生命周期管理**”构建的多模块系统，除了最基础的短链创建与跳转，还覆盖了：
+- 用户注册、登录、退出和分组管理
+- 单条和批量短链接创建
+- 短链跳转（HTTP 302）
+- 短链编辑、回收、恢复和彻底删除
+- PV / UV / UIP 统计以及访问明细
+- 热数据与冷数据迁移、查询和回温
+- 风险识别、自动封禁和站内通知
+- WebSocket 通知推送
+- Prometheus、Grafana、Alertmanager 监控配置
+- Docker 镜像构建和服务器部署脚本
 
-- 用户与分组管理
-- PV / UV / UIP 统计
-- 风控检测与自动封禁
-- 封禁后的站内通知与实时提醒
-- 本地与监控环境的一体化联调
-- Prometheus / Grafana / Alertmanager 可观测性闭环
+当前仓库已经进入发布与稳定化阶段。主线上的历史联调记录见 [`docs/refactor/phase7-acceptance-report-2026-03-06.md`](docs/refactor/phase7-acceptance-report-2026-03-06.md)，实际发布前仍应在目标环境重新执行检查和回滚验证。
 
-它既可以作为一个实际可运行的短链接平台，也很适合作为：
+## 能力概览
 
-- Spring Boot / Spring Cloud 微服务拆分示例
-- ShardingSphere 分库分表实践样例
-- RocketMQ 异步事件驱动样例
-- Redis / Redisson / BloomFilter / 本地缓存综合实践样例
-- 可观测性与发布验收流程示例
+### 业务能力
 
----
+| 能力 | 说明 |
+| --- | --- |
+| 用户与分组 | 注册、登录、退出、分组 CRUD、分组排序 |
+| 短链管理 | 创建、批量创建、修改、分页查询、标题解析 |
+| 跳转 | 校验短链状态和有效期，记录访问事件并返回 302 |
+| 回收站 | 回收、分页查询、恢复、彻底删除 |
+| 统计 | PV、UV、UIP、设备、浏览器、操作系统、网络、地域和访问记录 |
+| 冷热数据 | 定时归档冻结链接，冷热库合并查询，支持冷数据回温 |
+| 风控 | URL 内容检测、风险分类、自动封禁 |
+| 通知 | 封禁事件生成站内通知，并通过 WebSocket 推送给在线用户 |
+| 限流 | gateway、user-service、project-service 对注册、登录和短链创建进行限流 |
 
-## 核心特性
+### 工程能力
 
-### 短链接能力
-- 单个 / 批量创建短链接
-- 短链跳转与 302 重定向
-- 回收站、恢复与彻底删除
-- 冷热数据迁移与冷数据回温
+- Java 17、Spring Boot 3.2、Spring Cloud Alibaba
+- MyBatis-Plus 和 ShardingSphere 分库分表
+- Redis、Redisson、Caffeine、本地缓存和 Bloom Filter
+- RocketMQ 事件驱动和异步解耦
+- Nacos 服务注册与发现
+- Actuator、Micrometer、Prometheus 指标
+- Docker Compose、GitHub Actions、GHCR 镜像发布
 
-### 用户后台能力
-- 用户注册、登录、退出
-- 分组创建、排序、编辑、删除
-- 用户创建的短链封禁后，顶部铃铛实时通知
-
-### 数据与统计能力
-- PV / UV / UIP 多维度统计
-- 访问日志、设备、浏览器、操作系统、网络、地域统计
-- 分组维度与单链维度统计查询
-
-### 风控能力
-- 高风险链接识别
-- 自动封禁违规短链接
-- 生成站内通知并通过 WebSocket 推送给在线用户
-
-### 工程与运维能力
-- 微服务拆分：`gateway / user / project / stats / risk / aggregation`
-- Nacos 服务注册发现
-- RocketMQ 异步事件解耦
-- Prometheus / Grafana / Alertmanager 监控闭环
-- Phase 7 联调与验收已完成，当前结论为 **Go**
-
----
-
-## 系统架构
+## 架构
 
 ```text
-                        +----------------------+
-                        |    console-vue UI    |
-                        |  Vue3 + ElementPlus  |
-                        +----------+-----------+
-                                   |
-                                   v
-                        +----------------------+
-                        |   gateway-service    |
-                        | Spring Cloud Gateway |
-                        +----+-------------+---+
-                             |             |
-         +-------------------+             +-------------------+
-         |                                                       |
-         v                                                       v
-+----------------------+                           +----------------------+
-|    user-service      |                           |   project-service    |
-| 用户/分组/通知/WebSocket |                           | 短链创建/跳转/回收站 |
-+----------+-----------+                           +----------+-----------+
-           |                                                      |
-           | Feign / MQ                                            | MQ
-           v                                                      v
-+----------------------+                           +----------------------+
-|    stats-service     |                           |    risk-service      |
-| 统计消费与聚合分析     |                           | 风控检测 / 自动封禁   |
-+----------------------+                           +----------+-----------+
-                                                             |
-                                                             | MQ
-                                                             v
-                                                   +----------------------+
-                                                   | 用户通知创建事件推送 |
-                                                   +----------------------+
+                         +----------------------+
+                         |    console-vue       |
+                         | Vue 3 + Element Plus |
+                         +----------+-----------+
+                                    |
+                              /api 请求
+                                    v
+                         +----------------------+
+                         |   gateway-service    |
+                         | Spring Cloud Gateway |
+                         | 鉴权、路由、限流      |
+                         +----+-----------+-----+
+                              |           |
+                admin / project API       | stats API
+                              |           |
+             +----------------+           +----------------+
+             v                                 v
+   +----------------------+           +----------------------+
+   |    user-service      |           |   project-service    |
+   | 用户、分组、通知      |           | 创建、跳转、回收、缓存 |
+   +----------+-----------+           +----------+-----------+
+              | Feign / MQ                       | RocketMQ
+              v                                   v
+   +----------------------+           +----------------------+
+   |    stats-service     |           |     risk-service     |
+   | 统计消费与查询        |           | 风控检测与自动封禁    |
+   +----------------------+           +----------+-----------+
+                                                   |
+                                                   | 通知事件
+                                                   v
+                                         user-service 通知中心
 
-基础设施：
-- MySQL / ShardingSphere
-- Redis / Redisson / BloomFilter / Caffeine
-- RocketMQ
-- Nacos
-- Prometheus / Grafana / Alertmanager
+  基础设施：MySQL / ShardingSphere、Redis、RocketMQ、Nacos
+  观测组件：Prometheus、Grafana、Alertmanager
 ```
 
----
+生产环境还提供 `aggregation-service`。它把 user-service 和 project-service 的核心能力聚合到一个业务进程中，配合 `SPRING_PROFILES_ACTIVE=aggregation` 使用，减少生产环境需要维护的业务容器数量。
 
-## 项目结构
+## 代码结构
 
 ```text
 .
-├── services/             # 当前主线微服务模块
-│   ├── shortlink-api
-│   ├── user-service
-│   ├── project-service
-│   ├── stats-service
-│   ├── risk-service
-│   ├── gateway-service
-│   └── aggregation-service
-├── frameworks/           # 可复用基础能力 starter
-│   ├── base
-│   ├── common
-│   ├── web
-│   ├── database
-│   ├── cache
-│   ├── distributedid
-│   ├── idempotent
+├── dependencies/                 # 统一依赖版本和 BOM
+├── frameworks/                   # 可复用 Spring Boot starter
+│   ├── base                     # 基础能力
+│   ├── common                   # 通用组件
+│   ├── web                      # Web、异常和响应封装
+│   ├── database                 # 数据库和 MyBatis-Plus
+│   ├── cache                    # Redis、Redisson、本地缓存
+│   ├── distributedid            # 分布式 ID
+│   ├── idempotent               # 幂等控制
 │   └── ...
-├── dependencies/         # 统一 BOM 与依赖版本管理
-├── console-vue/          # 控制台前端（Vue 3）
-├── deploy/               # 服务器部署脚本
-├── docker/               # 本地依赖与监控栈编排
-├── docs/                 # 设计、实施计划、验收记录、回滚文档
-├── resources/            # SQL 与静态资源
-├── tests/                # 测试资产（含压测脚本）
-└── README.md
+├── services/
+│   ├── shortlink-api            # 跨服务 DTO、接口和事件契约
+│   ├── user-service             # 用户、分组、通知和 WebSocket
+│   ├── project-service          # 短链核心业务和跳转
+│   ├── stats-service            # 统计消息消费和统计查询
+│   ├── risk-service             # 风险检测和封禁
+│   ├── gateway-service          # 网关、鉴权、路由和限流
+│   └── aggregation-service      # 生产聚合服务
+├── console-vue/                 # Vue 3 管理控制台
+├── docker/                      # 本地依赖、生产编排、监控和 Nginx
+├── deploy/                      # 服务器初始化和部署脚本
+├── resources/database/          # 数据库初始化 SQL
+├── tests/performance/           # JMeter 压测脚本
+└── docs/                        # 设计、实施、验收和回滚文档
 ```
 
-> 说明：当前主线后端代码统一位于 `services/` 目录。
+## 服务和端口
 
----
+| 服务 | 默认端口 | 主要职责 |
+| --- | ---: | --- |
+| `gateway-service` | `8000` | 网关路由、鉴权、限流、WebSocket 转发 |
+| `project-service` | `8001` | 短链创建、修改、跳转、回收站、冷热数据 |
+| `user-service` | `8002` | 用户、分组、通知和 WebSocket |
+| `aggregation-service` | `8003` | 聚合 user/project 能力，生产部署使用 |
+| `stats-service` | `8004` | 统计事件消费和统计查询 |
+| `risk-service` | `8005` | URL 风险检测和封禁 |
 
-## 技术栈
+每个业务服务都暴露以下 Actuator 端点：
 
-### 后端
-- Java 17
-- Spring Boot 3.2.x
-- Spring Cloud / Spring Cloud Alibaba
-- MyBatis-Plus
-- ShardingSphere
-- RocketMQ
-- Redis / Redisson / Caffeine
-- Sa-Token
-- Micrometer + Actuator
-
-### 前端
-- Vue 3
-- Vue Router
-- Element Plus
-- Axios
-- ECharts
-
-### 运维与观测
-- Docker Compose
-- Nacos
-- Prometheus
-- Grafana
-- Alertmanager
-
----
+```text
+GET /actuator/health
+GET /actuator/prometheus
+```
 
 ## 环境要求
 
-在本地运行前，建议准备以下环境：
+本地开发需要：
 
 - JDK 17
 - Maven 3.9+
 - Node.js 18+
-- npm 或 pnpm
-- Docker Desktop / Docker Engine
-- MySQL 客户端（可选，便于排查）
+- npm
+- Docker Engine 或 Docker Desktop
+- 至少 4 GB 可用内存（完整依赖栈和多个 Java 服务会同时运行）
 
----
+如果使用 WSL，建议把仓库放在 WSL 原生文件系统，而不是 `/mnt/c` 或 `/mnt/d`。Maven、Java 编译和 `node_modules` 会产生大量小文件，在 Windows 挂载盘上通常明显更慢。
 
-## 快速开始
+## 本地开发
 
-### 1）启动基础依赖与监控栈
+### 1. 启动基础依赖
 
-项目已提供一套本地依赖编排：
-
-```bash
-docker compose -f docker/docker-compose.yml up -d mysql redis nacos namesrv broker dashboard alertmanager prometheus grafana
-```
-
-默认会拉起：
-- MySQL
-- Redis
-- Nacos
-- RocketMQ NameServer / Broker / Dashboard
-- Prometheus / Grafana / Alertmanager
-
-### 2）启动后端服务
-
-你可以分别启动服务，也可以只启动需要联调的几个。
-
-常用服务：
-- `gateway-service`：`8000`
-- `project-service`：`8001`
-- `user-service`：`8002`
-- `aggregation-service`：`8003`
-- `stats-service`：`8004`
-- `risk-service`：`8005`
-
-示例：
+本地拆分开发只需要先启动 MySQL、Redis、Nacos 和 RocketMQ：
 
 ```bash
-mvn -pl services/gateway-service -am spring-boot:run
-mvn -pl services/project-service -am spring-boot:run
-mvn -pl services/user-service -am spring-boot:run
-mvn -pl services/stats-service -am spring-boot:run
-mvn -pl services/risk-service -am spring-boot:run
+docker compose -f docker/docker-compose.yml \
+  up -d mysql redis nacos namesrv broker
 ```
 
-> 如果某个默认端口已被占用，可以临时覆盖，例如：
->
-> ```bash
-> mvn -pl services/project-service -am spring-boot:run -Dspring-boot.run.arguments="--server.port=8011"
-> ```
+查看容器状态：
 
-### 3）启动前端控制台
+```bash
+docker compose -f docker/docker-compose.yml ps
+```
+
+首次启动 MySQL 时，`resources/database/link.sql` 会通过初始化脚本导入 `link` 和 `link_cold` 数据库及表结构。初始化只对新建的数据卷生效。
+
+需要本地监控或 RocketMQ Dashboard 时，再启动可选组件：
+
+```bash
+docker compose -f docker/docker-compose.yml \
+  up -d dashboard prometheus grafana alertmanager
+```
+
+### 2. 编译后端
+
+只构建日常开发需要的服务：
+
+```bash
+mvn -pl services/gateway-service,services/user-service,services/project-service,services/stats-service,services/risk-service \
+  -am -DskipTests package
+```
+
+只构建一个服务：
+
+```bash
+mvn -pl services/project-service -am -DskipTests package
+```
+
+项目的 `compile` 阶段会执行 Spotless；开发循环中不需要每次都跑全量测试。提交前再执行完整检查即可。
+
+### 3. 启动后端
+
+本地开发建议使用拆分模式，启动 gateway、user、project、stats 和 risk：
+
+```bash
+mvn -pl services/gateway-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true spring-boot:run
+
+mvn -pl services/user-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true spring-boot:run
+
+mvn -pl services/project-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true spring-boot:run
+
+mvn -pl services/stats-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true spring-boot:run
+
+mvn -pl services/risk-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true spring-boot:run
+```
+
+也可以直接在 IDE 中运行各模块的 `*Application` 启动类。启动前请确认基础依赖已经可连接。
+
+如果只调试 project-service，可以覆盖端口：
+
+```bash
+mvn -pl services/project-service -am spring-boot:run \
+  -Dspring-boot.run.arguments="--server.port=8011"
+```
+
+### 4. 启动前端
 
 ```bash
 cd console-vue
-npm install
+npm ci
 npm run dev
 ```
 
-开发环境默认通过 Vite 代理把 `/api` 请求转到：
-- `http://127.0.0.1:8000`
+Vite 开发服务器默认在 `http://localhost:5173`，`/api` 请求会代理到 `http://127.0.0.1:8000`。因此前端开发时至少需要启动 gateway，以及 gateway 路由到的业务服务。
 
-### 4）访问入口
-
-- 控制台前端：通常是 Vite 默认开发地址
-- RocketMQ Dashboard：`http://127.0.0.1:8080`
-- Prometheus：`http://127.0.0.1:9090`
-- Grafana：`http://127.0.0.1:3000`
-- Alertmanager：`http://127.0.0.1:9093`
-- Nacos：`http://127.0.0.1:8848/nacos`
-
----
-
-## 自动部署
-
-当前仓库的生产部署已经调整为两段式流程：
-
-- 推送 `main`：只负责构建并推送镜像到 GHCR
-- 手动执行 `Deploy` 工作流：按需部署到服务器
-
-这样做的原因很直接：当前线上仍然是单机单实例部署，如果每次推送都自动拉起全量基础设施和应用，会把发布风险和中断窗口放大。
-
-### CI/CD 流程
-
-#### 1）自动构建镜像
-
-工作流文件：
-
-- `.github/workflows/build.yml`
-
-触发方式：
-
-- 推送到 `main`
-
-执行内容：
-
-- Maven 构建 `gateway / aggregation / stats / risk`
-- Node 构建前端 `console-vue`
-- 构建并推送以下镜像到 GHCR
-
-镜像列表：
-
-- `ghcr.io/xiaoyu994/shortlink-gateway-service`
-- `ghcr.io/xiaoyu994/shortlink-aggregation-service`
-- `ghcr.io/xiaoyu994/shortlink-stats-service`
-- `ghcr.io/xiaoyu994/shortlink-risk-service`
-- `ghcr.io/xiaoyu994/shortlink-frontend`
-
-标签策略：
-
-- `latest`
-- 当前提交 SHA
-
-#### 2）手动部署到服务器
-
-工作流文件：
-
-- `.github/workflows/deploy.yml`
-
-触发方式：
-
-- GitHub 仓库 `Actions -> Deploy -> Run workflow`
-
-可选参数：
-
-- `deploy_scope`
-- `image_tag`
-
-`deploy_scope` 说明：
-
-- `full`：首次部署或需要重建整套环境时使用，会部署基础设施和应用
-- `infra`：只维护基础设施时使用，只拉起 `MySQL / Redis / Nacos / RocketMQ`
-- `app`：日常发版使用，只更新业务应用，不动基础设施
-
-`image_tag` 说明：
-
-- 留空时默认部署当前工作流对应的提交 SHA
-- 也可以手动指定某个历史镜像标签，实现回滚或重发
-
-### 服务器执行逻辑
-
-`Deploy` 工作流会把 `docker/`、`deploy/`、`resources/database/link.sql` 下发到服务器，然后在服务器执行：
+前端常用命令：
 
 ```bash
-bash deploy/setup-server.sh <deploy_scope>
+npm run dev       # 开发服务器
+npm run build     # 生产构建
+npm run lint      # ESLint 检查（当前脚本会自动修复）
+npm run preview   # 预览生产构建
 ```
 
-当前部署脚本支持三种模式：
+### 5. 本地入口
 
-- `bash deploy/setup-server.sh full`
-- `bash deploy/setup-server.sh infra`
-- `bash deploy/setup-server.sh app`
+| 入口 | 地址 |
+| --- | --- |
+| Vue 控制台 | `http://localhost:5173` |
+| gateway | `http://localhost:8000` |
+| project-service | `http://localhost:8001` |
+| user-service | `http://localhost:8002` |
+| aggregation-service | `http://localhost:8003` |
+| stats-service | `http://localhost:8004` |
+| risk-service | `http://localhost:8005` |
+| RocketMQ Dashboard | `http://localhost:8080` |
+| Nacos | `http://localhost:8848/nacos` |
+| Prometheus | `http://localhost:9090` |
+| Grafana | `http://localhost:3000` |
+| Alertmanager | `http://localhost:9093` |
 
-推荐用法：
+Grafana 默认账号是 `admin / admin`，仅适用于本地环境。
 
-- 首次上线：`full`
-- 平时发布：`app`
-- 基础设施维护：`infra`
+## API 路由概览
 
-### 这套流程解决了什么
+通过 gateway 访问时，主要路由如下：
 
-和之前“推送即全量部署”相比，现在这套方式主要减少两类问题：
+| 路径 | 用途 | 目标服务 |
+| --- | --- | --- |
+| `/api/short-link/admin/v1/user/**` | 注册、登录、用户信息 | user-service 或 aggregation-service |
+| `/api/short-link/admin/v1/group/**` | 分组管理 | user-service 或 aggregation-service |
+| `/api/short-link/admin/v1/notification/**` | 通知列表、未读数、已读 | user-service 或 aggregation-service |
+| `/api/short-link/v1/create` | 创建短链 | project-service 或 aggregation-service |
+| `/api/short-link/v1/update` | 修改短链 | project-service 或 aggregation-service |
+| `/api/short-link/v1/page` | 短链分页查询 | project-service 或 aggregation-service |
+| `/api/short-link/v1/recycle-bin/**` | 回收站操作 | project-service 或 aggregation-service |
+| `/api/short-link/v1/stats/**` | 统计查询 | stats-service |
+| `/api/short-link/admin/v1/notification/ws` | 通知 WebSocket | user-service 或 aggregation-service |
 
-- 平时发版不会再顺手重建 MySQL、Redis、Nacos、RocketMQ
-- 可以手动选择镜像版本和部署时机，避免把代码提交和生产发布时间强绑定
+短链跳转使用短 URI：
 
-但也要明确一点：
+```text
+GET /{short-uri}
+```
 
-- 当前仍然不是蓝绿发布，也不是滚动发布
-- `app` 部署时依然会重建应用容器，所以会有一个短暂切换窗口
-- 只是这个中断范围被压缩到了应用层，不再每次都波及基础设施
+本地拆分模式下可以直接访问 project-service；生产模式下由 Nginx 把非 `/api/` 请求转发到 aggregation-service。
 
-实施计划文档见：
+## 配置
 
-- `docs/plans/2026-03-21-cicd-automated-deployment-implementation-plan.md`
+开发环境默认连接本机依赖服务。生产或 Docker 部署通过环境变量覆盖配置，模板见 [`docker/.env.example`](docker/.env.example)。常用变量：
 
-当前落地文件包括：
+| 变量 | 作用 | 示例 |
+| --- | --- | --- |
+| `DATABASE_ENV` | ShardingSphere 配置环境 | `dev` / `prod` |
+| `SPRING_PROFILES_ACTIVE` | Spring profile，生产通常使用 aggregation | `aggregation` |
+| `SHORT_LINK_DOMAIN_DEFAULT` | 生成短链使用的域名 | `s.example.com` |
+| `SHORT_LINK_DOMAIN_PROTOCOL` | 生成短链使用的协议 | `http` / `https` |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | 不要提交真实值 |
+| `REDIS_PASSWORD` | Redis 密码 | 不要提交真实值 |
+| `SHORT_LINK_STATS_LOCALE_AMAP_KEY` | 地域统计 API Key | 按需配置 |
+| `DASHSCOPE_API_KEY` | 风控模型 API Key | 按需配置 |
+| `GHCR_USERNAME` / `GHCR_TOKEN` | 拉取私有 GHCR 镜像 | 仅部署时配置 |
 
-- GitHub Actions 镜像构建：`.github/workflows/build.yml`
-- GitHub Actions 工作流：`.github/workflows/deploy.yml`
-- 生产基础设施编排：`docker/docker-compose.deploy.yml`
-- 应用层编排：`docker/docker-compose.app.yml`
-- 镜像构建文件：`docker/Dockerfile.backend`、`docker/Dockerfile.frontend`
-- 前端入口与反向代理：`docker/nginx/default.conf`
-- 服务器初始化脚本：`deploy/setup-server.sh`
-- 应用运行环境模板：`docker/.env.example`
+不要把生产密码、SSH 私钥或第三方 API Key 写入仓库。GitHub Actions 使用的值应配置在仓库 Secrets 中。
 
-### 数据库初始化
+短链域名必须配置成用户实际访问的域名。不要在生产环境继续使用 `nurl.ink:8001` 或 `nurl.ink:8003` 这类本地联调地址。
 
-数据库初始化已经纳入一键部署流程，不需要再手工执行 SQL：
+## 测试和质量检查
 
-- MySQL 首次启动时会自动执行 `docker/mysql/init/01-init-link.sh`
-- 初始化脚本会导入 `resources/database/link.sql`
-- 会自动创建 `link` 与 `link_cold` 两个库，以及所需表结构
-
-如果你想强制重新初始化数据库，需要先删除 MySQL 数据卷，再重新部署。
-
-### GitHub Secrets
-
-正式启用前，需要在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 中配置：
-
-- `SERVER_HOST`
-- `SERVER_USER`
-- `SERVER_SSH_KEY`
-- `GHCR_USERNAME`
-- `GHCR_TOKEN`
-- `SHORT_LINK_DOMAIN_DEFAULT`
-- `MYSQL_ROOT_PASSWORD`
-
-按需补充：
-
-- `REDIS_PASSWORD`
-- `SHORT_LINK_STATS_LOCALE_AMAP_KEY`
-- `DASHSCOPE_API_KEY`
-
-### 服务器要求
-
-目标服务器只需要预装：
-
-- Docker
-- Docker Compose
-
-部署时会统一拉起：
-
-- MySQL
-- Redis
-- Nacos
-- RocketMQ NameServer
-- RocketMQ Broker
-- gateway-service
-- aggregation-service
-- stats-service
-- risk-service
-- frontend
-
-对 `4 核 4G` 的机器，当前推荐先只跑这套业务必需组件，不要把 `dashboard / prometheus / grafana / alertmanager` 一起常驻到生产环境。
-
-为了保证一键部署可用，目标服务器至少需要提前释放这些应用端口：
-
-- `80`
-- `8000`
-- `8003`
-
-当前生产编排中的 `MySQL / Redis / Nacos / RocketMQ` 默认只在 Docker 内部网络通信，不再强制占用宿主机的 `3306 / 6379 / 8848 / 9876 / 10911` 等端口，因此可以和宿主机上已有的同类服务并存。
-
-### 域名与访问入口
-
-生产镜像内的 Nginx 现在已经统一了入口路由：
-
-- `/console/` -> 前端控制台
-- `/api/` -> gateway-service
-- 其余路径 -> aggregation-service，用于真实短链跳转
-
-这意味着你可以直接使用自己的正式域名，例如 `https://smallfish.cloud/`：
-
-- 控制台入口：`https://smallfish.cloud/console/`
-- 短链跳转：`https://smallfish.cloud/abc123`
-
-因此，`SHORT_LINK_DOMAIN_DEFAULT` 应设置为你真实要发放的短链域名，例如：
-
-- `smallfish.cloud`
-- `s.example.com`
-
-不要继续保留 `nurl.ink:8003` 这类本地测试地址，否则生成出来的短链仍然会指向测试环境。
-
----
-
-## 本地开发建议
-
-### Maven 构建
+后端测试按服务拆分，测试代码位于各服务的 `src/test` 目录。常用命令：
 
 ```bash
-mvn clean package
+# 全量测试
+mvn test
+
+# 跳过 Checkstyle 的全量测试
+mvn test -Dskip.checkstyle.check=true
+
+# 只测试指定服务
+mvn -pl services/project-service -Dskip.checkstyle.check=true test
+mvn -pl services/user-service -Dskip.checkstyle.check=true test
+
+# 只做快速编译，不编译和执行测试
+mvn -pl services/project-service -am \
+  -Dmaven.test.skip=true -Dskip.checkstyle.check=true package
 ```
 
-只构建指定服务：
-
-```bash
-mvn -pl services/user-service -am package
-mvn -pl services/project-service -am package
-```
-
-### 前端构建
+前端检查：
 
 ```bash
 cd console-vue
+npm run lint
 npm run build
 ```
 
-### 代码规范
+提交前建议至少完成：
 
-项目使用：
-- Checkstyle
-- Spotless
+1. 目标服务的单元/API 测试；
+2. 相关服务的编译和启动检查；
+3. gateway 到业务服务的最小黑盒链路；
+4. 前端 `npm run build`；
+5. `git diff --check` 和 `git status --short`。
 
-建议在提交前执行：
+测试依赖真实 Redis、MySQL、Nacos 或 RocketMQ 时，要先启动 Docker 基础设施。没有启动依赖时，测试失败不能简单标记为代码问题，也不能把跳过测试当成通过。
+
+## Docker 和生产部署
+
+Docker 配置分为三部分：
+
+| 文件 | 用途 |
+| --- | --- |
+| `docker/docker-compose.yml` | 本地依赖和监控栈，映射宿主机端口 |
+| `docker/docker-compose.deploy.yml` | 生产基础设施，不对外暴露大部分依赖端口 |
+| `docker/docker-compose.app.yml` | 生产业务容器：frontend、gateway、aggregation、stats、risk |
+
+生产应用编排只发布 frontend 的 80 端口；gateway 和 aggregation 仅通过 Compose 内部网络访问，避免绕过 Nginx 的可信客户端地址处理。
+
+### 本地构建镜像
 
 ```bash
-mvn validate
+docker build -f docker/Dockerfile.backend \
+  --build-arg JAR_FILE=services/aggregation-service/target/shortlink-aggregation-service.jar \
+  -t shortlink-aggregation-service:local .
+
+docker build -f docker/Dockerfile.frontend \
+  -t shortlink-frontend:local .
 ```
 
-更多规范可参考：
-- `CODE_STYLE.md`
-- `checkstyle/`
-- `format/`
+GitHub Actions 在推送到 `main` 时执行 [`build.yml`](.github/workflows/build.yml)：
 
----
+- 构建 gateway、aggregation、stats、risk 四个后端镜像；
+- 构建 Vue 前端镜像；
+- 推送 `latest` 和提交 SHA 两种标签到 GHCR。
 
-## 通知能力说明
+### 服务器部署
 
-当前系统已经补齐“**短链被封禁后通知用户**”的体验链路：
+部署工作流 [`deploy.yml`](.github/workflows/deploy.yml) 通过 GitHub Actions 手动触发。它会把部署文件复制到服务器 `/opt/shortlink`，然后执行：
 
-- `risk-service` 识别违规短链并封禁
-- 生成站内通知记录
-- 通知事件推送到 `user-service`
-- `user-service` 通过 WebSocket 推送给在线用户
-- 前端控制台顶部显示铃铛与未读角标
-- 点击铃铛后以**下拉通知面板**展示通知，无需跳转页面
+```bash
+bash deploy/setup-server.sh full   # 首次部署：基础设施 + 应用
+bash deploy/setup-server.sh infra  # 只更新基础设施
+bash deploy/setup-server.sh app    # 日常只更新应用
+```
 
-这条链路已完成实现与联调验证。
+服务器只需要预装 Docker 和 Docker Compose。应用入口为：
 
----
+- `http://<server>/console/`：控制台
+- `http://<server>/api/`：API，经 Nginx 转发到 gateway
+- `http://<server>/<short-uri>`：短链跳转，经 Nginx 转发到 aggregation
 
-## 监控与验收
+当前部署方式是单机容器切换，不是蓝绿发布或滚动发布。`app` 部署会重建应用容器，并存在短暂切换窗口。正式发布前要用历史 SHA 镜像完成一次回滚验证。
 
-项目已经落地：
-- Prometheus 抓取
-- Grafana 仪表盘
-- Alertmanager 告警
-- 最小业务链路验收
+## 监控和验收
 
-当前最新验收记录：
-- `docs/refactor/phase7-acceptance-report-2026-03-06.md`
+监控配置位于 [`docker/monitoring`](docker/monitoring)：
 
-关键结论：
-- **Phase 7 联调与验收闭环已完成，当前结论为 Go**
+- Prometheus：抓取 `/actuator/prometheus`；
+- Grafana：预置 `ShortLink Overview` 仪表盘；
+- Alertmanager：接收服务不可用、HTTP 5xx、P95 延迟、MQ 消费失败和冷热迁移失败告警。
 
-相关文档：
-- `docs/refactor/phase7-release-checklist.md`
-- `docs/refactor/phase7-rollback-playbook.md`
-- `docs/refactor/phase7-acceptance-report-template.md`
+常见检查命令：
 
----
+```bash
+curl http://localhost:8000/actuator/health
+curl http://localhost:8001/actuator/health
+curl http://localhost:8002/actuator/health
+curl http://localhost:8003/actuator/health
+curl http://localhost:8004/actuator/health
+curl http://localhost:8005/actuator/health
+```
 
-## 重构进度
+Phase 7 预检脚本：
 
-根据当前主线状态，核心重构已经完成，并进入“发布/稳定化”阶段。
+```bash
+bash docker/monitoring/scripts/phase7-preflight.sh
+```
 
-已完成主阶段：
-- Phase 1：Core CRUD + MQ 统一
-- Phase 2：Redirect 跳转服务
-- Phase 3：冷热数据优化
-- Phase 4：Stats / Risk 服务拆分
-- Phase 5：User / Gateway / 路由对齐
-- Phase 7：监控、联调、验收闭环
+脚本依赖业务服务和监控容器已经启动。详细的发布前检查、回滚步骤和历史验收记录见：
 
-参考文档：
-- `docs/plans/2026-02-16-project-service-refactor-design.md`
-- `docs/refactor/phase7-acceptance-report-2026-03-06.md`
+- [`docs/refactor/phase7-release-checklist.md`](docs/refactor/phase7-release-checklist.md)
+- [`docs/refactor/phase7-rollback-playbook.md`](docs/refactor/phase7-rollback-playbook.md)
+- [`docs/refactor/phase7-acceptance-report-2026-03-06.md`](docs/refactor/phase7-acceptance-report-2026-03-06.md)
 
----
+## 性能测试
 
-## 文档索引
+JMeter 脚本位于 [`tests/performance/jmeter`](tests/performance/jmeter)：
 
-### 设计与实施
-- `docs/plans/2026-02-16-project-service-refactor-design.md`
-- `docs/plans/2026-03-02-phase7-release-acceptance-design.md`
-- `docs/plans/2026-03-07-notification-bell-design.md`
-- `docs/plans/2026-03-07-notification-bell-implementation-plan.md`
+- `create-short-link.jmx`
+- `redirect-short-link.jmx`
 
-### 验收与回滚
-- `docs/refactor/phase7-acceptance-report-2026-03-02.md`
-- `docs/refactor/phase7-acceptance-report-2026-03-06.md`
-- `docs/refactor/phase7-release-checklist.md`
-- `docs/refactor/phase7-rollback-playbook.md`
+压测前需要明确目标服务、数据库规模、缓存状态、并发数和数据清理策略。不要把开发环境单次冒烟结果当成容量结论。
 
-### 需求与历史资料
-- `docs/refactor/requirement.md`
+## 相关文档
 
----
+| 文档 | 内容 |
+| --- | --- |
+| [`CODE_STYLE.md`](CODE_STYLE.md) | 编码和提交规范 |
+| [`docs/refactor/requirement.md`](docs/refactor/requirement.md) | 重构需求规格 |
+| [`docs/plans/2026-02-16-project-service-refactor-design.md`](docs/plans/2026-02-16-project-service-refactor-design.md) | project-service 拆分设计和阶段记录 |
+| [`docs/plans/2026-03-21-cicd-automated-deployment-implementation-plan.md`](docs/plans/2026-03-21-cicd-automated-deployment-implementation-plan.md) | CI/CD 实施计划 |
+| [`docs/plans/2026-03-07-notification-bell-design.md`](docs/plans/2026-03-07-notification-bell-design.md) | 通知铃铛设计 |
+| [`docs/refactor/phase7-release-checklist.md`](docs/refactor/phase7-release-checklist.md) | 发布检查清单 |
+| [`docs/refactor/phase7-rollback-playbook.md`](docs/refactor/phase7-rollback-playbook.md) | 回滚操作手册 |
 
-## 提交规范
+## 提交约定
 
-建议使用 Conventional Commits 风格：
+项目使用 Conventional Commits 风格：
 
 ```text
-feat(scope): description
-fix(scope): description
-refactor(scope): description
-docs(scope): description
-test(scope): description
-chore(scope): description
+feat(scope): add a capability
+fix(scope): correct a defect
+refactor(scope): restructure code without behavior change
+test(scope): add or update tests
+docs(scope): update documentation
+chore(scope): maintain tooling or deployment
 ```
-
-项目内已有大量这类提交记录，可直接保持一致。
-
----
-
-## 压测文件
-
-JMeter 脚本已经收敛到测试目录，可作为性能测试起点：
-
-- `tests/performance/jmeter/create-short-link.jmx`
-- `tests/performance/jmeter/redirect-short-link.jmx`
-
----
-
-## Roadmap
-
-后续可以继续演进的方向包括：
-
-- 更丰富的通知中心能力（分类、删除、归档）
-- 更完整的风控策略与可解释原因
-- 更完善的前端代码拆分与构建优化
-- 更系统的自动化验收脚本与 CI/CD 集成
-
----
 
 ## License
 
-本项目遵循 Apache 2.0 风格版权头规范，具体以仓库内版权与格式配置为准。
+仓库源码使用 Apache 2.0 风格版权头。具体版权文本见 [`format/copyright.txt`](format/copyright.txt)。
