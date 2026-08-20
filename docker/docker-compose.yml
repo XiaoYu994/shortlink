@@ -19,6 +19,7 @@ services:
       - ./mysql/init/01-init-link.sh:/docker-entrypoint-initdb.d/01-init-link.sh:ro
       - ../resources/database/link.sql:/opt/bootstrap/link.sql:ro
       - ./mysql/migrations/create-shard-tables.sh:/opt/migrations/create-shard-tables.sh:ro
+      - ./mysql/migrations/add-user-notification-event-id.sh:/opt/migrations/add-user-notification-event-id.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -uroot -proot --silent || exit 1"]
       interval: 10s

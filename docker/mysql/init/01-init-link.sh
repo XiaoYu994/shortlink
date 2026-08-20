@@ -8,3 +8,4 @@ EOSQL
 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" "${MYSQL_DATABASE:-link}" < /opt/bootstrap/link.sql
 
 bash /opt/migrations/create-shard-tables.sh
+bash /opt/migrations/add-user-notification-event-id.sh

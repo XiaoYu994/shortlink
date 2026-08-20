@@ -221,9 +221,11 @@ CREATE TABLE `t_user_notification` (
                                        `title` varchar(64) DEFAULT NULL COMMENT '标题',
                                        `content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '内容',
                                        `read_flag` tinyint(1) DEFAULT '0' COMMENT '是否已读: 0-未读 1-已读',
+                                       `event_id` varchar(64) DEFAULT NULL COMMENT '消息幂等 ID',
                                        `create_time` datetime DEFAULT NULL COMMENT '创建时间',
                                        PRIMARY KEY (`id`),
-                                       KEY `idx_user_id` (`user_id`)
+                                       KEY `idx_user_id` (`user_id`),
+                                       UNIQUE KEY `idx_unique_event_id` (`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户通知表';
 
 -- ----------------------------

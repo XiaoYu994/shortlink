@@ -347,6 +347,15 @@ migrate_mysql_shards() {
     -e "SHORTLINK_SHARD_COUNT=${SHORTLINK_SHARD_COUNT}" \
     shortlink-mysql bash "${script_path}"
   docker exec shortlink-mysql rm -f "${script_path}"
+
+  echo "ensuring t_user_notification.event_id exists"
+  local notify_script=/tmp/shortlink-add-user-notification-event-id.sh
+  docker cp "${PROJECT_DIR}/docker/mysql/migrations/add-user-notification-event-id.sh" "shortlink-mysql:${notify_script}"
+  docker exec \
+    -e "MYSQL_HOST=127.0.0.1" \
+    -e "MYSQL_PORT=3306" \
+    shortlink-mysql bash "${notify_script}"
+  docker exec shortlink-mysql rm -f "${notify_script}"
   MYSQL_SHARDS_MIGRATED=true
 }
 

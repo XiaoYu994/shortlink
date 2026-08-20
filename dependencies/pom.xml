@@ -53,6 +53,7 @@
 
         <!-- Excel 处理 -->
         <easyexcel.version>3.3.4</easyexcel.version>
+        <commons-io.version>2.16.1</commons-io.version>
         <poi.version>5.2.5</poi.version>
 
         <!-- 网络请求 -->
@@ -259,6 +260,12 @@
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
                 <version>${easyexcel.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
             </dependency>
 
             <dependency>
