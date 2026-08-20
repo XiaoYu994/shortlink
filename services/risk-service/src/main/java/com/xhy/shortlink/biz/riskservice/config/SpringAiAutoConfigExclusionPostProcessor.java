@@ -29,14 +29,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 空 api-key 仍会触发 DashScope 自动配置并在启动期断言失败。
+ * 始终关闭 Spring AI（含 DashScope）自动配置。ChatClient 由 {@link RiskChatClientConfiguration} 按 Nacos 手工创建，
+ * 避免空 Key 或 Nacos 晚于自动配置加载时启动失败。
+ * <p>
+ * 会与配置中已有的 {@code spring.autoconfigure.exclude} 合并（覆盖 YAML 列表的索引键形式与逗号分隔形式），
+ * 不会抹掉运维手工追加的排除项。
  */
-public class DashScopeOptionalEnvironmentPostProcessor implements EnvironmentPostProcessor {
+public class SpringAiAutoConfigExclusionPostProcessor implements EnvironmentPostProcessor {
 
-    private static final String PROPERTY_SOURCE = "dashscope-optional";
+    private static final String PROPERTY_SOURCE = "spring-ai-auto-config-off";
     private static final String EXCLUDE_PROPERTY = "spring.autoconfigure.exclude";
-    private static final List<String> DASHSCOPE_AUTO_CONFIGS = List.of(
-            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAutoConfiguration",
+    private static final List<String> AI_AUTO_CONFIGS = List.of(
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration",
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration",
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration",
@@ -44,27 +47,48 @@ public class DashScopeOptionalEnvironmentPostProcessor implements EnvironmentPos
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration",
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration",
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration",
-            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration");
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration",
+            "org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration");
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        String apiKey = environment.getProperty("spring.ai.dashscope.api-key", "");
-        if (StringUtils.hasText(apiKey)) {
-            return;
-        }
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("spring.ai.model.chat", "none");
-        List<String> excludes = new ArrayList<>();
-        String existing = environment.getProperty(EXCLUDE_PROPERTY, "");
-        if (StringUtils.hasText(existing)) {
-            excludes.addAll(List.of(existing.split(",")));
-        }
-        for (String autoConfig : DASHSCOPE_AUTO_CONFIGS) {
-            if (excludes.stream().noneMatch(item -> item.trim().equals(autoConfig))) {
+        List<String> excludes = collectExistingExcludes(environment);
+        for (String autoConfig : AI_AUTO_CONFIGS) {
+            if (excludes.stream().noneMatch(item -> item.equals(autoConfig))) {
                 excludes.add(autoConfig);
             }
         }
         properties.put(EXCLUDE_PROPERTY, String.join(",", excludes));
         environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE, properties));
+    }
+
+    /**
+     * 收集配置中已有的排除项。YAML 列表会被扁平化为 {@code spring.autoconfigure.exclude[0..n]} 索引键，
+     * 整串读取返回 null，因此需要两种形式都尝试。
+     */
+    private List<String> collectExistingExcludes(ConfigurableEnvironment environment) {
+        List<String> excludes = new ArrayList<>();
+        String flat = environment.getProperty(EXCLUDE_PROPERTY, "");
+        if (StringUtils.hasText(flat)) {
+            collect(flat, excludes);
+        }
+        for (int i = 0; ; i++) {
+            String indexed = environment.getProperty(EXCLUDE_PROPERTY + "[" + i + "]");
+            if (indexed == null) {
+                break;
+            }
+            collect(indexed, excludes);
+        }
+        return new ArrayList<>(excludes.stream().distinct().toList());
+    }
+
+    private void collect(String value, List<String> excludes) {
+        for (String item : value.split(",")) {
+            if (StringUtils.hasText(item)) {
+                excludes.add(item.trim());
+            }
+        }
     }
 }

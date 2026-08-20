@@ -103,7 +103,7 @@ Replace hardcoded local endpoints with env-backed defaults in the three deployed
 Also parameterize:
 
 - `short-link.domain.default` in `aggregation-service`
-- `DASHSCOPE_API_KEY` in `risk-service` remains required at runtime
+- `short-link.risk-control.ai.*` in `risk-service` (RISK_AI_PROVIDER/API_KEY/MODEL/BASE_URL；`DASHSCOPE_API_KEY` 仅作为空 Key 时的兼容回退，不再必需)
 
 Use local defaults so existing developer startup still works.
 
@@ -282,7 +282,7 @@ Document the required variables, including:
 - `SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD`
 - `ROCKETMQ_NAME_SERVER`
 - `SHORT_LINK_DOMAIN_DEFAULT`
-- `DASHSCOPE_API_KEY`
+- `RISK_AI_PROVIDER` / `RISK_AI_API_KEY` / `RISK_AI_MODEL` / `RISK_AI_BASE_URL`（URL 风控 AI；`DASHSCOPE_API_KEY` 仍作为空 Key 兼容回退）
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
 
@@ -450,7 +450,7 @@ Document these repository secrets:
 - `SERVER_SSH_KEY`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
-- `DASHSCOPE_API_KEY`
+- `RISK_AI_PROVIDER` / `RISK_AI_API_KEY` / `RISK_AI_MODEL` / `RISK_AI_BASE_URL`（URL 风控 AI；`DASHSCOPE_API_KEY` 仍作为空 Key 兼容回退）
 - `SHORT_LINK_DOMAIN_DEFAULT`
 
 Optional, if production enables Nacos auth:

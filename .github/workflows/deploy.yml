@@ -95,6 +95,10 @@ jobs:
             SHORT_LINK_DOMAIN_DEFAULT=${{ secrets.SHORT_LINK_DOMAIN_DEFAULT }}
             SHORT_LINK_DOMAIN_PROTOCOL=${{ secrets.SHORT_LINK_DOMAIN_PROTOCOL || 'http' }}
             SHORT_LINK_STATS_LOCALE_AMAP_KEY=${{ secrets.SHORT_LINK_STATS_LOCALE_AMAP_KEY }}
+            RISK_AI_PROVIDER=${{ secrets.RISK_AI_PROVIDER }}
+            RISK_AI_API_KEY=${{ secrets.RISK_AI_API_KEY }}
+            RISK_AI_MODEL=${{ secrets.RISK_AI_MODEL }}
+            RISK_AI_BASE_URL=${{ secrets.RISK_AI_BASE_URL }}
             DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
             GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}
             GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}

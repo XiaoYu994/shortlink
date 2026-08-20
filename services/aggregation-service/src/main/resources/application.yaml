@@ -53,14 +53,6 @@ spring:
         group: DEFAULT_GROUP
         namespace: ${NACOS_NAMESPACE:}
         refresh-enabled: true
-  ai:
-    model:
-      chat: none
-    dashscope:
-      api-key: ${DASHSCOPE_API_KEY:}
-      chat:
-        options:
-          model: qwen3-max
 
 sa-token:
   token-style: simple-uuid
@@ -135,6 +127,11 @@ short-link:
       amap-key: ${SHORT_LINK_STATS_LOCALE_AMAP_KEY:}
   risk-control:
     jsoup-timeout: 3000
+    ai:
+      provider: ${RISK_AI_PROVIDER:}
+      api-key: ${RISK_AI_API_KEY:${DASHSCOPE_API_KEY:}}
+      model: ${RISK_AI_MODEL:}
+      base-url: ${RISK_AI_BASE_URL:}
 
 mybatis-plus:
   configuration:

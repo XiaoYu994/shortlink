@@ -40,6 +40,11 @@ services:
       SHORTLINK_MYSQL_PASSWORD: ${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
       SHORTLINK_MYSQL_DATABASE: ${MYSQL_DATABASE:-link}
       SHORTLINK_MYSQL_COLD_DATABASE: ${MYSQL_COLD_DATABASE:-link_cold}
+      RISK_AI_PROVIDER: ${RISK_AI_PROVIDER:-}
+      RISK_AI_API_KEY: ${RISK_AI_API_KEY:-}
+      RISK_AI_MODEL: ${RISK_AI_MODEL:-}
+      RISK_AI_BASE_URL: ${RISK_AI_BASE_URL:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       SPRING_DATASOURCE_URL: jdbc:shardingsphere:classpath:shardingsphere-config-prod.yaml?placeholder-type=environment
     networks:
       - shortlink

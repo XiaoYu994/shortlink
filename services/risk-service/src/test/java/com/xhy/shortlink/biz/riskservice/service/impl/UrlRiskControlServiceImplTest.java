@@ -26,7 +26,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -36,16 +39,29 @@ class UrlRiskControlServiceImplTest {
     private UrlRiskControlServiceImpl riskControlService;
 
     @Mock
-    private ChatClient.Builder chatClientBuilder;
-    @Mock
     private ChatClient chatClient;
+    @Mock
+    private ChatClient.ChatClientRequestSpec promptSpec;
+    @Mock
+    private ChatClient.CallResponseSpec callResponseSpec;
+
+    /**
+     * 本地回环地址会被 SSRF 守卫拒绝，fetch 抛非连接类 IOException，
+     * 从而以 warning 摘要为入参走 AI 分支——不依赖外网即可覆盖 callAiForAnalysis。
+     */
+    private static final String SSRF_BLOCKED_URL = "http://127.0.0.1:8000/login";
 
     @BeforeEach
     void setUp() {
-        when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder);
-        when(chatClientBuilder.build()).thenReturn(chatClient);
-        riskControlService = new UrlRiskControlServiceImpl(chatClientBuilder);
+        riskControlService = new UrlRiskControlServiceImpl(chatClient);
         ReflectionTestUtils.setField(riskControlService, "jsoupTimeout", 3000);
+    }
+
+    private void stubAiResponse(ShortLinkRiskCheckRespDTO dto) {
+        when(chatClient.prompt()).thenReturn(promptSpec);
+        when(promptSpec.user(anyString())).thenReturn(promptSpec);
+        when(promptSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.entity(ShortLinkRiskCheckRespDTO.class)).thenReturn(dto);
     }
 
     @Test
@@ -91,16 +107,65 @@ class UrlRiskControlServiceImplTest {
     }
 
     @Test
-    void checkUrlRisk_normalUrl_notMatchBlacklist() {
-        // Normal paypal.com without suspicious patterns should not hit blacklist
-        // (will go to AI analysis or network fetch, but won't match local rules)
-        String url = "https://normal-site.com/page";
+    void checkUrlRisk_withoutChatClient_skipsModel() {
+        UrlRiskControlServiceImpl withoutAi = new UrlRiskControlServiceImpl(null);
+        ReflectionTestUtils.setField(withoutAi, "jsoupTimeout", 3000);
 
-        // This will try to fetch the page and call AI, which will fail in test.
-        // The service should handle this gracefully.
-        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(url);
+        ShortLinkRiskCheckRespDTO result = withoutAi.checkUrlRisk("https://normal-site.com/page");
 
-        // Even if AI call fails, the service should return a result (degraded)
         assertNotNull(result);
+        assertTrue(result.isSafe());
+        assertEquals("NONE", result.getRiskType());
+        assertTrue(result.getDetail().contains("未配置 AI 风控"));
+    }
+
+    @Test
+    void checkUrlRisk_aiAnalysis_returnsModelVerdict() {
+        stubAiResponse(ShortLinkRiskCheckRespDTO.builder()
+                .safe(false).riskType("SCAM").summary("疑似诈骗").detail("诱导充值").build());
+
+        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(SSRF_BLOCKED_URL);
+
+        assertFalse(result.isSafe());
+        assertEquals("SCAM", result.getRiskType());
+        assertEquals("诱导充值", result.getDetail());
+    }
+
+    @Test
+    void checkUrlRisk_aiDataInspectionFailed_returnsHighRisk() {
+        when(chatClient.prompt()).thenReturn(promptSpec);
+        when(promptSpec.user(anyString())).thenReturn(promptSpec);
+        when(promptSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.entity(ShortLinkRiskCheckRespDTO.class))
+                .thenThrow(new RuntimeException("DataInspectionFailed: blocked by safety check"));
+
+        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(SSRF_BLOCKED_URL);
+
+        assertFalse(result.isSafe());
+        assertEquals("HIGH_RISK", result.getRiskType());
+        assertTrue(result.getDetail().contains("DataInspectionFailed"));
+    }
+
+    @Test
+    void checkUrlRisk_aiServiceUnavailable_degradesToSafe() {
+        when(chatClient.prompt()).thenReturn(promptSpec);
+        when(promptSpec.user(anyString())).thenReturn(promptSpec);
+        when(promptSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.entity(ShortLinkRiskCheckRespDTO.class))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk(SSRF_BLOCKED_URL);
+
+        assertTrue(result.isSafe());
+        assertTrue(result.getDetail().contains("AI 服务暂时不可用"));
+    }
+
+    @Test
+    void checkUrlRisk_unknownHost_returnsSuspicious() {
+        // .invalid 是 RFC 2606 保留 TLD，解析必然失败 → UnknownHostException → SUSPICIOUS
+        ShortLinkRiskCheckRespDTO result = riskControlService.checkUrlRisk("https://doesnotexist.invalid/page");
+
+        assertFalse(result.isSafe());
+        assertEquals("SUSPICIOUS", result.getRiskType());
     }
 }

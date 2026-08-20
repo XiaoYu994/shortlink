@@ -2,6 +2,17 @@ server:
   port: 8005
 
 spring:
+  autoconfigure:
+    exclude:
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeImageAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration
+      - org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration
   application:
     name: shortlink-risk-service
   datasource:
@@ -18,12 +29,6 @@ spring:
         server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}
         username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
         password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
-  ai:
-    dashscope:
-      api-key: ${DASHSCOPE_API_KEY:}
-      chat:
-        options:
-          model: qwen3-max
 
 mybatis-plus:
   configuration:
@@ -38,6 +43,11 @@ rocketmq:
 short-link:
   risk-control:
     jsoup-timeout: 3000
+    ai:
+      provider: ${RISK_AI_PROVIDER:}
+      api-key: ${RISK_AI_API_KEY:${DASHSCOPE_API_KEY:}}
+      model: ${RISK_AI_MODEL:}
+      base-url: ${RISK_AI_BASE_URL:}
 
 management:
   endpoints:

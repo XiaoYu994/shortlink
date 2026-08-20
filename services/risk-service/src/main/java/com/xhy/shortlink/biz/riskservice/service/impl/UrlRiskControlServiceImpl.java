@@ -48,35 +48,14 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     @Value("${short-link.risk-control.jsoup-timeout:3000}")
     private int jsoupTimeout;
 
-    @Value("${spring.ai.dashscope.api-key:}")
-    private String dashscopeApiKey;
-
     private static final int MAX_ANALYSIS_CHARS = 2000;
     private static final int MAX_REDIRECTS = 4;
     private static final int HTTP_REDIRECT_MIN_STATUS = 300;
     private static final int HTTP_REDIRECT_MAX_STATUS = 400;
     private static final int HTTP_ERROR_STATUS = 400;
 
-    public UrlRiskControlServiceImpl(@Autowired(required = false) ChatClient.Builder chatClientBuilder) {
-        if (chatClientBuilder == null) {
-            this.chatClient = null;
-        } else {
-            this.chatClient = chatClientBuilder
-                    .defaultSystem("""
-                            你是一个资深网络安全专家（Cybersecurity Analyst）。
-                            你的核心任务是根据用户提供的【URL特征】和【网页内容摘要】，判断该链接是否存在安全风险。
-
-                            如果发现风险，请严格按照以下分类进行归类 (riskType)：
-                            1. PHISHING (网络钓鱼)：伪造银行、支付、社交账号登录页。
-                            2. GAMBLING (非法赌博)：涉及真钱博彩、在线赌场、六合彩。
-                            3. PORN (色情低俗)：包含露骨色情内容、招嫖信息。
-                            4. SCAM (诈骗/杀猪盘)：虚假投资、刷单、中奖欺诈、贷款诈骗。
-                            5. OTHER (其他违规)：政治敏感、暴力恐怖等。
-
-                            请务必以 JSON 格式输出结果。
-                            """)
-                    .build();
-        }
+    public UrlRiskControlServiceImpl(@Autowired(required = false) ChatClient chatClient) {
+        this.chatClient = chatClient;
     }
 
     @Override
@@ -87,7 +66,7 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
         } else if (isBlackListPattern(url)) {
             result = buildRiskResponse("PHISHING", "疑似钓鱼网址",
                     "命中本地黑名单关键词规则 (Suspicious Pattern)");
-        } else if (chatClient == null || !StringUtils.hasText(dashscopeApiKey)) {
+        } else if (chatClient == null) {
             result = buildSafeResponse("未配置 AI 风控，跳过模型审核");
         } else {
             try {

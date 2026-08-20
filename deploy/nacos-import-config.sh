@@ -122,10 +122,18 @@ render_template() {
   content=${content//__REDIS_PORT__/${REDIS_PORT:-6379}}
   content=${content//__REDIS_PASSWORD__/${REDIS_PASSWORD:-}}
   content=${content//__ROCKETMQ_NAME_SERVER__/${ROCKETMQ_NAME_SERVER:-namesrv:9876}}
-  content=${content//__DASHSCOPE_API_KEY__/${DASHSCOPE_API_KEY:-}}
   content=${content//__SHORT_LINK_DOMAIN_DEFAULT__/${SHORT_LINK_DOMAIN_DEFAULT:-}}
   content=${content//__SHORT_LINK_DOMAIN_PROTOCOL__/${SHORT_LINK_DOMAIN_PROTOCOL:-http}}
   content=${content//__SHORT_LINK_STATS_LOCALE_AMAP_KEY__/${SHORT_LINK_STATS_LOCALE_AMAP_KEY:-}}
+  local ai_key="${RISK_AI_API_KEY:-${DASHSCOPE_API_KEY:-}}"
+  local ai_provider="${RISK_AI_PROVIDER:-}"
+  if [[ -z "${ai_provider}" && -n "${ai_key}" ]]; then
+    ai_provider="dashscope"
+  fi
+  content=${content//__RISK_AI_PROVIDER__/${ai_provider}}
+  content=${content//__RISK_AI_API_KEY__/${ai_key}}
+  content=${content//__RISK_AI_MODEL__/${RISK_AI_MODEL:-}}
+  content=${content//__RISK_AI_BASE_URL__/${RISK_AI_BASE_URL:-}}
   printf '%s' "${content}"
 }
 
@@ -142,6 +150,9 @@ publish_config() {
 
   if [[ "${OVERWRITE}" != "true" ]] && config_exists "${base}" "${data_id}" "${token}"; then
     echo "nacos config exists, skip: ${data_id}"
+    # 存量环境升级提示：旧配置不含 short-link.risk-control.ai.* 时，AI 风控不会生效（静默回退本地黑白名单）。
+    # 迁移方式：设置 NACOS_CONFIG_OVERWRITE=true 重新导入，或在 Nacos 控制台删除该配置后重跑本脚本。
+    echo "  hint: 若本环境已升级 URL 风控 AI 配置（RISK_AI_*），请设置 NACOS_CONFIG_OVERWRITE=true 或删除旧配置后重跑，否则新配置不会下发。"
     return
   fi
 

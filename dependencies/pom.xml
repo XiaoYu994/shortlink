@@ -60,6 +60,7 @@
         <okhttp.version>4.12.0</okhttp.version>
 
         <!-- AI 相关 -->
+        <spring-ai.version>1.1.0</spring-ai.version>
         <spring-ai-alibaba.version>1.1.0.0-RC2</spring-ai-alibaba.version>
 
         <!-- 监控和日志 -->
@@ -294,6 +295,12 @@
                 <groupId>com.alibaba.cloud.ai</groupId>
                 <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
                 <version>${spring-ai-alibaba.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-openai</artifactId>
+                <version>${spring-ai.version}</version>
             </dependency>
 
             <!-- ========================================= -->

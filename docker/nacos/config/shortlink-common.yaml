@@ -17,12 +17,6 @@ spring:
       host: "__REDIS_HOST__"
       port: __REDIS_PORT__
       password: "__REDIS_PASSWORD__"
-  ai:
-    dashscope:
-      api-key: "__DASHSCOPE_API_KEY__"
-      chat:
-        options:
-          model: qwen3-max
 
 rocketmq:
   name-server: "__ROCKETMQ_NAME_SERVER__"
@@ -38,3 +32,17 @@ short-link:
   stats:
     locale:
       amap-key: "__SHORT_LINK_STATS_LOCALE_AMAP_KEY__"
+  risk-control:
+    ai:
+      # 空且有 api-key 时按 dashscope；none 关闭；openai 为兼容协议
+      provider: "__RISK_AI_PROVIDER__"
+      api-key: "__RISK_AI_API_KEY__"
+      # 空则 dashscope=qwen3-max，openai=gpt-4o-mini
+      model: "__RISK_AI_MODEL__"
+      # openai 时填写根地址，SDK 会再拼 /v1/chat/completions：
+      # https://api.openai.com
+      # https://api.deepseek.com
+      # https://api.moonshot.cn
+      # https://api.siliconflow.cn
+      # https://api.x.ai
+      base-url: "__RISK_AI_BASE_URL__"
