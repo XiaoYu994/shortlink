@@ -7,6 +7,17 @@ server:
     connection-timeout: 20000
 
 spring:
+  autoconfigure:
+    exclude:
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeImageAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration
+      - org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration
   application:
     name: shortlink-aggregation-service
   config:
@@ -43,6 +54,8 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         refresh-enabled: true
   ai:
+    model:
+      chat: none
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:}
       chat:
@@ -77,8 +90,8 @@ framework:
 # aggregation 不会自动加载子服务 application.yaml，需要在这里显式声明
 short-link:
   remote:
-    project-service: shortlink-aggregation-service
-    stats-service: shortlink-aggregation-service
+    project-service: shortlink-aggregation-project-feign
+    stats-service: shortlink-aggregation-stats-feign
     project-url: http://127.0.0.1:8003
     stats-url: http://127.0.0.1:8003
   group:

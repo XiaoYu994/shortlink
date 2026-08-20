@@ -37,7 +37,14 @@ public class DashScopeOptionalEnvironmentPostProcessor implements EnvironmentPos
     private static final String EXCLUDE_PROPERTY = "spring.autoconfigure.exclude";
     private static final List<String> DASHSCOPE_AUTO_CONFIGS = List.of(
             "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAutoConfiguration",
-            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration");
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeImageAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration",
+            "com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration");
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {

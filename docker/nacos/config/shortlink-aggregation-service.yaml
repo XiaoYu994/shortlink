@@ -2,8 +2,8 @@
 
 short-link:
   remote:
-    project-service: shortlink-aggregation-service
-    stats-service: shortlink-aggregation-service
+    project-service: shortlink-aggregation-project-feign
+    stats-service: shortlink-aggregation-stats-feign
     project-url: http://127.0.0.1:8003
     stats-url: http://127.0.0.1:8003
   group:

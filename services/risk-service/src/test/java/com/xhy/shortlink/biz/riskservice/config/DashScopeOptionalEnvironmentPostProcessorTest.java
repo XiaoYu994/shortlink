@@ -42,6 +42,7 @@ class DashScopeOptionalEnvironmentPostProcessorTest {
         String excludes = environment.getProperty("spring.autoconfigure.exclude");
         assertNotNull(excludes);
         assertTrue(excludes.contains("com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAutoConfiguration"));
+        assertTrue(excludes.contains("com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration"));
     }
 
     @Test

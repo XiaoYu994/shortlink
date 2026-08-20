@@ -84,7 +84,7 @@ jobs:
             NACOS_AUTH_ENABLE=${{ secrets.NACOS_AUTH_ENABLE || 'true' }}
             NACOS_USERNAME=${{ secrets.NACOS_USERNAME || 'nacos' }}
             NACOS_PASSWORD=${{ secrets.NACOS_PASSWORD || 'nacos' }}
-            NACOS_AUTH_TOKEN=${{ secrets.NACOS_AUTH_TOKEN || 'c2hvcnRsaW5rLW5hY29zLWF1dGgtdG9rZW4tMzJiIQ==' }}
+            NACOS_AUTH_TOKEN=${{ secrets.NACOS_AUTH_TOKEN || 'c2hvcnRsaW5rLW5hY29zLWF1dGgtdG9rZW4tMzJiISE=' }}
             NACOS_AUTH_IDENTITY_KEY=serverIdentity
             NACOS_AUTH_IDENTITY_VALUE=shortlink
             NACOS_NAMESPACE=${{ secrets.NACOS_NAMESPACE }}
