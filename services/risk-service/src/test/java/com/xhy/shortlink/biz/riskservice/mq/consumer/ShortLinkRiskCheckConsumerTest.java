@@ -124,7 +124,7 @@ class ShortLinkRiskCheckConsumerTest {
     }
 
     @Test
-    void onMessage_alreadyBanned_skipsAiCheck() {
+    void onMessage_alreadyBanned_skipsAiCheckButInvalidatesCache() {
         ShortLinkRiskEvent event = ShortLinkRiskEvent.builder()
                 .eventId("evt-3")
                 .fullShortUrl("test.cn/banned")
@@ -136,10 +136,46 @@ class ShortLinkRiskCheckConsumerTest {
         ShortLinkDO linkDO = new ShortLinkDO();
         linkDO.setEnableStatus(LinkEnableStatusEnum.BANNED.getCode());
         when(shortLinkMapper.selectOne(any())).thenReturn(linkDO);
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
 
         consumer.onMessage(event);
 
         verify(riskControlService, never()).checkUrlRisk(anyString());
+        verify(shortLinkMapper, never()).update(any(), any());
+        verify(stringRedisTemplate).delete("short-link:goto:test.cn/banned:");
+        verify(stringRedisTemplate).delete("short-link:goto:is-null:test.cn/banned:");
+        verify(rocketMQTemplate).convertAndSend(
+                eq("short_link_project_cache_invalidate_topic:invalidate"),
+                eq("test.cn/banned"));
+        verify(riskMetrics).recordConsumeSuccess(any(Duration.class));
+    }
+
+    @Test
+    void onMessage_redisDeleteFails_stillBroadcasts() {
+        ShortLinkRiskEvent event = ShortLinkRiskEvent.builder()
+                .eventId("evt-5")
+                .fullShortUrl("test.cn/risky")
+                .originUrl("https://fake-paypal-security-verify.com/login")
+                .gid("g1")
+                .userId(100L)
+                .build();
+
+        ShortLinkDO linkDO = new ShortLinkDO();
+        linkDO.setEnableStatus(LinkEnableStatusEnum.ENABLE.getCode());
+        when(shortLinkMapper.selectOne(any())).thenReturn(linkDO);
+        when(riskControlService.checkUrlRisk(anyString()))
+                .thenReturn(ShortLinkRiskCheckRespDTO.builder()
+                        .safe(false).riskType("PHISHING").summary("钓鱼").detail("疑似钓鱼").build());
+        doThrow(new IllegalStateException("redis down"))
+                .when(stringRedisTemplate).delete(anyString());
+
+        consumer.onMessage(event);
+
+        verify(stringRedisTemplate).delete("short-link:goto:test.cn/risky:");
+        verify(stringRedisTemplate).delete("short-link:goto:is-null:test.cn/risky:");
+        verify(rocketMQTemplate).convertAndSend(
+                eq("short_link_project_cache_invalidate_topic:invalidate"),
+                eq("test.cn/risky"));
         verify(riskMetrics).recordConsumeSuccess(any(Duration.class));
     }
 

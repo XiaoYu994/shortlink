@@ -37,6 +37,7 @@ import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
@@ -82,6 +83,8 @@ public class ShortLinkRiskCheckConsumer implements RocketMQListener<ShortLinkRis
                             .select(ShortLinkDO::getEnableStatus));
             if (linkDO != null && linkDO.getEnableStatus() == LinkEnableStatusEnum.BANNED.getCode()) {
                 log.info("该链接已被封禁，跳过 AI 检测: {}", event.getFullShortUrl());
+                // 上次可能已写库但缓存未清干净，重试时再失效一次。
+                invalidateGotoCache(event.getFullShortUrl());
                 riskMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
                 return;
             }
@@ -111,12 +114,23 @@ public class ShortLinkRiskCheckConsumer implements RocketMQListener<ShortLinkRis
     }
 
     private void invalidateGotoCache(String fullShortUrl) {
-        stringRedisTemplate.delete(ShortLinkGotoCacheKeys.gotoKey(fullShortUrl));
-        stringRedisTemplate.delete(ShortLinkGotoCacheKeys.gotoIsNullKey(fullShortUrl));
+        if (!StringUtils.hasText(fullShortUrl)) {
+            return;
+        }
+        deleteFromRedisQuietly(ShortLinkGotoCacheKeys.gotoKey(fullShortUrl));
+        deleteFromRedisQuietly(ShortLinkGotoCacheKeys.gotoIsNullKey(fullShortUrl));
         try {
             rocketMQTemplate.convertAndSend(ShortLinkGotoCacheKeys.invalidateDestination(), fullShortUrl);
         } catch (Exception e) {
-            log.error("风控封禁广播发送失败", e);
+            log.warn("风控封禁广播发送失败，fullShortUrl={}", fullShortUrl, e);
+        }
+    }
+
+    private void deleteFromRedisQuietly(String key) {
+        try {
+            stringRedisTemplate.delete(key);
+        } catch (Exception e) {
+            log.warn("风控清理 Redis 跳转缓存失败，key={}，仍尝试广播", key, e);
         }
     }
 
