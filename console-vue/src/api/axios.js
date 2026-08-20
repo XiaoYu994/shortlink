@@ -1,10 +1,11 @@
 import axios from 'axios'
-import {getToken, getUsername} from '@/core/auth.js'
+import {getToken, getUsername, removeKey, removeUsername} from '@/core/auth.js'
 import {isNotEmpty} from '@/utils/plugins.js'
 import router from "@/router";
 import {ElMessage} from 'element-plus'
 
 const baseURL = '/api/short-link/admin/v1'
+let redirectingToLogin = false
 
 const http = axios.create({
     baseURL: baseURL,
@@ -53,8 +54,19 @@ http.interceptors.response.use(
     (err) => {
         // 🔥 优化2：健壮性处理。如果断网，err.response 是 undefined
         if (err.response && err.response.status === 401) {
-            localStorage.removeItem('token')
-            router.push('/login')
+            removeKey()
+            removeUsername()
+            if (!redirectingToLogin) {
+                redirectingToLogin = true
+                if (router.currentRoute.value.path !== '/login') {
+                    router.push('/login').finally(() => {
+                        redirectingToLogin = false
+                    })
+                } else {
+                    redirectingToLogin = false
+                }
+            }
+            return Promise.reject(err)
         }
 
         // 🔥 优化3：处理网络超时等没有 response 的情况

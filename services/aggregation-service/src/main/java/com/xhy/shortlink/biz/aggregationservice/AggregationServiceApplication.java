@@ -21,14 +21,29 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
+import com.xhy.shortlink.biz.userservice.ShortlinkUserApplication;
+import com.xhy.shortlink.biz.projectservice.ShortlinkProjectApplication;
 
 /** 聚合服务启动类 - 聚合 user-service 和 project-service */
 @EnableDiscoveryClient
-@SpringBootApplication(scanBasePackages = {
-        "com.xhy.shortlink.biz.userservice",
-        "com.xhy.shortlink.biz.projectservice",
-        "com.xhy.shortlink.biz.aggregationservice"
-})
+@EnableFeignClients("com.xhy.shortlink.biz.userservice.remote")
+@SpringBootApplication
+@ComponentScan(
+        basePackages = {
+                "com.xhy.shortlink.biz.userservice",
+                "com.xhy.shortlink.biz.projectservice",
+                "com.xhy.shortlink.biz.aggregationservice"
+        },
+        nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = {ShortlinkUserApplication.class, ShortlinkProjectApplication.class}
+        )
+)
 @MapperScan(value = {
         "com.xhy.shortlink.biz.userservice.dao.mapper",
         "com.xhy.shortlink.biz.projectservice.dao.mapper"

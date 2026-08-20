@@ -172,12 +172,14 @@ const loginFormRule = reactive({
 
 // 处理登录成功后的逻辑
 const handleLoginSuccess = (token, username) => {
-  if (token) {
-    setToken(token)
-    setUsername(username)
-    localStorage.setItem('token', token)
-    localStorage.setItem('username', username)
+  if (!token || token === 'null' || token === 'undefined') {
+    ElMessage.error('登录响应缺少有效 token')
+    return
   }
+  setToken(token)
+  setUsername(username)
+  localStorage.setItem('token', token)
+  localStorage.setItem('username', username)
   ElMessage.success('登录成功！')
   router.push('/home')
 }

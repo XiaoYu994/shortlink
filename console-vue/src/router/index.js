@@ -44,19 +44,29 @@ const router = createRouter({
 })
 
 // eslint-disable-next-line no-unused-vars
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
   // 从localstorage中先获取token，并赋给chookies，如果还存在token，而且还处于正常登录状态就直接将token和username赋给cookies，用户徐的数据请求
-  setToken(localStorage.getItem('token'))
-  setUsername(localStorage.getItem('username'))
-  const token = getToken()
-  if (to.path === '/login') {
-    next()
-  }
-  if (isNotEmpty(token)) {
-    next()
+  const storedToken = localStorage.getItem('token')
+  const storedUsername = localStorage.getItem('username')
+  if (isNotEmpty(storedToken)) {
+    setToken(storedToken)
   } else {
-    next('/login')
+    localStorage.removeItem('token')
+    setToken(null)
   }
+  if (isNotEmpty(storedUsername)) {
+    setUsername(storedUsername)
+  } else {
+    localStorage.removeItem('username')
+    setUsername(null)
+  }
+  const token = getToken()
+
+  if (to.path === '/login') {
+    return token ? next('/home') : next()
+  }
+
+  return isNotEmpty(token) ? next() : next('/login')
 })
 
 export default router

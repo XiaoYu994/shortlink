@@ -28,6 +28,19 @@ spring:
         username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
         password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
 
+# Keep the aggregation facade on the same Sa-Token namespace as user-service
+# and gateway. The aggregation module embeds user/project services, so their
+# application.yaml files are not loaded automatically.
+sa-token:
+  token-style: simple-uuid
+  token-name: short-link
+  timeout: 1800
+  is-concurrent: true
+  is-share: true
+  is-read-header: true
+  is-read-cookie: false
+  is-print: false
+
 # user-service 业务配置
 short-link:
   group:

@@ -157,7 +157,7 @@ function wsBaseUrl() {
 
 function connectSocket() {
   const token = getToken()
-  if (!token) return
+  if (!token || token === 'null' || token === 'undefined') return
   manualClose = false
   const url = `${wsBaseUrl()}?token=${encodeURIComponent(token)}`
   socket = new WebSocket(url)
@@ -185,7 +185,7 @@ function connectSocket() {
 
   socket.onclose = () => {
     socket = null
-    if (!manualClose) {
+    if (!manualClose && getToken()) {
       scheduleReconnect()
     }
   }
