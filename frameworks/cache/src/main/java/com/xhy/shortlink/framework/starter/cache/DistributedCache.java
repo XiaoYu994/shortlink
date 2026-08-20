@@ -17,8 +17,7 @@
 
 package com.xhy.shortlink.framework.starter.cache;
 
-import com.xhy.shortlink.framework.starter.cache.core.CacheGetFilter;
-import com.xhy.shortlink.framework.starter.cache.core.CacheGetIfAbsent;
+import com.xhy.shortlink.framework.starter.cache.core.CacheGetOptions;
 import com.xhy.shortlink.framework.starter.cache.core.CacheLoader;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,38 +51,12 @@ public interface DistributedCache extends Cache {
     <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit);
 
     /**
-     * 安全获取缓存（布隆过滤器防穿透 + 分布式锁防击穿），使用默认时间单位
+     * 安全获取缓存（布隆过滤器防穿透 + 分布式锁防击穿）。
+     *
+     * @param options 安全读取选项，可配置时间单位、布隆过滤器和回调
      */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, RBloomFilter<String> bloomFilter);
-
-    /**
-     * 安全获取缓存（布隆过滤器防穿透 + 分布式锁防击穿）
-     */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit, RBloomFilter<String> bloomFilter);
-
-    /**
-     * 安全获取缓存（布隆过滤器防穿透 + {@link CacheGetFilter} 补偿删除 + 分布式锁防击穿），使用默认时间单位
-     */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout,
-                  RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter);
-
-    /**
-     * 安全获取缓存（布隆过滤器防穿透 + {@link CacheGetFilter} 补偿删除 + 分布式锁防击穿）
-     */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                  RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter);
-
-    /**
-     * 安全获取缓存（布隆过滤器防穿透 + {@link CacheGetFilter} 补偿删除 + 分布式锁防击穿 + 缺失回调），使用默认时间单位
-     */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout,
-                  RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter, CacheGetIfAbsent<String> cacheGetIfAbsent);
-
-    /**
-     * 安全获取缓存（布隆过滤器防穿透 + {@link CacheGetFilter} 补偿删除 + 分布式锁防击穿 + 缺失回调）
-     */
-    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                  RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter, CacheGetIfAbsent<String> cacheGetIfAbsent);
+    <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader,
+                  CacheGetOptions options);
 
     /**
      * 放入缓存，自定义超时时间（使用默认时间单位）

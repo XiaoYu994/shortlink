@@ -21,8 +21,7 @@ import com.alibaba.fastjson2.JSON;
 import com.google.common.collect.Lists;
 import com.xhy.shortlink.framework.starter.bases.Singleton;
 import com.xhy.shortlink.framework.starter.cache.config.RedisDistributedProperties;
-import com.xhy.shortlink.framework.starter.cache.core.CacheGetFilter;
-import com.xhy.shortlink.framework.starter.cache.core.CacheGetIfAbsent;
+import com.xhy.shortlink.framework.starter.cache.core.CacheGetOptions;
 import com.xhy.shortlink.framework.starter.cache.core.CacheLoader;
 import com.xhy.shortlink.framework.starter.cache.toolkit.CacheUtil;
 import com.xhy.shortlink.framework.starter.cache.toolkit.FastJson2Util;
@@ -38,6 +37,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scripting.support.ResourceScriptSource;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -116,45 +116,24 @@ public class StringRedisTemplateProxy implements DistributedCache {
 
     @Override
     public <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit) {
-        return safeGet(key, clazz, cacheLoader, timeout, timeUnit, null);
+        return safeGet(key, clazz, cacheLoader, CacheGetOptions.of(timeout, timeUnit));
     }
 
     @Override
-    public <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, RBloomFilter<String> bloomFilter) {
-        return safeGet(key, clazz, cacheLoader, timeout, bloomFilter, null, null);
-    }
-
-    @Override
-    public <T> T safeGet(@NotBlank String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit, RBloomFilter<String> bloomFilter) {
-        return safeGet(key, clazz, cacheLoader, timeout, timeUnit, bloomFilter, null, null);
-    }
-
-    @Override
-    public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout,
-                         RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter) {
-        return safeGet(key, clazz, cacheLoader, timeout, redisProperties.getValueTimeUnit(), bloomFilter, cacheCheckFilter, null);
-    }
-
-    @Override
-    public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                         RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheCheckFilter) {
-        return safeGet(key, clazz, cacheLoader, timeout, timeUnit, bloomFilter, cacheCheckFilter, null);
-    }
-
-    @Override
-    public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout,
-                         RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheGetFilter, CacheGetIfAbsent<String> cacheGetIfAbsent) {
-        return safeGet(key, clazz, cacheLoader, timeout, redisProperties.getValueTimeUnit(), bloomFilter, cacheGetFilter, cacheGetIfAbsent);
-    }
-
-    @Override
-    public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                         RBloomFilter<String> bloomFilter, CacheGetFilter<String> cacheGetFilter, CacheGetIfAbsent<String> cacheGetIfAbsent) {
+    public <T> T safeGet(String key, Class<T> clazz, CacheLoader<T> cacheLoader,
+                         CacheGetOptions options) {
+        Objects.requireNonNull(options, "Cache get options must not be null");
+        if (options.getTimeout() <= 0) {
+            throw new IllegalArgumentException("Cache get options timeout must be positive");
+        }
+        TimeUnit timeUnit = Optional.ofNullable(options.getTimeUnit())
+                .orElseGet(redisProperties::getValueTimeUnit);
+        Objects.requireNonNull(timeUnit, "Cache get options timeUnit must not be null");
         T result = get(key, clazz);
         // 缓存命中直接返回；通过 cacheGetFilter 判断是否跳过（补偿布隆过滤器无法删除）；布隆过滤器不包含则直接返回空
         if (!CacheUtil.isNullOrBlank(result)
-                || Optional.ofNullable(cacheGetFilter).map(each -> each.filter(key)).orElse(false)
-                || Optional.ofNullable(bloomFilter).map(each -> !each.contains(key)).orElse(false)) {
+                || Optional.ofNullable(options.getCacheGetFilter()).map(each -> each.filter(key)).orElse(false)
+                || Optional.ofNullable(options.getBloomFilter()).map(each -> !each.contains(key)).orElse(false)) {
             return result;
         }
         RLock lock = redissonClient.getLock(SAFE_GET_DISTRIBUTED_LOCK_KEY_PREFIX + key);
@@ -164,9 +143,9 @@ public class StringRedisTemplateProxy implements DistributedCache {
             result = get(key, clazz);
             if (CacheUtil.isNullOrBlank(result)) {
                 // 回源加载，仍为空则执行缺失回调
-                result = safeLoadAndSet(key, cacheLoader, timeout, timeUnit, bloomFilter);
+                result = safeLoadAndSet(key, cacheLoader, options, timeUnit);
                 if (CacheUtil.isNullOrBlank(result)) {
-                    Optional.ofNullable(cacheGetIfAbsent).ifPresent(each -> each.execute(key));
+                    Optional.ofNullable(options.getCacheGetIfAbsent()).ifPresent(each -> each.execute(key));
                 }
             }
         } finally {
@@ -223,13 +202,12 @@ public class StringRedisTemplateProxy implements DistributedCache {
         return result;
     }
 
-    private <T> T safeLoadAndSet(String key, CacheLoader<T> cacheLoader, long timeout, TimeUnit timeUnit,
-                                 RBloomFilter<String> bloomFilter) {
+    private <T> T safeLoadAndSet(String key, CacheLoader<T> cacheLoader, CacheGetOptions options, TimeUnit timeUnit) {
         T result = cacheLoader.load();
         if (CacheUtil.isNullOrBlank(result)) {
             return result;
         }
-        safePut(key, result, timeout, timeUnit, bloomFilter);
+        safePut(key, result, options.getTimeout(), timeUnit, options.getBloomFilter());
         return result;
     }
 }
