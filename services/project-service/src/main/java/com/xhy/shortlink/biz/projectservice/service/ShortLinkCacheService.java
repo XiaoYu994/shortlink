@@ -47,6 +47,13 @@ public interface ShortLinkCacheService {
     void rebuildCache(String fullShortUrl, String originUrl, String gid, Date validDate);
 
     /**
+     * 失效跳转缓存：删 Redis、清本机 Caffeine，并广播让其他实例清本地缓存。
+     *
+     * @param fullShortUrl 完整短链接
+     */
+    void invalidate(String fullShortUrl);
+
+    /**
      * 清除本地 Caffeine 缓存
      *
      * @param fullShortUrl 完整短链接

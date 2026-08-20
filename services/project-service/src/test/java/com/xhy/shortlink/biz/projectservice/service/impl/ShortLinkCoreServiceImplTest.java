@@ -42,7 +42,6 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkRiskProducer;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
@@ -106,8 +105,6 @@ class ShortLinkCoreServiceImplTest {
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private ShortLinkRiskProducer riskProducer;
-    @Mock
-    private ShortLinkCacheProducer cacheProducer;
     @Mock
     private ShortLinkExpireArchiveProducer expireArchiveProducer;
     @Mock
@@ -301,14 +298,13 @@ class ShortLinkCoreServiceImplTest {
                 .enableStatus(0)
                 .build();
         when(shortLinkMapper.selectOne(any())).thenReturn(existing);
-        when(stringRedisTemplate.delete(anyList())).thenReturn(2L);
 
         shortLinkCoreService.updateShortLink(req);
 
         verify(shortLinkMapper).update(
                 isNull(),
                 any(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class));
-        verify(cacheProducer).sendMessage("test.cn/abc");
+        verify(cacheHelper).invalidate("test.cn/abc");
         verify(riskProducer).sendMessage(any());
         verify(eventPublisher).publishEvent(any(Object.class));
     }

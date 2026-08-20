@@ -33,31 +33,22 @@ import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
 import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.service.RecycleBinService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
-import static com.xhy.shortlink.biz.projectservice.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
-
-
 /**
  * 回收站服务实现
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RecycleBinServiceImpl implements RecycleBinService {
 
     private static final long MAX_PAGE_SIZE = 100;
@@ -68,13 +59,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     private final ShortLinkColdMapper shortLinkColdMapper;
     private final ShortLinkCoreService shortLinkCoreService;
     private final ShortLinkColdDataService shortLinkColdDataService;
-    private final StringRedisTemplate stringRedisTemplate;
-
-    @Autowired(required = false)
-    private ShortLinkCacheHelper cacheHelper;
-
-    @Autowired(required = false)
-    private ShortLinkCacheProducer cacheProducer;
+    private final ShortLinkCacheHelper cacheHelper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -192,27 +177,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     }
 
     private void clearCache(String fullShortUrl) {
-        // 逐个删除以兼容不同 RedisTemplate 实现，并确保一个 key 的异常不跳过另一个。
-        for (String key : List.of(
-                String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
-                String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl))) {
-            try {
-                stringRedisTemplate.delete(key);
-            } catch (Exception e) {
-                log.warn("[回收站] 清理 Redis 缓存失败，key={}", key, e);
-            }
-        }
-        if (cacheHelper != null) {
-            cacheHelper.evictLocalCache(fullShortUrl);
-        }
-        if (cacheProducer != null) {
-            try {
-                cacheProducer.sendMessage(fullShortUrl);
-            } catch (Exception e) {
-                // 本地缓存已经清理，后续请求仍可回源重建；记录异常便于定位广播链路故障。
-                log.warn("[回收站] 广播缓存失效消息失败，fullShortUrl={}", fullShortUrl, e);
-            }
-        }
+        cacheHelper.invalidate(fullShortUrl);
     }
 
     private void validatePage(ShortLinkRecycleBinPageReqDTO requestParam) {

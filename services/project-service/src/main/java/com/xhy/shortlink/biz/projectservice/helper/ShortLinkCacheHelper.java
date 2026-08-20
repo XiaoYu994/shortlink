@@ -18,6 +18,8 @@
 package com.xhy.shortlink.biz.projectservice.helper;
 
 import com.github.benmanes.caffeine.cache.Cache;
+import com.xhy.shortlink.biz.api.project.constant.ShortLinkGotoCacheKeys;
+import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCacheService;
 import com.xhy.shortlink.biz.projectservice.toolkit.LinkUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import org.redisson.api.RBloomFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.Date;
 import java.net.URLEncoder;
@@ -57,6 +60,7 @@ public class ShortLinkCacheHelper implements ShortLinkCacheService {
     private final StringRedisTemplate stringRedisTemplate;
     private final Cache<String, String> shortLinkCache;
     private final RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter;
+    private final ShortLinkCacheProducer cacheProducer;
 
     @Value("${short-link.cache.ttl-jitter-ratio:0.1}")
     private double ttlJitterRatio = 0.1;
@@ -104,6 +108,32 @@ public class ShortLinkCacheHelper implements ShortLinkCacheService {
         long initialTTL = applyTtlJitter(LinkUtil.getLinkCacheValidTime(validDate));
         stringRedisTemplate.opsForValue().set(key, cacheValue, initialTTL, TimeUnit.MILLISECONDS);
         shortLinkCache.put(key, cacheValue);
+    }
+
+    /**
+     * 失效跳转缓存：删 Redis、清本机 Caffeine，并广播让其他实例清本地缓存。
+     */
+    public void invalidate(String fullShortUrl) {
+        if (!StringUtils.hasText(fullShortUrl)) {
+            return;
+        }
+        // 逐个删除并容错：一个 key 的异常不跳过另一个，也不阻断本机清缓存与广播。
+        deleteFromRedisQuietly(ShortLinkGotoCacheKeys.gotoKey(fullShortUrl));
+        deleteFromRedisQuietly(ShortLinkGotoCacheKeys.gotoIsNullKey(fullShortUrl));
+        evictLocalCache(fullShortUrl);
+        try {
+            cacheProducer.sendMessage(fullShortUrl);
+        } catch (Exception e) {
+            log.warn("广播跳转缓存失效失败，fullShortUrl={}", fullShortUrl, e);
+        }
+    }
+
+    private void deleteFromRedisQuietly(String key) {
+        try {
+            stringRedisTemplate.delete(key);
+        } catch (Exception e) {
+            log.warn("清理 Redis 跳转缓存失败，key={}，本机缓存仍会清除并尝试广播", key, e);
+        }
     }
 
     /**

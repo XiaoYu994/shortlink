@@ -35,8 +35,8 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToHistoryMappe
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkHistoryMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
 import com.xhy.shortlink.framework.starter.common.enums.DelEnum;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
@@ -78,7 +78,7 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
     private final ShortLinkGoToColdMapper shortLinkGoToColdMapper;
     private final ShortLinkHistoryMapper shortLinkHistoryMapper;
     private final ShortLinkGoToHistoryMapper shortLinkGoToHistoryMapper;
-    private final ShortLinkCacheProducer cacheProducer;
+    private final ShortLinkCacheHelper cacheHelper;
     private final ShortLinkExpireArchiveProducer expireArchiveProducer;
     private final ColdDataProperties coldDataProperties;
 
@@ -219,10 +219,6 @@ public class ShortLinkExpireArchiveConsumer implements RocketMQListener<ShortLin
 
     /** 清除跳转缓存并广播本地缓存失效 */
     private void clearCache(String fullShortUrl) {
-        try {
-            cacheProducer.sendMessage(fullShortUrl);
-        } catch (Exception e) {
-            log.error("[过期归档] 清除缓存失败，fullShortUrl={}", fullShortUrl, e);
-        }
+        cacheHelper.invalidate(fullShortUrl);
     }
 }

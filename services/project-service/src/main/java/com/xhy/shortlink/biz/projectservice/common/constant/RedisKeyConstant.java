@@ -17,6 +17,8 @@
 
 package com.xhy.shortlink.biz.projectservice.common.constant;
 
+import com.xhy.shortlink.biz.api.project.constant.ShortLinkGotoCacheKeys;
+
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -30,10 +32,10 @@ public final class RedisKeyConstant {
     }
 
     /** 短链接跳转前缀 Key */
-    public static final String GOTO_SHORT_LINK_KEY = "short-link:goto:%s:";
+    public static final String GOTO_SHORT_LINK_KEY = ShortLinkGotoCacheKeys.GOTO;
 
     /** 短链接空值缓存 Key */
-    public static final String GOTO_IS_NULL_SHORT_LINK_KEY = "short-link:goto:is-null:%s:";
+    public static final String GOTO_IS_NULL_SHORT_LINK_KEY = ShortLinkGotoCacheKeys.GOTO_IS_NULL;
 
     /** 短链接空缓存过期时间（秒），加随机偏移防止缓存雪崩 */
     public static final long DEFAULT_CACHE_VALID_TIME_FOR_GOTO = 30 + ThreadLocalRandom.current().nextInt(10);

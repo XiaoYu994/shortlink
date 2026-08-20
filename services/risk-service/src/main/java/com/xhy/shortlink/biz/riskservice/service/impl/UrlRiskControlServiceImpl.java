@@ -19,11 +19,12 @@ package com.xhy.shortlink.biz.riskservice.service.impl;
 
 import com.xhy.shortlink.biz.riskservice.dto.resp.ShortLinkRiskCheckRespDTO;
 import com.xhy.shortlink.biz.riskservice.service.UrlRiskControlService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -41,9 +42,10 @@ import java.net.UnknownHostException;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UrlRiskControlServiceImpl implements UrlRiskControlService {
 
-    private final ChatClient chatClient;
+    private final ObjectProvider<ChatClient> chatClientProvider;
 
     @Value("${short-link.risk-control.jsoup-timeout:3000}")
     private int jsoupTimeout;
@@ -54,10 +56,6 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
     private static final int HTTP_REDIRECT_MAX_STATUS = 400;
     private static final int HTTP_ERROR_STATUS = 400;
 
-    public UrlRiskControlServiceImpl(@Autowired(required = false) ChatClient chatClient) {
-        this.chatClient = chatClient;
-    }
-
     @Override
     public ShortLinkRiskCheckRespDTO checkUrlRisk(String url) {
         ShortLinkRiskCheckRespDTO result;
@@ -66,7 +64,7 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
         } else if (isBlackListPattern(url)) {
             result = buildRiskResponse("PHISHING", "疑似钓鱼网址",
                     "命中本地黑名单关键词规则 (Suspicious Pattern)");
-        } else if (chatClient == null) {
+        } else if (chatClient() == null) {
             result = buildSafeResponse("未配置 AI 风控，跳过模型审核");
         } else {
             try {
@@ -115,10 +113,14 @@ public class UrlRiskControlServiceImpl implements UrlRiskControlService {
                 4. "detail": string (详细的风控推理过程)
                 """.formatted(url, StringUtils.truncate(pageContent, MAX_ANALYSIS_CHARS));
 
-        return chatClient.prompt()
+        return chatClient().prompt()
                 .user(userPrompt)
                 .call()
                 .entity(ShortLinkRiskCheckRespDTO.class);
+    }
+
+    private ChatClient chatClient() {
+        return chatClientProvider.getIfAvailable();
     }
 
     private String fetchPageContent(String url) throws Exception {

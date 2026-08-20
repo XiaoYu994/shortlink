@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +40,8 @@ class UrlRiskControlServiceImplTest {
 
     private UrlRiskControlServiceImpl riskControlService;
 
+    @Mock
+    private ObjectProvider<ChatClient> chatClientProvider;
     @Mock
     private ChatClient chatClient;
     @Mock
@@ -53,7 +57,8 @@ class UrlRiskControlServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        riskControlService = new UrlRiskControlServiceImpl(chatClient);
+        lenient().when(chatClientProvider.getIfAvailable()).thenReturn(chatClient);
+        riskControlService = new UrlRiskControlServiceImpl(chatClientProvider);
         ReflectionTestUtils.setField(riskControlService, "jsoupTimeout", 3000);
     }
 
@@ -108,7 +113,8 @@ class UrlRiskControlServiceImplTest {
 
     @Test
     void checkUrlRisk_withoutChatClient_skipsModel() {
-        UrlRiskControlServiceImpl withoutAi = new UrlRiskControlServiceImpl(null);
+        when(chatClientProvider.getIfAvailable()).thenReturn(null);
+        UrlRiskControlServiceImpl withoutAi = new UrlRiskControlServiceImpl(chatClientProvider);
         ReflectionTestUtils.setField(withoutAi, "jsoupTimeout", 3000);
 
         ShortLinkRiskCheckRespDTO result = withoutAi.checkUrlRisk("https://normal-site.com/page");

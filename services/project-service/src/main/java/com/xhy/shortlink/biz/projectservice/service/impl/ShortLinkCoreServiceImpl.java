@@ -50,7 +50,6 @@ import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkExpireArchiveEvent;
 import com.xhy.shortlink.biz.projectservice.mq.event.ShortLinkRiskEvent;
 import com.xhy.shortlink.biz.projectservice.mq.event.UpdateFaviconEvent;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkExpireArchiveProducer;
 import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkRiskProducer;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
@@ -114,7 +113,6 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
     private final RedissonClient redissonClient;
     private final ApplicationEventPublisher eventPublisher;
     private final ShortLinkRiskProducer riskProducer;
-    private final ShortLinkCacheProducer cacheProducer;
     private final ShortLinkExpireArchiveProducer expireArchiveProducer;
     private final ShortLinkCacheHelper cacheHelper;
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
@@ -420,15 +418,7 @@ public class ShortLinkCoreServiceImpl implements ShortLinkCoreService {
                     .userId(Long.parseLong(UserContext.getUserId()))
                     .build());
         }
-        // 5. 清除 Redis 缓存 + 广播清除本地 Caffeine
-        stringRedisTemplate.delete(Arrays.asList(
-                String.format(GOTO_SHORT_LINK_KEY, requestParam.getFullShortUrl()),
-                String.format(GOTO_IS_NULL_SHORT_LINK_KEY, requestParam.getFullShortUrl())));
-        try {
-            cacheProducer.sendMessage(requestParam.getFullShortUrl());
-        } catch (Exception e) {
-            log.error("修改短链接后清除缓存失败", e);
-        }
+        cacheHelper.invalidate(requestParam.getFullShortUrl());
     }
 
     private Integer getInteger(ShortLinkUpdateReqDTO requestParam, ShortLinkDO shortLinkDO) {

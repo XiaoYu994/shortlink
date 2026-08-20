@@ -18,6 +18,7 @@
 package com.xhy.shortlink.biz.riskservice.mq.consumer;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xhy.shortlink.biz.api.project.constant.ShortLinkGotoCacheKeys;
 import com.xhy.shortlink.biz.riskservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.riskservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.riskservice.dao.mapper.ShortLinkMapper;
@@ -41,7 +42,6 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.UUID;
 
-import static com.xhy.shortlink.biz.riskservice.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
 import static com.xhy.shortlink.biz.riskservice.common.constant.RocketMQConstant.*;
 
 /**
@@ -107,10 +107,14 @@ public class ShortLinkRiskCheckConsumer implements RocketMQListener<ShortLinkRis
                 .eq(ShortLinkDO::getFullShortUrl, event.getFullShortUrl())
                 .set(ShortLinkDO::getEnableStatus, LinkEnableStatusEnum.BANNED.getCode()));
 
-        stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, event.getFullShortUrl()));
+        invalidateGotoCache(event.getFullShortUrl());
+    }
 
+    private void invalidateGotoCache(String fullShortUrl) {
+        stringRedisTemplate.delete(ShortLinkGotoCacheKeys.gotoKey(fullShortUrl));
+        stringRedisTemplate.delete(ShortLinkGotoCacheKeys.gotoIsNullKey(fullShortUrl));
         try {
-            rocketMQTemplate.convertAndSend(CACHE_INVALIDATE_TOPIC, event.getFullShortUrl());
+            rocketMQTemplate.convertAndSend(ShortLinkGotoCacheKeys.invalidateDestination(), fullShortUrl);
         } catch (Exception e) {
             log.error("风控封禁广播发送失败", e);
         }

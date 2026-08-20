@@ -32,8 +32,8 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.framework.starter.cache.toolkit.RedisIncrWithExpire;
 import com.xhy.shortlink.framework.starter.common.toolkit.BeanUtil;
@@ -41,7 +41,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -79,16 +78,12 @@ public class ShortLinkColdDataServiceImpl implements ShortLinkColdDataService {
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
     private final ShortLinkGoToColdMapper shortLinkGoToColdMapper;
-    private final ShortLinkCacheProducer cacheProducer;
+    private final ShortLinkCacheHelper cacheHelper;
     private final ColdDataProperties coldDataProperties;
     private final ShortLinkMetrics shortLinkMetrics;
     private final StringRedisTemplate stringRedisTemplate;
-
-    @Autowired(required = false)
-    private RedissonClient redissonClient;
-
-    @Autowired(required = false)
-    private PlatformTransactionManager transactionManager;
+    private final RedissonClient redissonClient;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${short-link.domain.protocol:http}")
     private String domainProtocol = "http";
@@ -132,9 +127,6 @@ public class ShortLinkColdDataServiceImpl implements ShortLinkColdDataService {
     public int migrateInactiveLinks() {
         if (!Boolean.TRUE.equals(coldDataProperties.getEnabled())) {
             return 0;
-        }
-        if (redissonClient == null) {
-            return doMigrateInactiveLinks();
         }
         RLock migrationLock = redissonClient.getLock(SHORT_LINK_COLD_MIGRATION_LOCK_KEY);
         migrationLock.lock();
@@ -314,7 +306,7 @@ public class ShortLinkColdDataServiceImpl implements ShortLinkColdDataService {
             return withLinkLock(record.getFullShortUrl(), () -> {
                 boolean migrated = executeInTransaction(() -> migrateSingleInternal(record));
                 if (migrated) {
-                    cacheProducer.sendMessage(record.getFullShortUrl());
+                    cacheHelper.invalidate(record.getFullShortUrl());
                 } else {
                     shortLinkMetrics.recordColdMigrationFailure();
                 }
@@ -368,9 +360,6 @@ public class ShortLinkColdDataServiceImpl implements ShortLinkColdDataService {
     }
 
     private <T> T withLinkLock(String fullShortUrl, Supplier<T> action) {
-        if (redissonClient == null) {
-            return action.get();
-        }
         RLock linkLock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         linkLock.lock();
         try {
@@ -381,9 +370,6 @@ public class ShortLinkColdDataServiceImpl implements ShortLinkColdDataService {
     }
 
     private <T> T executeInTransaction(Supplier<T> action) {
-        if (transactionManager == null) {
-            return action.get();
-        }
         return new TransactionTemplate(transactionManager).execute(status -> action.get());
     }
 }

@@ -32,16 +32,21 @@ import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.metrics.ShortLinkMetrics;
-import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.util.Collections;
 import java.util.Date;
@@ -49,6 +54,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -78,13 +85,27 @@ class ShortLinkColdDataServiceImplTest {
     @Mock
     private ShortLinkGoToColdMapper shortLinkGoToColdMapper;
     @Mock
-    private ShortLinkCacheProducer cacheProducer;
+    private ShortLinkCacheHelper cacheHelper;
     @Mock
     private ColdDataProperties coldDataProperties;
     @Mock
     private ShortLinkMetrics shortLinkMetrics;
     @Mock
     private StringRedisTemplate stringRedisTemplate;
+    @Mock
+    private RedissonClient redissonClient;
+    @Mock
+    private RLock rLock;
+    @Mock
+    private PlatformTransactionManager transactionManager;
+    @Mock
+    private TransactionStatus transactionStatus;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(redissonClient.getLock(anyString())).thenReturn(rLock);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+    }
 
     @Test
     void mergeSorted_byCreateTime_keepsDescendingOrder() {
@@ -222,7 +243,7 @@ class ShortLinkColdDataServiceImplTest {
 
         verify(shortLinkColdMapper).insert(org.mockito.ArgumentMatchers.<ShortLinkColdDO>argThat(cold -> cold.getId() == null));
         verify(shortLinkGoToColdMapper).insert(org.mockito.ArgumentMatchers.<ShortLinkGoToColdDO>argThat(route -> route.getId() == null));
-        verify(cacheProducer).sendMessage("test.cn/old");
+        verify(cacheHelper).invalidate("test.cn/old");
         verify(shortLinkMetrics).recordColdMigrationBatch(1);
     }
 

@@ -37,9 +37,6 @@ public final class RocketMQConstant {
     /** 违规通知消费者组 */
     public static final String NOTIFY_GROUP = "short_link_project_notify_group";
 
-    /** 清除本地缓存 Topic */
-    public static final String CACHE_INVALIDATE_TOPIC = "short_link_project_cache_invalidate_topic";
-
     /** 用户通知创建 Topic */
     public static final String USER_NOTIFICATION_CREATED_TOPIC = "short_link_user_notification_created_topic";
 

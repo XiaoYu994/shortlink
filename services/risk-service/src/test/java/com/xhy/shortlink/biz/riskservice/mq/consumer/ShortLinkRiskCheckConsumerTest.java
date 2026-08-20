@@ -114,6 +114,11 @@ class ShortLinkRiskCheckConsumerTest {
         consumer.onMessage(event);
 
         verify(shortLinkMapper).update(isNull(), any());
+        verify(stringRedisTemplate).delete("short-link:goto:test.cn/risky:");
+        verify(stringRedisTemplate).delete("short-link:goto:is-null:test.cn/risky:");
+        verify(rocketMQTemplate).convertAndSend(
+                eq("short_link_project_cache_invalidate_topic:invalidate"),
+                eq("test.cn/risky"));
         verify(rocketMQTemplate, atLeastOnce()).convertAndSend(anyString(), any(Object.class));
         verify(riskMetrics).recordConsumeSuccess(any(Duration.class));
     }

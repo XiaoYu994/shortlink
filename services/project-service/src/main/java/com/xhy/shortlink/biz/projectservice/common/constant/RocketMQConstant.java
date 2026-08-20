@@ -17,6 +17,8 @@
 
 package com.xhy.shortlink.biz.projectservice.common.constant;
 
+import com.xhy.shortlink.biz.api.project.constant.ShortLinkGotoCacheKeys;
+
 /**
  * RocketMQ Topic / Group 常量
  *
@@ -28,10 +30,10 @@ public final class RocketMQConstant {
     }
 
     /** 清除本地缓存 Topic */
-    public static final String CACHE_INVALIDATE_TOPIC = "short_link_project_cache_invalidate_topic";
+    public static final String CACHE_INVALIDATE_TOPIC = ShortLinkGotoCacheKeys.INVALIDATE_TOPIC;
 
     /** 清除本地缓存 Tag */
-    public static final String CACHE_INVALIDATE_TAG = "invalidate";
+    public static final String CACHE_INVALIDATE_TAG = ShortLinkGotoCacheKeys.INVALIDATE_TAG;
 
     /** AI 风控审核消息 Topic */
     public static final String RISK_CHECK_TOPIC = "short_link_project_risk_check_topic";

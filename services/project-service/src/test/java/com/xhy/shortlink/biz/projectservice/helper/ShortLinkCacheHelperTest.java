@@ -18,6 +18,7 @@
 package com.xhy.shortlink.biz.projectservice.helper;
 
 import com.github.benmanes.caffeine.cache.Cache;
+import com.xhy.shortlink.biz.projectservice.mq.producer.ShortLinkCacheProducer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,6 +47,8 @@ class ShortLinkCacheHelperTest {
     private Cache<String, String> shortLinkCache;
     @Mock
     private RBloomFilter<String> shortlinkUriCreateCachePenetrationBloomFilter;
+    @Mock
+    private ShortLinkCacheProducer cacheProducer;
 
     @Test
     @SuppressWarnings("unchecked")
@@ -104,6 +107,38 @@ class ShortLinkCacheHelperTest {
 
         verify(shortLinkCache).invalidate("short-link:goto:test.cn/abc:");
         verify(shortLinkCache).invalidate("short-link:goto:is-null:test.cn/abc:");
+    }
+
+    @Test
+    void invalidate_deletesRedisEvictsLocalAndBroadcasts() {
+        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
+
+        cacheHelper.invalidate("test.cn/abc");
+
+        verify(stringRedisTemplate).delete("short-link:goto:test.cn/abc:");
+        verify(stringRedisTemplate).delete("short-link:goto:is-null:test.cn/abc:");
+        verify(shortLinkCache).invalidate("short-link:goto:test.cn/abc:");
+        verify(shortLinkCache).invalidate("short-link:goto:is-null:test.cn/abc:");
+        verify(cacheProducer).sendMessage("test.cn/abc");
+    }
+
+    @Test
+    void invalidate_blankUrl_skips() {
+        cacheHelper.invalidate(" ");
+        verify(stringRedisTemplate, never()).delete(anyString());
+        verify(cacheProducer, never()).sendMessage(any());
+    }
+
+    @Test
+    void invalidate_redisDeleteFails_stillEvictsLocalAndBroadcasts() {
+        doThrow(new IllegalStateException("redis down"))
+                .when(stringRedisTemplate).delete(anyString());
+
+        cacheHelper.invalidate("test.cn/abc");
+
+        verify(shortLinkCache).invalidate("short-link:goto:test.cn/abc:");
+        verify(shortLinkCache).invalidate("short-link:goto:is-null:test.cn/abc:");
+        verify(cacheProducer).sendMessage("test.cn/abc");
     }
 
     @Test

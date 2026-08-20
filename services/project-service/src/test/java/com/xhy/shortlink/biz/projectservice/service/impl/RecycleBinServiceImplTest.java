@@ -24,6 +24,7 @@ import com.xhy.shortlink.biz.projectservice.common.enums.LinkEnableStatusEnum;
 import com.xhy.shortlink.biz.projectservice.dao.entity.ShortLinkDO;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.projectservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.projectservice.helper.ShortLinkCacheHelper;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkColdDataService;
 import com.xhy.shortlink.biz.projectservice.service.ShortLinkCoreService;
 import com.xhy.shortlink.framework.starter.convention.exception.ClientException;
@@ -32,12 +33,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +54,7 @@ class RecycleBinServiceImplTest {
     @Mock
     private ShortLinkColdDataService shortLinkColdDataService;
     @Mock
-    private StringRedisTemplate stringRedisTemplate;
+    private ShortLinkCacheHelper cacheHelper;
 
     @Test
     void recycleBinSave_success() {
@@ -64,13 +63,12 @@ class RecycleBinServiceImplTest {
         req.setFullShortUrl("test.cn/abc");
 
         when(shortLinkMapper.update(any(ShortLinkDO.class), any())).thenReturn(1);
-        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
 
         assertDoesNotThrow(() -> recycleBinService.recycleBinSave(req));
 
         verify(shortLinkMapper).update(argThat(entity ->
                 entity.getEnableStatus().equals(LinkEnableStatusEnum.NOT_ENABLED.getCode())), any());
-        verify(stringRedisTemplate, times(2)).delete(contains("test.cn/abc"));
+        verify(cacheHelper).invalidate("test.cn/abc");
     }
 
     @Test
@@ -81,12 +79,12 @@ class RecycleBinServiceImplTest {
         req.setEnableStatus(LinkEnableStatusEnum.NOT_ENABLED.getCode());
 
         when(shortLinkMapper.update(any(ShortLinkDO.class), any())).thenReturn(1);
-        when(stringRedisTemplate.delete(anyString())).thenReturn(true);
 
         assertDoesNotThrow(() -> recycleBinService.recoverShortlink(req));
 
         verify(shortLinkMapper).update(argThat(entity ->
                 entity.getEnableStatus().equals(LinkEnableStatusEnum.ENABLE.getCode())), any());
+        verify(cacheHelper).invalidate("test.cn/abc");
     }
 
     @Test
@@ -111,5 +109,6 @@ class RecycleBinServiceImplTest {
         assertDoesNotThrow(() -> recycleBinService.removeShortlink(req));
 
         verify(shortLinkMapper).delete(any());
+        verify(cacheHelper).invalidate("test.cn/abc");
     }
 }
