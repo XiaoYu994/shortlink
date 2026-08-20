@@ -55,6 +55,7 @@ apply_connection_defaults() {
   export MYSQL_PASSWORD="${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"
   export MYSQL_DATABASE="${MYSQL_DATABASE:-link}"
   export MYSQL_COLD_DATABASE="${MYSQL_COLD_DATABASE:-link_cold}"
+  export SHORTLINK_SHARD_COUNT="${SHORTLINK_SHARD_COUNT:-16}"
   export REDIS_HOST="${REDIS_HOST:-redis}"
   export REDIS_PORT="${REDIS_PORT:-6379}"
   export NACOS_SERVER_ADDR="${NACOS_SERVER_ADDR:-nacos:8848}"
@@ -333,9 +334,20 @@ migrate_mysql_shards() {
     echo "using external mysql; automatic shard migration is skipped"
     return 0
   fi
+  if [[ "${MYSQL_SHARDS_MIGRATED:-false}" == "true" ]]; then
+    return 0
+  fi
 
   echo "ensuring MySQL shard tables exist"
-  docker exec shortlink-mysql bash /opt/migrations/create-shard-tables.sh
+  local script_path=/tmp/shortlink-create-shard-tables.sh
+  docker cp "${PROJECT_DIR}/docker/mysql/migrations/create-shard-tables.sh" "shortlink-mysql:${script_path}"
+  docker exec \
+    -e "MYSQL_HOST=127.0.0.1" \
+    -e "MYSQL_PORT=3306" \
+    -e "SHORTLINK_SHARD_COUNT=${SHORTLINK_SHARD_COUNT}" \
+    shortlink-mysql bash "${script_path}"
+  docker exec shortlink-mysql rm -f "${script_path}"
+  MYSQL_SHARDS_MIGRATED=true
 }
 
 setup_infra() {
@@ -381,6 +393,10 @@ deploy_app() {
   fi
 
   ensure_app_network
+  if is_enabled "${MANAGE_MYSQL}"; then
+    wait_for_container_health shortlink-mysql 120
+  fi
+  migrate_mysql_shards
   app_compose pull
   import_nacos_config
   remove_containers_if_present \

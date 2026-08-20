@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import {setToken, setUsername} from '@/core/auth.js'
+import {isUsableValue, setToken, setUsername} from '@/core/auth.js'
 import {getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
@@ -150,7 +150,7 @@ const addFormRule = reactive({
   mail: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     {
-      pattern: /^([a-zA-Z]|[0-9])(\w|\-)+@[a-zA-Z0-9]+\.([a-zA-Z]{2,4})$/,
+      pattern: /^([a-zA-Z]|[0-9])(\w|-)+@[a-zA-Z0-9]+\.([a-zA-Z]{2,4})$/,
       message: '请输入正确的邮箱号',
       trigger: 'blur'
     }
@@ -172,12 +172,13 @@ const loginFormRule = reactive({
 
 // 处理登录成功后的逻辑
 const handleLoginSuccess = (token, username) => {
-  if (token) {
-    setToken(token)
-    setUsername(username)
-    localStorage.setItem('token', token)
-    localStorage.setItem('username', username)
+  if (!isUsableValue(token)) {
+    ElMessage.error('登录响应缺少有效 token')
+    return
   }
+
+  setToken(token)
+  setUsername(username)
   ElMessage.success('登录成功！')
   router.push('/home')
 }
@@ -221,13 +222,6 @@ const login = (formEl) => {
   if (!formEl) return
   formEl.validate(async (valid) => {
     if (valid) {
-      // 演示环境拦截
-      let domain = window.location.host
-      // if (domain === 'shortlink.magestack.cn' || domain === 'shortlink.nageoffer.com') {
-      //   isWC.value = true
-      //   return
-      // }
-
       try {
         loading.value = true
         const res = await API.user.login(loginForm)

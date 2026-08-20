@@ -417,6 +417,8 @@ bash deploy/setup-server.sh infra-reset  # 仅重建 MANAGE_*=true 的容器
 
 `app` 和默认的 `infra` **不会**删除已有 Nacos、RocketMQ、MySQL、Redis。只有 `infra-reset` 会重建本项目自己托管的那些容器。
 
+每次 `full`、`infra`、`infra-reset` 或 `app` 部署在 MySQL 健康后都会执行 [`docker/mysql/migrations/create-shard-tables.sh`](docker/mysql/migrations/create-shard-tables.sh)。脚本使用 `CREATE TABLE IF NOT EXISTS`，会在保留 `mysql_data` 命名卷的升级中补齐 4 张逻辑表对应的 16 个物理分表，不会删除或覆盖已有数据。复用外部 MySQL（`MANAGE_MYSQL=false`）时，需要在能访问数据库的环境中手动执行该脚本，并设置 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_ROOT_PASSWORD` 和 `MYSQL_DATABASE`。
+
 接入已有中间件的最小 `.env` 示例：
 
 ```bash

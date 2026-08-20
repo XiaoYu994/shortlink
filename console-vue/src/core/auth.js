@@ -1,28 +1,68 @@
 import Cookies from 'js-cookie'
 
 const TokenKey = 'token'
+const UsernameKey = 'username'
 
 export function getToken() {
-  return Cookies.get(TokenKey)
+  return readValue(TokenKey)
 }
+
 export function getUsername() {
-  return Cookies.get('username')
+  return readValue(UsernameKey)
 }
 
 export function setToken(token) {
-  return Cookies.set(TokenKey, token)
+  return writeValue(TokenKey, token)
 }
 
 export function setUsername(username) {
-  return Cookies.set('username', username)
+  return writeValue(UsernameKey, username)
 }
 
 export function removeKey() {
-  return Cookies.remove(TokenKey)
+  return removeValue(TokenKey)
 }
 
 export function removeUsername() {
-  return Cookies.remove('username')
+  return removeValue(UsernameKey)
 }
 
+export function isUsableValue(value) {
+  return typeof value === 'string'
+    && value.trim() !== ''
+    && value !== 'null'
+    && value !== 'undefined'
+}
 
+function readValue(key) {
+  const storedValue = localStorage.getItem(key)
+  if (isUsableValue(storedValue)) {
+    return storedValue
+  }
+
+  const cookieValue = Cookies.get(key)
+  if (isUsableValue(cookieValue)) {
+    // Reconcile a missing or stale local value with the valid cookie fallback.
+    localStorage.setItem(key, cookieValue)
+    return cookieValue
+  }
+
+  if (storedValue !== null) {
+    localStorage.removeItem(key)
+  }
+  return null
+}
+
+function writeValue(key, value) {
+  if (!isUsableValue(value)) {
+    return removeValue(key)
+  }
+
+  localStorage.setItem(key, value)
+  return Cookies.set(key, value)
+}
+
+function removeValue(key) {
+  localStorage.removeItem(key)
+  return Cookies.remove(key)
+}

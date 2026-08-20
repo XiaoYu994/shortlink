@@ -1,6 +1,5 @@
 import {createRouter, createWebHistory} from 'vue-router'
-import {isNotEmpty} from '@/utils/plugins'
-import {getToken, setToken, setUsername} from '@/core/auth' // 验权
+import {getToken} from '@/core/auth' // 验权
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -43,16 +42,18 @@ const router = createRouter({
   ]
 })
 
-// eslint-disable-next-line no-unused-vars
-router.beforeEach(async (to, from, next) => {
-  // 从localstorage中先获取token，并赋给chookies，如果还存在token，而且还处于正常登录状态就直接将token和username赋给cookies，用户徐的数据请求
-  setToken(localStorage.getItem('token'))
-  setUsername(localStorage.getItem('username'))
+router.beforeEach((to, _from, next) => {
   const token = getToken()
   if (to.path === '/login') {
-    next()
+    if (token) {
+      next('/home')
+    } else {
+      next()
+    }
+    return
   }
-  if (isNotEmpty(token)) {
+
+  if (token) {
     next()
   } else {
     next('/login')

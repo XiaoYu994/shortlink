@@ -75,6 +75,7 @@ jobs:
             MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD || 'root' }}
             MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE || 'link' }}
             MYSQL_COLD_DATABASE=${{ secrets.MYSQL_COLD_DATABASE || 'link_cold' }}
+            SHORTLINK_SHARD_COUNT=${{ secrets.SHORTLINK_SHARD_COUNT || '16' }}
             REDIS_HOST=${{ secrets.REDIS_HOST || 'redis' }}
             REDIS_PORT=${{ secrets.REDIS_PORT || '6379' }}
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || 'xhy_redis' }}

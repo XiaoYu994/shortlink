@@ -1,10 +1,10 @@
 import axios from 'axios'
-import {getToken, getUsername} from '@/core/auth.js'
-import {isNotEmpty} from '@/utils/plugins.js'
-import router from "@/router";
+import {getToken, getUsername, removeKey, removeUsername} from '@/core/auth.js'
+import router from '@/router'
 import {ElMessage} from 'element-plus'
 
 const baseURL = '/api/short-link/admin/v1'
+let redirectingToLogin = false
 
 const http = axios.create({
     baseURL: baseURL,
@@ -14,10 +14,10 @@ const http = axios.create({
 // 请求拦截
 http.interceptors.request.use(
     (config) => {
-        const token = isNotEmpty(getToken()) ? getToken() : ''
+        const token = getToken() || ''
         config.headers.Token = token
         config.headers['short-link'] = token
-        config.headers.Username = isNotEmpty(getUsername()) ? getUsername() : ''
+        config.headers.Username = getUsername() || ''
         return config
     },
     (error) => {
@@ -53,8 +53,19 @@ http.interceptors.response.use(
     (err) => {
         // 🔥 优化2：健壮性处理。如果断网，err.response 是 undefined
         if (err.response && err.response.status === 401) {
-            localStorage.removeItem('token')
-            router.push('/login')
+            removeKey()
+            removeUsername()
+            ElMessage.error(err.response?.data?.message || '登录状态已过期，请重新登录')
+
+            if (!redirectingToLogin && router.currentRoute.value.path !== '/login') {
+                redirectingToLogin = true
+                router.push('/login')
+                    .catch(() => undefined)
+                    .finally(() => {
+                        redirectingToLogin = false
+                    })
+            }
+            return Promise.reject(err)
         }
 
         // 🔥 优化3：处理网络超时等没有 response 的情况
