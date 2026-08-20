@@ -29,5 +29,3 @@ scrape_configs:
       - targets:
           - gateway:8000
           - aggregation:8003
-          - stats:8004
-          - risk:8005

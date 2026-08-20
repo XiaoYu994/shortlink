@@ -17,22 +17,48 @@
 
 package com.xhy.shortlink.biz.aggregationservice;
 
+import com.xhy.shortlink.biz.projectservice.ShortlinkProjectApplication;
+import com.xhy.shortlink.biz.riskservice.RiskServiceApplication;
+import com.xhy.shortlink.biz.statsservice.StatsServiceApplication;
+import com.xhy.shortlink.biz.userservice.ShortlinkUserApplication;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
 
-/** 聚合服务启动类 - 聚合 user-service 和 project-service */
+/** 聚合 user / project / stats / risk 的生产进程。 */
 @EnableDiscoveryClient
-@SpringBootApplication(scanBasePackages = {
-        "com.xhy.shortlink.biz.userservice",
-        "com.xhy.shortlink.biz.projectservice",
-        "com.xhy.shortlink.biz.aggregationservice"
-})
-@MapperScan(value = {
-        "com.xhy.shortlink.biz.userservice.dao.mapper",
-        "com.xhy.shortlink.biz.projectservice.dao.mapper"
-})
+@EnableFeignClients("com.xhy.shortlink.biz.userservice.remote")
+@SpringBootApplication(nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
+@ComponentScan(
+        basePackages = {
+                "com.xhy.shortlink.biz.userservice",
+                "com.xhy.shortlink.biz.projectservice",
+                "com.xhy.shortlink.biz.statsservice",
+                "com.xhy.shortlink.biz.riskservice",
+                "com.xhy.shortlink.biz.aggregationservice"
+        },
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = {
+                        ShortlinkUserApplication.class,
+                        ShortlinkProjectApplication.class,
+                        StatsServiceApplication.class,
+                        RiskServiceApplication.class
+                }),
+        nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
+@MapperScan(
+        value = {
+                "com.xhy.shortlink.biz.userservice.dao.mapper",
+                "com.xhy.shortlink.biz.projectservice.dao.mapper",
+                "com.xhy.shortlink.biz.statsservice.dao.mapper",
+                "com.xhy.shortlink.biz.riskservice.dao.mapper"
+        },
+        nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
 public class AggregationServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(AggregationServiceApplication.class, args);

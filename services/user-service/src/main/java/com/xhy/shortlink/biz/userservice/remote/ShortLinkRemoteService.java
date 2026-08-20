@@ -48,7 +48,8 @@ import java.util.List;
  * @author XiaoYu
  */
 @FeignClient(
-        value = "shortlink-project-service",
+        name = "${short-link.remote.project-service:shortlink-project-service}",
+        url = "${short-link.remote.project-url:}",
         configuration = OpenFeignConfiguration.class
 )
 public interface ShortLinkRemoteService {

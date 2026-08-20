@@ -9,6 +9,10 @@ server:
 spring:
   application:
     name: shortlink-aggregation-service
+  config:
+    import:
+      - optional:nacos:shortlink-common.yaml
+      - optional:nacos:${spring.application.name}.yaml
   datasource:
     driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
     url: jdbc:shardingsphere:classpath:shardingsphere-config-${DATABASE_ENV:${database.env:dev}}.yaml?placeholder-type=environment
@@ -23,13 +27,60 @@ spring:
       suffix: .html
   cloud:
     nacos:
+      username: ${SPRING_CLOUD_NACOS_USERNAME:${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}}
+      password: ${SPRING_CLOUD_NACOS_PASSWORD:${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}}
       discovery:
-        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}
-        username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
-        password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        namespace: ${NACOS_NAMESPACE:}
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        namespace: ${NACOS_NAMESPACE:}
+        refresh-enabled: true
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: qwen3-max
 
-# user-service 业务配置
+sa-token:
+  token-style: simple-uuid
+  token-name: short-link
+  timeout: 1800
+  is-concurrent: true
+  is-share: true
+  is-read-header: true
+  is-read-cookie: false
+  is-print: false
+
+framework:
+  fastjson:
+    safe-mode: true
+  cache:
+    redis:
+      bloom-filter:
+        user-register:
+          name: user_register_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.01
+        short-link-create:
+          name: shortlink_uri_create_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.001
+
+# aggregation 不会自动加载子服务 application.yaml，需要在这里显式声明
 short-link:
+  remote:
+    project-service: shortlink-aggregation-service
+    stats-service: shortlink-aggregation-service
+    project-url: http://127.0.0.1:8003
+    stats-url: http://127.0.0.1:8003
   group:
     max-num: 20
   # project-service 业务配置
@@ -66,6 +117,11 @@ short-link:
         - juejin.cn
         - cnblogs.com
         - github.com
+  stats:
+    locale:
+      amap-key: ${SHORT_LINK_STATS_LOCALE_AMAP_KEY:}
+  risk-control:
+    jsoup-timeout: 3000
 
 mybatis-plus:
   configuration:

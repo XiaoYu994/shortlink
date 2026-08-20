@@ -23,7 +23,7 @@ spring:
                   - /api/short-link/admin/v1/user/has-username
 
         - id: shortlink-stats-service
-          uri: lb://shortlink-stats-service
+          uri: lb://shortlink-aggregation-service
           predicates:
             - Path=/api/short-link/v1/stats/**
           filters:

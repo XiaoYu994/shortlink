@@ -1,0 +1,40 @@
+# Shared by gateway and aggregation. Seeded on deploy; later edits in Nacos console
+# are kept unless NACOS_CONFIG_OVERWRITE=true.
+
+sa-token:
+  token-style: simple-uuid
+  token-name: short-link
+  timeout: 1800
+  is-concurrent: true
+  is-share: true
+  is-read-header: true
+  is-read-cookie: false
+  is-print: false
+
+spring:
+  data:
+    redis:
+      host: "__REDIS_HOST__"
+      port: __REDIS_PORT__
+      password: "__REDIS_PASSWORD__"
+  ai:
+    dashscope:
+      api-key: "__DASHSCOPE_API_KEY__"
+      chat:
+        options:
+          model: qwen3-max
+
+rocketmq:
+  name-server: "__ROCKETMQ_NAME_SERVER__"
+
+short-link:
+  domain:
+    default: "__SHORT_LINK_DOMAIN_DEFAULT__"
+    protocol: "__SHORT_LINK_DOMAIN_PROTOCOL__"
+  flow-limit:
+    enable: true
+    time-window: 1
+    max-access-count: 20
+  stats:
+    locale:
+      amap-key: "__SHORT_LINK_STATS_LOCALE_AMAP_KEY__"

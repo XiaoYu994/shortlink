@@ -5,6 +5,10 @@ spring:
     name: shortlink-gateway-service
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  config:
+    import:
+      - optional:nacos:shortlink-common.yaml
+      - optional:nacos:${spring.application.name}.yaml
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:127.0.0.1}
@@ -12,10 +16,21 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:xhy_redis}
   cloud:
     nacos:
+      username: ${SPRING_CLOUD_NACOS_USERNAME:${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}}
+      password: ${SPRING_CLOUD_NACOS_PASSWORD:${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}}
       discovery:
-        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}
-        username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
-        password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        namespace: ${NACOS_NAMESPACE:}
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:127.0.0.1:8848}}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        namespace: ${NACOS_NAMESPACE:}
+        refresh-enabled: true
 
 short-link:
   flow-limit:

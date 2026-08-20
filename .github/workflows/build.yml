@@ -27,7 +27,7 @@ jobs:
 
       - name: Build backend jars
         run: >
-          mvn -pl services/aggregation-service,services/gateway-service,services/stats-service,services/risk-service
+          mvn -pl services/aggregation-service,services/gateway-service
           -am -DskipTests package
 
       - name: Upload backend jars
@@ -37,8 +37,6 @@ jobs:
           path: |
             services/aggregation-service/target/shortlink-aggregation-service.jar
             services/gateway-service/target/shortlink-gateway-service.jar
-            services/stats-service/target/shortlink-stats-service.jar
-            services/risk-service/target/shortlink-risk-service.jar
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -69,10 +67,6 @@ jobs:
             jar_file: services/gateway-service/target/shortlink-gateway-service.jar
           - image_name: shortlink-aggregation-service
             jar_file: services/aggregation-service/target/shortlink-aggregation-service.jar
-          - image_name: shortlink-stats-service
-            jar_file: services/stats-service/target/shortlink-stats-service.jar
-          - image_name: shortlink-risk-service
-            jar_file: services/risk-service/target/shortlink-risk-service.jar
     steps:
       - uses: actions/checkout@v4
 

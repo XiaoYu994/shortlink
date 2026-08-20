@@ -1,0 +1,43 @@
+# Aggregation-only business settings. Secrets stay in shortlink-common.yaml.
+
+short-link:
+  remote:
+    project-service: shortlink-aggregation-service
+    stats-service: shortlink-aggregation-service
+    project-url: http://127.0.0.1:8003
+    stats-url: http://127.0.0.1:8003
+  group:
+    max-num: 20
+  cache:
+    ttl-jitter-ratio: 0.1
+    local:
+      initial-capacity: 100
+      maximum-size: 10000
+      expire-after-write: 30
+  create:
+    strategy: bloom-filter
+  cold-data:
+    enabled: true
+    days: 90
+    batch-size: 200
+    cron: "0 30 2 * * ?"
+    rehot:
+      threshold: 1000
+    grace-days: 30
+  risk-control:
+    jsoup-timeout: 3000
+
+framework:
+  fastjson:
+    safe-mode: true
+  cache:
+    redis:
+      bloom-filter:
+        user-register:
+          name: user_register_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.01
+        short-link-create:
+          name: shortlink_uri_create_cache_penetration_bloom_filter
+          expectedInsertions: 100000000
+          falseProbability: 0.001

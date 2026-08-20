@@ -1,0 +1,20 @@
+# Attach app containers to an existing infra network, e.g. platform-infra-network.
+# Used when MANAGE_NACOS/ROCKETMQ/MYSQL/REDIS=false and those services live on
+# another Compose project.
+services:
+  gateway:
+    networks:
+      - shortlink
+      - infra
+
+  aggregation:
+    networks:
+      - shortlink
+      - infra
+
+networks:
+  shortlink:
+    name: ${DOCKER_NETWORK:-shortlink-network}
+  infra:
+    name: ${DOCKER_EXTERNAL_NETWORK}
+    external: true

@@ -12,6 +12,7 @@ on:
           - app
           - full
           - infra
+          - infra-reset
       image_tag:
         description: 镜像标签，默认使用当前工作流提交 SHA
         required: false
@@ -63,8 +64,33 @@ jobs:
             GHCR_IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
             SPRING_PROFILES_ACTIVE=aggregation
             DATABASE_ENV=prod
+            MANAGE_MYSQL=${{ secrets.MANAGE_MYSQL || 'true' }}
+            MANAGE_REDIS=${{ secrets.MANAGE_REDIS || 'true' }}
+            MANAGE_NACOS=${{ secrets.MANAGE_NACOS || 'true' }}
+            MANAGE_ROCKETMQ=${{ secrets.MANAGE_ROCKETMQ || 'true' }}
+            MYSQL_HOST=${{ secrets.MYSQL_HOST || 'mysql' }}
+            MYSQL_PORT=${{ secrets.MYSQL_PORT || '3306' }}
+            MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME || 'root' }}
+            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
             MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD || 'root' }}
+            MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE || 'link' }}
+            MYSQL_COLD_DATABASE=${{ secrets.MYSQL_COLD_DATABASE || 'link_cold' }}
+            REDIS_HOST=${{ secrets.REDIS_HOST || 'redis' }}
+            REDIS_PORT=${{ secrets.REDIS_PORT || '6379' }}
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || 'xhy_redis' }}
+            NACOS_SERVER_ADDR=${{ secrets.NACOS_SERVER_ADDR || 'nacos:8848' }}
+            NACOS_ADDR=${{ secrets.NACOS_ADDR }}
+            NACOS_AUTH_ENABLE=${{ secrets.NACOS_AUTH_ENABLE || 'true' }}
+            NACOS_USERNAME=${{ secrets.NACOS_USERNAME || 'nacos' }}
+            NACOS_PASSWORD=${{ secrets.NACOS_PASSWORD || 'nacos' }}
+            NACOS_AUTH_TOKEN=${{ secrets.NACOS_AUTH_TOKEN || 'c2hvcnRsaW5rLW5hY29zLWF1dGgtdG9rZW4tMzJiIQ==' }}
+            NACOS_AUTH_IDENTITY_KEY=serverIdentity
+            NACOS_AUTH_IDENTITY_VALUE=shortlink
+            NACOS_NAMESPACE=${{ secrets.NACOS_NAMESPACE }}
+            NACOS_CONFIG_OVERWRITE=${{ secrets.NACOS_CONFIG_OVERWRITE || 'false' }}
+            ROCKETMQ_NAME_SERVER=${{ secrets.ROCKETMQ_NAME_SERVER || 'namesrv:9876' }}
+            DOCKER_NETWORK=${{ secrets.DOCKER_NETWORK || 'shortlink-network' }}
+            DOCKER_EXTERNAL_NETWORK=${{ secrets.DOCKER_EXTERNAL_NETWORK }}
             SHORT_LINK_DOMAIN_DEFAULT=${{ secrets.SHORT_LINK_DOMAIN_DEFAULT }}
             SHORT_LINK_DOMAIN_PROTOCOL=${{ secrets.SHORT_LINK_DOMAIN_PROTOCOL || 'http' }}
             SHORT_LINK_STATS_LOCALE_AMAP_KEY=${{ secrets.SHORT_LINK_STATS_LOCALE_AMAP_KEY }}
@@ -72,5 +98,5 @@ jobs:
             GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}
             GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}
             EOF
-            chmod +x deploy/setup-server.sh
+            chmod +x deploy/setup-server.sh deploy/nacos-import-config.sh
             bash deploy/setup-server.sh "${{ inputs.deploy_scope }}"

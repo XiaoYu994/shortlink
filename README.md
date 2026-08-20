@@ -86,7 +86,7 @@ ShortLink 是一个面向 SaaS 场景的短链接平台。它提供短链的创�
   观测组件：Prometheus、Grafana、Alertmanager
 ```
 
-生产环境还提供 `aggregation-service`。它把 user-service 和 project-service 的核心能力聚合到一个业务进程中，配合 `SPRING_PROFILES_ACTIVE=aggregation` 使用，减少生产环境需要维护的业务容器数量。
+生产环境使用 `aggregation-service`。它把 user-service、project-service、stats-service 和 risk-service 聚合到一个业务进程中，gateway 使用 `SPRING_PROFILES_ACTIVE=aggregation` 把所有业务路由指到这个进程。gateway 是 Spring Cloud Gateway（WebFlux），不能并进聚合服务。
 
 ## 代码结构
 
@@ -109,7 +109,7 @@ ShortLink 是一个面向 SaaS 场景的短链接平台。它提供短链的创�
 │   ├── stats-service            # 统计消息消费和统计查询
 │   ├── risk-service             # 风险检测和封禁
 │   ├── gateway-service          # 网关、鉴权、路由和限流
-│   └── aggregation-service      # 生产聚合服务
+│   └── aggregation-service      # 生产聚合服务（user + project + stats + risk）
 ├── console-vue/                 # Vue 3 管理控制台
 ├── docker/                      # 本地依赖、生产编排、监控和 Nginx
 ├── deploy/                      # 服务器初始化和部署脚本
@@ -125,9 +125,9 @@ ShortLink 是一个面向 SaaS 场景的短链接平台。它提供短链的创�
 | `gateway-service` | `8000` | 网关路由、鉴权、限流、WebSocket 转发 |
 | `project-service` | `8001` | 短链创建、修改、跳转、回收站、冷热数据 |
 | `user-service` | `8002` | 用户、分组、通知和 WebSocket |
-| `aggregation-service` | `8003` | 聚合 user/project 能力，生产部署使用 |
-| `stats-service` | `8004` | 统计事件消费和统计查询 |
-| `risk-service` | `8005` | URL 风险检测和封禁 |
+| `aggregation-service` | `8003` | 生产聚合：用户、短链、统计、风控 |
+| `stats-service` | `8004` | 拆分模式下的统计服务 |
+| `risk-service` | `8005` | 拆分模式下的风控服务 |
 
 每个业务服务都暴露以下 Actuator 端点：
 
@@ -286,21 +286,53 @@ GET /{short-uri}
 
 ## 配置
 
-开发环境默认连接本机依赖服务。生产或 Docker 部署通过环境变量覆盖配置，模板见 [`docker/.env.example`](docker/.env.example)。常用变量：
+配置分成两层：`.env` 只负责基础设施启动和连上 Nacos；业务配置与第三方 Key 放在 Nacos，由 gateway / aggregation 通过 `spring.config.import` 读取。
 
-| 变量 | 作用 | 示例 |
-| --- | --- | --- |
-| `DATABASE_ENV` | ShardingSphere 配置环境 | `dev` / `prod` |
-| `SPRING_PROFILES_ACTIVE` | Spring profile，生产通常使用 aggregation | `aggregation` |
-| `SHORT_LINK_DOMAIN_DEFAULT` | 生成短链使用的域名 | `s.example.com` |
-| `SHORT_LINK_DOMAIN_PROTOCOL` | 生成短链使用的协议 | `http` / `https` |
-| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | 不要提交真实值 |
-| `REDIS_PASSWORD` | Redis 密码 | 不要提交真实值 |
-| `SHORT_LINK_STATS_LOCALE_AMAP_KEY` | 地域统计 API Key | 按需配置 |
-| `DASHSCOPE_API_KEY` | 风控模型 API Key | 按需配置 |
-| `GHCR_USERNAME` / `GHCR_TOKEN` | 拉取私有 GHCR 镜像 | 仅部署时配置 |
+本地 `mvn spring-boot:run` 仍使用各服务 `application.yaml` 里的默认值。Nacos 导入是 `optional:`，Nacos 不可用时不会挡住本地启动。
 
-不要把生产密码、SSH 私钥或第三方 API Key 写入仓库。GitHub Actions 使用的值应配置在仓库 Secrets 中。
+### `.env`：一键部署或接入已有中间件
+
+模板见 [`docker/.env.example`](docker/.env.example)。
+
+`MANAGE_MYSQL` / `MANAGE_REDIS` / `MANAGE_NACOS` / `MANAGE_ROCKETMQ` 默认都是 `true`，`setup-server.sh full` 会自己起容器。服务器上已经有对应服务时，把该项改成 `false`，填接入地址和账号，部署脚本**不会**再拉、删、重建那些容器。
+
+| 变量 | 作用 |
+| --- | --- |
+| `MANAGE_*` | `true` 由本项目托管容器；`false` 复用已有服务 |
+| `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USERNAME` / `MYSQL_PASSWORD` | 应用访问 MySQL |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | 写入 Nacos 的 Redis 连接 |
+| `NACOS_SERVER_ADDR` | 容器内访问 Nacos，如 `nacos:8848` 或 `host.docker.internal:8848` |
+| `NACOS_ADDR` | 部署脚本从宿主机访问 Nacos 的 URL，复用已有 Nacos 时必填 |
+| `NACOS_USERNAME` / `NACOS_PASSWORD` | 应用和导入脚本登录 Nacos |
+| `NACOS_NAMESPACE` | 共享 Nacos 时建议设为 `shortlink` |
+| `ROCKETMQ_NAME_SERVER` | 如 `namesrv:9876` 或 `host.docker.internal:9876` |
+| `DOCKER_EXTERNAL_NETWORK` | 已有中间件在别的 Compose 网络时填入，应用会加入该网络 |
+| `DATABASE_ENV` | 选择 `shardingsphere-config-prod.yaml` |
+| `SPRING_PROFILES_ACTIVE` | gateway 使用 `aggregation` 路由 |
+| `GHCR_USERNAME` / `GHCR_TOKEN` | 拉私有镜像 |
+
+复用宿主机上的 Nacos/RocketMQ 时，应用容器可通过 `host.docker.internal` 访问。复用另一套 Compose 里的容器时，设置 `DOCKER_EXTERNAL_NETWORK` 为那个项目的网络名，并把 `NACOS_SERVER_ADDR` 设成对方的服务名。
+
+### Nacos：业务配置和敏感 Key
+
+首次部署（或 `NACOS_CONFIG_OVERWRITE=true`）时，[`deploy/nacos-import-config.sh`](deploy/nacos-import-config.sh) 会把 [`docker/nacos/config/`](docker/nacos/config/) 渲染后写入 Nacos：
+
+| DataId | 内容 |
+| --- | --- |
+| `shortlink-common.yaml` | Sa-Token、Redis、RocketMQ、短链域名、DashScope、高德 Key |
+| `shortlink-aggregation-service.yaml` | 聚合服务业务参数 |
+| `shortlink-gateway-service.yaml` | 网关覆盖项 |
+
+之后改 Key 或超时时间，直接在 Nacos 控制台改 `shortlink-common.yaml`，不必重建镜像。默认不会在每次部署时覆盖已有配置。
+
+生产 Nacos 只绑定 `127.0.0.1:8848`。本机访问：
+
+```bash
+ssh -L 8848:127.0.0.1:8848 user@your-server
+# 浏览器打开 http://127.0.0.1:8848/nacos
+```
+
+不要把 Nacos、Redis、RocketMQ 端口暴露到公网。不要把生产密码、SSH 私钥或第三方 API Key 写入仓库；GitHub Actions 使用仓库 Secrets。
 
 短链域名必须配置成用户实际访问的域名。不要在生产环境继续使用 `nurl.ink:8001` 或 `nurl.ink:8003` 这类本地联调地址。
 
@@ -350,7 +382,7 @@ Docker 配置分为三部分：
 | --- | --- |
 | `docker/docker-compose.yml` | 本地依赖和监控栈，映射宿主机端口 |
 | `docker/docker-compose.deploy.yml` | 生产基础设施，不对外暴露大部分依赖端口 |
-| `docker/docker-compose.app.yml` | 生产业务容器：frontend、gateway、aggregation、stats、risk |
+| `docker/docker-compose.app.yml` | 生产业务容器：frontend、gateway、aggregation |
 
 生产应用编排只发布 frontend 的 80 端口；gateway 和 aggregation 仅通过 Compose 内部网络访问，避免绕过 Nginx 的可信客户端地址处理。
 
@@ -367,7 +399,8 @@ docker build -f docker/Dockerfile.frontend \
 
 GitHub Actions 在推送到 `main` 时执行 [`build.yml`](.github/workflows/build.yml)：
 
-- 构建 gateway、aggregation、stats、risk 四个后端镜像；
+- 构建 gateway、aggregation 两个生产后端镜像；
+- stats-service 和 risk-service 仍可作为拆分模式独立运行，但生产 Compose 不再启动它们；
 - 构建 Vue 前端镜像；
 - 推送 `latest` 和提交 SHA 两种标签到 GHCR。
 
@@ -376,10 +409,34 @@ GitHub Actions 在推送到 `main` 时执行 [`build.yml`](.github/workflows/bui
 部署工作流 [`deploy.yml`](.github/workflows/deploy.yml) 通过 GitHub Actions 手动触发。它会把部署文件复制到服务器 `/opt/shortlink`，然后执行：
 
 ```bash
-bash deploy/setup-server.sh full   # 首次部署：基础设施 + 应用
-bash deploy/setup-server.sh infra  # 只更新基础设施
-bash deploy/setup-server.sh app    # 日常只更新应用
+bash deploy/setup-server.sh full         # 首次：按 MANAGE_* 启动中间件 + 应用
+bash deploy/setup-server.sh infra        # 只确保本项目托管的中间件在跑（不删除）
+bash deploy/setup-server.sh app          # 日常只更新应用，不动 Nacos/RocketMQ
+bash deploy/setup-server.sh infra-reset  # 仅重建 MANAGE_*=true 的容器
 ```
+
+`app` 和默认的 `infra` **不会**删除已有 Nacos、RocketMQ、MySQL、Redis。只有 `infra-reset` 会重建本项目自己托管的那些容器。
+
+接入已有中间件的最小 `.env` 示例：
+
+```bash
+MANAGE_MYSQL=false
+MANAGE_REDIS=false
+MANAGE_NACOS=false
+MANAGE_ROCKETMQ=false
+MYSQL_HOST=host.docker.internal
+MYSQL_PASSWORD=your-mysql-password
+REDIS_HOST=host.docker.internal
+REDIS_PASSWORD=your-redis-password
+NACOS_SERVER_ADDR=host.docker.internal:8848
+NACOS_ADDR=http://127.0.0.1:8848
+NACOS_USERNAME=nacos
+NACOS_PASSWORD=your-nacos-password
+NACOS_NAMESPACE=shortlink
+ROCKETMQ_NAME_SERVER=host.docker.internal:9876
+```
+
+然后执行 `bash deploy/setup-server.sh app`。
 
 服务器只需要预装 Docker 和 Docker Compose。应用入口为：
 

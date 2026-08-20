@@ -36,7 +36,8 @@ import org.springframework.web.bind.annotation.GetMapping;
  * @author XiaoYu
  */
 @FeignClient(
-        value = "shortlink-stats-service",
+        name = "${short-link.remote.stats-service:shortlink-stats-service}",
+        url = "${short-link.remote.stats-url:}",
         configuration = OpenFeignConfiguration.class
 )
 public interface ShortLinkStatsRemoteService {

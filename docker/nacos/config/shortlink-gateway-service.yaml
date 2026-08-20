@@ -1,0 +1,8 @@
+# Gateway-only overrides. Sa-Token and Redis come from shortlink-common.yaml.
+# Routes stay in application-aggregation.yaml / application-dev.yaml.
+
+short-link:
+  flow-limit:
+    enable: true
+    time-window: 1
+    max-access-count: 20

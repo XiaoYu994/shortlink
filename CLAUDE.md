@@ -40,7 +40,7 @@ Spring Cloud Gateway for routing and token validation.
 - Bypasses authentication for login/register endpoints
 
 ### 4. **aggregation-service** (Port 8003)
-Aggregated deployment module that combines admin + project services into a single deployable unit for simplified deployment scenarios.
+Aggregated deployment module that combines user, project, stats, and risk services into a single deployable unit for low-memory production hosts. Gateway stays separate because it is WebFlux.
 
 ### 5. **console-vue**
 Vue 3 frontend application for the short link management console.
@@ -238,6 +238,9 @@ JMeter test plans included:
 4. **Message Queue**: When switching between Redis/RocketMQ, ensure corresponding infrastructure is running
 5. **Database Sharding**: Table names must match ShardingSphere actual nodes configuration
 6. **Cold Data Migration**: Job only runs when `short-link.cold-data.enabled=true`
+7. **Aggregation config**: aggregation-service does not auto-load child service `application.yaml`. Auth, Feign targets, stats and risk settings must be declared in aggregation's own yaml or in Nacos (`shortlink-common.yaml` / `shortlink-aggregation-service.yaml`).
+8. **Nacos config**: production apps load shared config from Nacos. `.env` only keeps infrastructure secrets (MySQL/Redis/Nacos auth). Do not put DASHSCOPE/AMAP/Sa-Token in Compose app environment.
+9. **Optional middleware**: `MANAGE_MYSQL/REDIS/NACOS/ROCKETMQ` default true for one-click deploy. Set false to reuse existing services. App deploys must not delete unmanaged infra; use `infra-reset` only for managed containers.
 
 ## Service Dependencies
 
@@ -246,7 +249,7 @@ Start order for local development:
 2. Redis
 3. Nacos
 4. RocketMQ (if using RocketMQ mode)
-5. Gateway → Admin → Project
+5. Gateway → Aggregation (production) or user + project + stats + risk (split mode)
 6. Frontend (console-vue)
 
 ## Model Usage Preferences
