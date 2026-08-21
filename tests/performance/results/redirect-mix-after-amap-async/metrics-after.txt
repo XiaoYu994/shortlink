@@ -1,0 +1,21 @@
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_mq_consume_failure_total Total failed MQ consumptions
+# TYPE shortlink_mq_consume_failure_total counter
+shortlink_mq_consume_failure_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_mq_consume_success_total Total successful MQ consumptions
+# TYPE shortlink_mq_consume_success_total counter
+shortlink_mq_consume_success_total{application="shortlink-aggregation-service",} 4520.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 219878.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 219878.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_locale_enrich_dropped_total Locale enrich tasks dropped when amap executor is saturated
+# TYPE shortlink_locale_enrich_dropped_total counter
+shortlink_locale_enrich_dropped_total{application="shortlink-aggregation-service",} 0.0
