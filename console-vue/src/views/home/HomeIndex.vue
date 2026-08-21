@@ -3,7 +3,7 @@
     <el-container>
       <el-header height="54px" style="padding: 0">
         <div class="header">
-          <div @click="toMySpace" class="logo">SaaS短链接</div>
+          <div @click="toMySpace" class="logo">云链</div>
           <div style="display: flex; align-items: center">
             <!-- <a
               class="link-span"
@@ -181,8 +181,9 @@ const truncateText = (text, maxLength) => {
 }
 
 .logo {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  letter-spacing: 0.18em;
   color: #e8e8e8;
   font-family: Helvetica, Tahoma, Arial, 'PingFang SC', 'Hiragino Sans GB', 'Heiti SC',
     'Microsoft YaHei', 'WenQuanYi Micro Hei';

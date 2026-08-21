@@ -1,6 +1,9 @@
 <template>
   <div class="login-page">
-    <h1 class="title">SaaS 短 链 接 平 台</h1>
+    <header class="brand">
+      <h1 class="title">云链</h1>
+      <p class="subtitle">短链接平台</p>
+    </header>
     <div class="login-box">
       <div class="logon" :class="{ hidden: !isLogin }">
         <h2>用户登录</h2>
@@ -83,12 +86,11 @@
           }}</el-button>
       </div>
     </div>
-    <div ref="vantaRef" class="vanta"></div>
   </div>
 
   <el-dialog v-model="isWC" title="人机验证" width="40%" :before-close="handleClose">
     <div class="verification-flex">
-      <span>扫码下方二维码，关注后回复：<strong><span style="color:blue;">link</span></strong>，获取拿个offer-SaaS短链接系统人机验证码</span>
+      <span>扫码下方二维码，关注后回复：<strong><span style="color:blue;">link</span></strong>，获取云链人机验证码</span>
       <img class="img" src="@/assets/png/公众号二维码.png" alt="">
       <el-form class="form" :model="verification" :rules="verificationRule" ref="verificationRef">
         <el-form-item prop="code" label="验证码">
@@ -109,11 +111,9 @@
 
 <script setup>
 import {isUsableValue, setToken, setUsername} from '@/core/auth.js'
-import {getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
+import {getCurrentInstance, reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
-import * as THREE from 'three'
-import WAVES from 'vanta/src/vanta.waves'
 
 const { proxy } = getCurrentInstance()
 const API = proxy.$API
@@ -275,29 +275,6 @@ const verificationLogin = (formEl) => {
 // --- 样式效果逻辑 ---
 
 const checked = ref(true)
-const vantaRef = ref()
-let vantaEffect = null
-
-onMounted(() => {
-  vantaEffect = WAVES({
-    el: vantaRef.value,
-    THREE: THREE,
-    mouseControls: true,
-    touchControls: true,
-    gyroControls: false,
-    minHeight: 200.0,
-    minWidth: 200.0,
-    scale: 1.0,
-    scaleMobile: 1.0
-  })
-})
-
-onBeforeUnmount(() => {
-  if (vantaEffect) {
-    vantaEffect.destroy()
-  }
-})
-
 const isLogin = ref(true)
 const moveRef = ref()
 
@@ -328,7 +305,7 @@ const changeLogin = () => {
   width: 700px;
   position: absolute;
   z-index: 999;
-  top: 50%;
+  top: 56%;
   left: 50%;
   transform: translate(-50%, -50%);
   box-sizing: border-box;
@@ -375,14 +352,14 @@ const changeLogin = () => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  background: #070b16 url('@/assets/png/login-bg.jpg') center / cover no-repeat;
 }
 
-.vanta {
+.login-page::before {
+  content: '';
   position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  bottom: 0;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 11, 22, 0.28) 0%, rgba(7, 11, 22, 0.12) 42%, rgba(7, 11, 22, 0.45) 100%);
   z-index: 0;
 }
 
@@ -416,15 +393,31 @@ const changeLogin = () => {
   background: linear-gradient(to right, #1a8fd5, #0984e3);
 }
 
-.title {
+.brand {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  top: 15%;
+  top: 28px;
   z-index: 999;
-  font-size: 40px;
+  text-align: center;
   color: #fff;
-  font-weight: bolder;
+}
+
+.title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 14px;
+  letter-spacing: 0.38em;
+  text-indent: 0.38em;
+  color: rgba(240, 217, 160, 0.9);
 }
 
 :deep(.el-input__suffix-inner) {
