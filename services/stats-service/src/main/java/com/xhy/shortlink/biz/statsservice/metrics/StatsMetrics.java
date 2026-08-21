@@ -49,7 +49,14 @@ public class StatsMetrics {
     }
 
     public void recordConsumeSuccess(Duration duration) {
-        consumeSuccessCounter.increment();
+        recordConsumeSuccess(1, duration);
+    }
+
+    public void recordConsumeSuccess(int count, Duration duration) {
+        if (count <= 0) {
+            return;
+        }
+        consumeSuccessCounter.increment(count);
         consumeLatencyTimer.record(duration);
     }
 

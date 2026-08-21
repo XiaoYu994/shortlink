@@ -64,15 +64,18 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static com.xhy.shortlink.biz.statsservice.common.constant.RedisKeyConstant.LOCK_GID_UPDATE_KEY;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RedisKeyConstant.RANK_KEY;
@@ -100,6 +103,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         RocketMQPushConsumerLifecycleListener {
 
     private static final int BATCH_SIZE = 64;
+    private static final int CONSUME_THREADS = 16;
     private static final int IDEMPOTENT_SECONDS = 7200;
     private static final String IDEMPOTENT_PREFIX = "stats-save:";
 
@@ -128,144 +132,123 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
     public void prepareStart(DefaultMQPushConsumer consumer) {
         consumer.setConsumeMessageBatchMaxSize(BATCH_SIZE);
         consumer.setPullBatchSize(BATCH_SIZE);
-        consumer.setConsumeThreadMin(16);
-        consumer.setConsumeThreadMax(16);
-        consumer.registerMessageListener((MessageListenerConcurrently) (messages, context) -> {
-            try {
-                List<ShortLinkStatsRecordEvent> events = new ArrayList<>(messages.size());
-                for (MessageExt message : messages) {
-                    events.add(JSON.parseObject(new String(message.getBody(), StandardCharsets.UTF_8),
-                            ShortLinkStatsRecordEvent.class));
+        consumer.setConsumeThreadMin(CONSUME_THREADS);
+        consumer.setConsumeThreadMax(CONSUME_THREADS);
+        consumer.registerMessageListener((MessageListenerConcurrently) (messages, context) ->
+                handleMessages(messages));
+    }
+
+    ConsumeConcurrentlyStatus handleMessages(List<MessageExt> messages) {
+        try {
+            consumeBatch(parseMessages(messages));
+            return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+        } catch (RuntimeException ex) {
+            log.warn("批量消费统计消息失败, size={}", messages.size(), ex);
+            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+        }
+    }
+
+    List<ShortLinkStatsRecordEvent> parseMessages(List<MessageExt> messages) {
+        List<ShortLinkStatsRecordEvent> events = new ArrayList<>(messages.size());
+        for (MessageExt message : messages) {
+            ShortLinkStatsRecordEvent event = parseMessage(message);
+            if (event != null) {
+                if (StrUtil.isBlank(event.getEventId()) && StrUtil.isNotBlank(message.getMsgId())) {
+                    event.setEventId(message.getMsgId());
                 }
-                consumeBatch(events);
-                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
-            } catch (RuntimeException ex) {
-                log.warn("批量消费统计消息失败, size={}", messages.size(), ex);
-                return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+                events.add(event);
             }
-        });
+        }
+        return events;
     }
 
     public void consumeBatch(List<ShortLinkStatsRecordEvent> rawEvents) {
         long startNanos = System.nanoTime();
-        List<String> claimedKeys = new ArrayList<>();
+        List<Claim> claims = new ArrayList<>();
+        Set<String> persistedUrls = new HashSet<>();
         try {
             List<ShortLinkStatsRecordEvent> events = new ArrayList<>();
             for (ShortLinkStatsRecordEvent event : rawEvents) {
                 if (event == null || StrUtil.isBlank(event.getFullShortUrl())) {
                     continue;
                 }
-                if (claim(event.getEventId(), claimedKeys)) {
+                if (event.getCurrentDate() == null) {
+                    event.setCurrentDate(new Date());
+                }
+                if (claim(event, claims)) {
                     events.add(event);
                 }
             }
             if (events.isEmpty()) {
                 return;
             }
-            persistBatch(events);
-            statsMetrics.recordConsumeSuccess(Duration.ofNanos(System.nanoTime() - startNanos));
+            persistClaimed(events, persistedUrls);
+            statsMetrics.recordConsumeSuccess(events.size(), Duration.ofNanos(System.nanoTime() - startNanos));
         } catch (RuntimeException ex) {
-            release(claimedKeys);
+            releaseUnpersisted(claims, persistedUrls);
             statsMetrics.recordConsumeFailure(Duration.ofNanos(System.nanoTime() - startNanos));
             throw ex;
         }
     }
 
-    private void persistBatch(List<ShortLinkStatsRecordEvent> events) {
+    private void persistClaimed(List<ShortLinkStatsRecordEvent> events, Set<String> persistedUrls) {
         Map<String, List<ShortLinkStatsRecordEvent>> byUrl = new LinkedHashMap<>();
         for (ShortLinkStatsRecordEvent event : events) {
             byUrl.computeIfAbsent(event.getFullShortUrl(), key -> new ArrayList<>()).add(event);
         }
         List<String> urls = new ArrayList<>(byUrl.keySet());
         urls.sort(Comparator.naturalOrder());
-
-        List<LinkAccessLogsDO> logs = new ArrayList<>(events.size());
-        Map<String, LinkAccessStatsDO> accessStats = new HashMap<>();
-        Map<String, LinkOsStatsDO> osStats = new HashMap<>();
-        Map<String, LinkBrowserStatsDO> browserStats = new HashMap<>();
-        Map<String, LinkDeviceStatsDO> deviceStats = new HashMap<>();
-        Map<String, LinkNetworkStatsDO> networkStats = new HashMap<>();
-        Map<String, LinkLocaleStatsDO> localeStats = new HashMap<>();
-        Map<String, int[]> linkTotals = new HashMap<>();
-        Map<String, String> urlGid = new HashMap<>();
-        List<ShortLinkStatsRecordEvent> publicIpEvents = new ArrayList<>();
-
         for (String url : urls) {
-            List<ShortLinkStatsRecordEvent> group = byUrl.get(url);
-            RLock lock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, url)).readLock();
-            lock.lock();
-            try {
-                String gid = resolveGid(url, group.get(0).getGid());
-                urlGid.put(url, gid);
-                RedisDelta delta = applyRedis(url, gid, group);
-                int[] totals = linkTotals.computeIfAbsent(url, key -> new int[3]);
-                totals[0] += group.size();
-                totals[1] += delta.uvNew();
-                totals[2] += delta.uipNew();
-                for (ShortLinkStatsRecordEvent event : group) {
-                    accumulate(event, logs, accessStats, osStats, browserStats, deviceStats,
-                            networkStats, localeStats, publicIpEvents);
-                }
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        if (!logs.isEmpty()) {
-            linkAccessLogsMapper.insertBatch(logs);
-        }
-        if (!accessStats.isEmpty()) {
-            linkAccessStatsMapper.shortLinkStats(new ArrayList<>(accessStats.values()));
-        }
-        if (!osStats.isEmpty()) {
-            linkOsStatsMapper.shortLinkOsStateBatch(new ArrayList<>(osStats.values()));
-        }
-        if (!browserStats.isEmpty()) {
-            linkBrowserStatsMapper.shortLinkBrowserStateBatch(new ArrayList<>(browserStats.values()));
-        }
-        if (!deviceStats.isEmpty()) {
-            linkDeviceStatsMapper.shortLinkDeviceStateBatch(new ArrayList<>(deviceStats.values()));
-        }
-        if (!networkStats.isEmpty()) {
-            linkNetworkStatsMapper.shortLinkNetworkStateBatch(new ArrayList<>(networkStats.values()));
-        }
-        for (Map.Entry<String, int[]> entry : linkTotals.entrySet()) {
-            String url = entry.getKey();
-            String gid = urlGid.get(url);
-            int[] totals = entry.getValue();
-            int affected = shortLinkMapper.incrementStats(gid, url, totals[0], totals[1], totals[2]);
-            if (affected == 0) {
-                shortLinkColdMapper.incrementStats(gid, url, totals[0], totals[1], totals[2]);
-            }
-        }
-        if (!localeStats.isEmpty()) {
-            linkLocaleStatsMapper.shortLinkLocaleStateBatch(new ArrayList<>(localeStats.values()));
-        }
-        for (ShortLinkStatsRecordEvent event : publicIpEvents) {
-            accessLocaleEnricher.submit(event.getFullShortUrl(), event.getCurrentDate(),
-                    event.getRemoteAddr(), null);
+            persistUrl(url, byUrl.get(url), persistedUrls);
         }
     }
 
-    private void accumulate(ShortLinkStatsRecordEvent event,
-                            List<LinkAccessLogsDO> logs,
-                            Map<String, LinkAccessStatsDO> accessStats,
-                            Map<String, LinkOsStatsDO> osStats,
-                            Map<String, LinkBrowserStatsDO> browserStats,
-                            Map<String, LinkDeviceStatsDO> deviceStats,
-                            Map<String, LinkNetworkStatsDO> networkStats,
-                            Map<String, LinkLocaleStatsDO> localeStats,
-                            List<ShortLinkStatsRecordEvent> publicIpEvents) {
+    private void persistUrl(String url, List<ShortLinkStatsRecordEvent> group, Set<String> persistedUrls) {
+        UrlWrite write = new UrlWrite();
+        RLock lock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, url)).readLock();
+        lock.lock();
+        try {
+            write.gid = resolveGid(url, group);
+            Map<String, List<ShortLinkStatsRecordEvent>> byDay = new LinkedHashMap<>();
+            for (ShortLinkStatsRecordEvent event : group) {
+                Date currentDate = event.getCurrentDate() == null ? new Date() : event.getCurrentDate();
+                byDay.computeIfAbsent(DateUtil.formatDate(currentDate), key -> new ArrayList<>()).add(event);
+            }
+            for (List<ShortLinkStatsRecordEvent> dayGroup : byDay.values()) {
+                addDayGroup(write, url, dayGroup);
+            }
+        } finally {
+            lock.unlock();
+        }
+        persistedUrls.add(url);
+        flush(url, write);
+    }
+
+    private void addDayGroup(UrlWrite write, String url, List<ShortLinkStatsRecordEvent> dayGroup) {
+        List<EventRedisDelta> deltas;
+        if (StrUtil.isBlank(write.gid)) {
+            log.warn("统计消息缺少 gid, 跳过短链累计和排行, url={}", url);
+            deltas = zeroDeltas(dayGroup.size());
+        } else {
+            deltas = applyRedis(url, write.gid, dayGroup);
+        }
+        for (int i = 0; i < dayGroup.size(); i++) {
+            addEvent(write, dayGroup.get(i), deltas.get(i));
+        }
+    }
+
+    private void addEvent(UrlWrite write, ShortLinkStatsRecordEvent event, EventRedisDelta delta) {
+        write.pv += 1;
+        write.totalUv += delta.totalUvNew();
+        write.totalUip += delta.totalUipNew();
         Date currentDate = event.getCurrentDate() == null ? new Date() : event.getCurrentDate();
         String day = DateUtil.formatDate(currentDate);
         Date dayDate = DateUtil.parseDate(day);
         int hour = DateUtil.hour(currentDate, true);
-        int weekday = DateUtil.dayOfWeekEnum(currentDate).getIso8601Value();
         String url = event.getFullShortUrl();
-
         Optional<IpLocation> peeked = ipLocationService.peekWithoutHttp(event.getRemoteAddr());
         IpLocation location = peeked.orElse(IpLocation.unknown());
-        logs.add(LinkAccessLogsDO.builder()
+        LinkAccessLogsDO log = LinkAccessLogsDO.builder()
                 .fullShortUrl(url)
                 .ip(event.getRemoteAddr())
                 .user(event.getUv())
@@ -274,87 +257,98 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 .device(event.getDevice())
                 .network(event.getNetwork())
                 .locale(location.display())
-                .build());
-
-        String accessKey = url + "|" + day + "|" + hour;
-        accessStats.compute(accessKey, (key, existing) -> {
-            if (existing == null) {
-                return LinkAccessStatsDO.builder()
-                        .fullShortUrl(url).date(dayDate).hour(hour).weekday(weekday)
-                        .pv(1).uv(0).uip(0).build();
-            }
-            existing.setPv(existing.getPv() + 1);
-            return existing;
-        });
-        bumpOs(osStats, url, dayDate, event.getOs());
-        bumpBrowser(browserStats, url, dayDate, event.getBrowser());
-        bumpDevice(deviceStats, url, dayDate, event.getDevice());
-        bumpNetwork(networkStats, url, dayDate, event.getNetwork());
+                .build();
+        write.logs.add(log);
+        bumpAccess(write, url, dayDate, hour, delta);
+        bump(write.osStats, url + "|" + day + "|" + event.getOs(),
+                () -> LinkOsStatsDO.builder().fullShortUrl(url).date(dayDate).os(event.getOs()).cnt(1).build(),
+                item -> item.setCnt(item.getCnt() + 1));
+        bump(write.browserStats, url + "|" + day + "|" + event.getBrowser(),
+                () -> LinkBrowserStatsDO.builder().fullShortUrl(url).date(dayDate).browser(event.getBrowser()).cnt(1).build(),
+                item -> item.setCnt(item.getCnt() + 1));
+        bump(write.deviceStats, url + "|" + day + "|" + event.getDevice(),
+                () -> LinkDeviceStatsDO.builder().fullShortUrl(url).date(dayDate).device(event.getDevice()).cnt(1).build(),
+                item -> item.setCnt(item.getCnt() + 1));
+        bump(write.networkStats, url + "|" + day + "|" + event.getNetwork(),
+                () -> LinkNetworkStatsDO.builder().fullShortUrl(url).date(dayDate).network(event.getNetwork()).cnt(1).build(),
+                item -> item.setCnt(item.getCnt() + 1));
         if (peeked.isPresent()) {
             String localeKey = url + "|" + day + "|" + location.province() + "|" + location.city();
-            localeStats.compute(localeKey, (key, existing) -> {
-                if (existing == null) {
-                    return LinkLocaleStatsDO.builder()
+            bump(write.localeStats, localeKey,
+                    () -> LinkLocaleStatsDO.builder()
                             .fullShortUrl(url).date(dayDate).cnt(1)
                             .country(LOCALE_COUNTRY_CN)
                             .province(location.province())
                             .city(location.city())
                             .adcode(location.adcode())
-                            .build();
-                }
-                existing.setCnt(existing.getCnt() + 1);
-                return existing;
-            });
+                            .build(),
+                    item -> item.setCnt(item.getCnt() + 1));
         } else {
-            publicIpEvents.add(event);
+            write.localePendings.add(new LocalePending(event, currentDate, log));
         }
     }
 
-    private void bumpOs(Map<String, LinkOsStatsDO> stats, String url, Date day, String os) {
-        String key = url + "|" + DateUtil.formatDate(day) + "|" + os;
-        stats.compute(key, (k, existing) -> {
+    private void bumpAccess(UrlWrite write, String url, Date dayDate, int hour, EventRedisDelta delta) {
+        int weekday = DateUtil.dayOfWeekEnum(dayDate).getIso8601Value();
+        String accessKey = url + "|" + DateUtil.formatDate(dayDate) + "|" + hour;
+        write.accessStats.compute(accessKey, (key, existing) -> {
             if (existing == null) {
-                return LinkOsStatsDO.builder().fullShortUrl(url).date(day).os(os).cnt(1).build();
+                return LinkAccessStatsDO.builder()
+                        .fullShortUrl(url).date(dayDate).hour(hour).weekday(weekday)
+                        .pv(1).uv(delta.todayUvNew()).uip(delta.todayUipNew()).build();
             }
-            existing.setCnt(existing.getCnt() + 1);
+            existing.setPv(existing.getPv() + 1);
+            existing.setUv(existing.getUv() + delta.todayUvNew());
+            existing.setUip(existing.getUip() + delta.todayUipNew());
             return existing;
         });
     }
 
-    private void bumpBrowser(Map<String, LinkBrowserStatsDO> stats, String url, Date day, String browser) {
-        String key = url + "|" + DateUtil.formatDate(day) + "|" + browser;
-        stats.compute(key, (k, existing) -> {
+    private static <T> void bump(Map<String, T> stats, String key, Supplier<T> creator, Consumer<T> adder) {
+        stats.compute(key, (ignored, existing) -> {
             if (existing == null) {
-                return LinkBrowserStatsDO.builder().fullShortUrl(url).date(day).browser(browser).cnt(1).build();
+                return creator.get();
             }
-            existing.setCnt(existing.getCnt() + 1);
+            adder.accept(existing);
             return existing;
         });
     }
 
-    private void bumpDevice(Map<String, LinkDeviceStatsDO> stats, String url, Date day, String device) {
-        String key = url + "|" + DateUtil.formatDate(day) + "|" + device;
-        stats.compute(key, (k, existing) -> {
-            if (existing == null) {
-                return LinkDeviceStatsDO.builder().fullShortUrl(url).date(day).device(device).cnt(1).build();
+    private void flush(String url, UrlWrite write) {
+        if (!write.logs.isEmpty()) {
+            linkAccessLogsMapper.insertBatch(write.logs);
+        }
+        if (!write.accessStats.isEmpty()) {
+            linkAccessStatsMapper.shortLinkStats(new ArrayList<>(write.accessStats.values()));
+        }
+        if (!write.osStats.isEmpty()) {
+            linkOsStatsMapper.shortLinkOsStateBatch(new ArrayList<>(write.osStats.values()));
+        }
+        if (!write.browserStats.isEmpty()) {
+            linkBrowserStatsMapper.shortLinkBrowserStateBatch(new ArrayList<>(write.browserStats.values()));
+        }
+        if (!write.deviceStats.isEmpty()) {
+            linkDeviceStatsMapper.shortLinkDeviceStateBatch(new ArrayList<>(write.deviceStats.values()));
+        }
+        if (!write.networkStats.isEmpty()) {
+            linkNetworkStatsMapper.shortLinkNetworkStateBatch(new ArrayList<>(write.networkStats.values()));
+        }
+        if (StrUtil.isNotBlank(write.gid)) {
+            int affected = shortLinkMapper.incrementStats(write.gid, url, write.pv, write.totalUv, write.totalUip);
+            if (affected == 0) {
+                shortLinkColdMapper.incrementStats(write.gid, url, write.pv, write.totalUv, write.totalUip);
             }
-            existing.setCnt(existing.getCnt() + 1);
-            return existing;
-        });
+        }
+        if (!write.localeStats.isEmpty()) {
+            linkLocaleStatsMapper.shortLinkLocaleStateBatch(new ArrayList<>(write.localeStats.values()));
+        }
+        for (LocalePending pending : write.localePendings) {
+            accessLocaleEnricher.submit(pending.event().getFullShortUrl(), pending.accessDate(),
+                    pending.event().getRemoteAddr(), pending.log().getId());
+        }
     }
 
-    private void bumpNetwork(Map<String, LinkNetworkStatsDO> stats, String url, Date day, String network) {
-        String key = url + "|" + DateUtil.formatDate(day) + "|" + network;
-        stats.compute(key, (k, existing) -> {
-            if (existing == null) {
-                return LinkNetworkStatsDO.builder().fullShortUrl(url).date(day).network(network).cnt(1).build();
-            }
-            existing.setCnt(existing.getCnt() + 1);
-            return existing;
-        });
-    }
-
-    private RedisDelta applyRedis(String url, String gid, List<ShortLinkStatsRecordEvent> events) {
+    private List<EventRedisDelta> applyRedis(String url, String gid, List<ShortLinkStatsRecordEvent> events) {
         String today = DateUtil.formatDate(events.get(0).getCurrentDate() == null
                 ? new Date() : events.get(0).getCurrentDate());
         String pvRankKey = String.format(RANK_KEY, OrderTagEnum.TODAY_PV.getValue(), gid, today);
@@ -382,14 +376,14 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 return null;
             }
         });
-        int uvNew = 0;
-        int uipNew = 0;
+        List<EventRedisDelta> deltas = new ArrayList<>(events.size());
         int cursor = 2;
         for (int i = 0; i < events.size(); i++) {
-            uvNew += longVal(first, cursor++) == 1 ? 1 : 0;
-            longVal(first, cursor++);
-            uipNew += longVal(first, cursor++) == 1 ? 1 : 0;
-            longVal(first, cursor++);
+            int todayUv = longVal(first, cursor++) == 1 ? 1 : 0;
+            int totalUv = longVal(first, cursor++) == 1 ? 1 : 0;
+            int todayUip = longVal(first, cursor++) == 1 ? 1 : 0;
+            int totalUip = longVal(first, cursor++) == 1 ? 1 : 0;
+            deltas.add(new EventRedisDelta(todayUv, todayUip, totalUv, totalUip));
         }
         List<Object> second = stringRedisTemplate.executePipelined(new SessionCallback<Object>() {
             @Override
@@ -413,38 +407,75 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 return null;
             }
         });
-        return new RedisDelta(uvNew, uipNew);
+        return deltas;
     }
 
-    private String resolveGid(String url, String gid) {
-        if (StrUtil.isNotBlank(gid)) {
-            return gid;
+    private String resolveGid(String url, List<ShortLinkStatsRecordEvent> events) {
+        for (ShortLinkStatsRecordEvent event : events) {
+            if (StrUtil.isNotBlank(event.getGid())) {
+                return event.getGid();
+            }
         }
         ShortLinkGoToDO gotoDO = shortLinkGoToMapper.selectOne(
                 Wrappers.lambdaQuery(ShortLinkGoToDO.class)
                         .eq(ShortLinkGoToDO::getFullShortUrl, url));
-        return gotoDO == null ? gid : gotoDO.getGid();
+        return gotoDO == null ? null : gotoDO.getGid();
     }
 
-    private boolean claim(String eventId, List<String> claimedKeys) {
-        if (StrUtil.isBlank(eventId)) {
+    private ShortLinkStatsRecordEvent parseMessage(MessageExt message) {
+        try {
+            byte[] body = message.getBody();
+            if (body == null || body.length == 0) {
+                log.warn("统计消息 body 为空, msgId={}", message.getMsgId());
+                return null;
+            }
+            ShortLinkStatsRecordEvent event = JSON.parseObject(new String(body, StandardCharsets.UTF_8),
+                    ShortLinkStatsRecordEvent.class);
+            if (event == null || StrUtil.isBlank(event.getFullShortUrl())) {
+                log.warn("统计消息无法解析或缺少短链, msgId={}", message.getMsgId());
+                return null;
+            }
+            return event;
+        } catch (RuntimeException ex) {
+            log.warn("统计消息 JSON 非法, msgId={}", message.getMsgId(), ex);
+            return null;
+        }
+    }
+
+    private boolean claim(ShortLinkStatsRecordEvent event, List<Claim> claims) {
+        if (StrUtil.isBlank(event.getEventId())) {
+            claims.add(new Claim(null, event.getFullShortUrl()));
             return true;
         }
-        String key = IDEMPOTENT_PREFIX + eventId;
+        String key = IDEMPOTENT_PREFIX + event.getEventId();
         Boolean absent = stringRedisTemplate.opsForValue()
                 .setIfAbsent(key, "1", IDEMPOTENT_SECONDS, TimeUnit.SECONDS);
         if (!Boolean.TRUE.equals(absent)) {
             return false;
         }
-        claimedKeys.add(key);
+        claims.add(new Claim(key, event.getFullShortUrl()));
         return true;
     }
 
-    private void release(Collection<String> keys) {
-        if (keys == null || keys.isEmpty()) {
+    private void releaseUnpersisted(List<Claim> claims, Set<String> persistedUrls) {
+        List<String> keys = new ArrayList<>();
+        for (Claim claim : claims) {
+            if (claim.key() != null && !persistedUrls.contains(claim.url())) {
+                keys.add(claim.key());
+            }
+        }
+        if (keys.isEmpty()) {
             return;
         }
         stringRedisTemplate.delete(keys);
+    }
+
+    private static List<EventRedisDelta> zeroDeltas(int size) {
+        List<EventRedisDelta> deltas = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            deltas.add(new EventRedisDelta(0, 0, 0, 0));
+        }
+        return deltas;
     }
 
     private static long longVal(List<Object> results, int index) {
@@ -458,9 +489,47 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         if (value instanceof Number number) {
             return number.longValue();
         }
+        if (value instanceof CharSequence text) {
+            String normalized = text.toString().trim();
+            if ("true".equalsIgnoreCase(normalized)) {
+                return 1L;
+            }
+            if ("false".equalsIgnoreCase(normalized)) {
+                return 0L;
+            }
+            try {
+                return Long.parseLong(normalized);
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
         return 0L;
     }
 
-    private record RedisDelta(int uvNew, int uipNew) {
+    /**
+     * 单条短链在一批内的聚合写缓冲。
+     */
+    private static final class UrlWrite {
+        private String gid;
+        private int pv;
+        private int totalUv;
+        private int totalUip;
+        private final List<LinkAccessLogsDO> logs = new ArrayList<>();
+        private final Map<String, LinkAccessStatsDO> accessStats = new HashMap<>();
+        private final Map<String, LinkOsStatsDO> osStats = new HashMap<>();
+        private final Map<String, LinkBrowserStatsDO> browserStats = new HashMap<>();
+        private final Map<String, LinkDeviceStatsDO> deviceStats = new HashMap<>();
+        private final Map<String, LinkNetworkStatsDO> networkStats = new HashMap<>();
+        private final Map<String, LinkLocaleStatsDO> localeStats = new HashMap<>();
+        private final List<LocalePending> localePendings = new ArrayList<>();
+    }
+
+    private record LocalePending(ShortLinkStatsRecordEvent event, Date accessDate, LinkAccessLogsDO log) {
+    }
+
+    private record Claim(String key, String url) {
+    }
+
+    private record EventRedisDelta(int todayUvNew, int todayUipNew, int totalUvNew, int totalUipNew) {
     }
 }

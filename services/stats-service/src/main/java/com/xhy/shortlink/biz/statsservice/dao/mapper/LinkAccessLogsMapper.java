@@ -26,6 +26,7 @@ import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkUvTypeReqDTO;
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -53,7 +54,8 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             </foreach>
             </script>
             """)
-    int insertBatch(@Param("list") List<LinkAccessLogsDO> list);
+    @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
+    int insertBatch(List<LinkAccessLogsDO> list);
 
     /**
      * 根据短链接查询 Top5 高频访问 IP

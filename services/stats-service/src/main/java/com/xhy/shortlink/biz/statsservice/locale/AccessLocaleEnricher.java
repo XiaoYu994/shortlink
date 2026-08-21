@@ -32,7 +32,7 @@ import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConsta
 /**
  * 公网 IP 的高德解析与地区行补写。
  * <p>
- * 只在主统计全部写库成功之后提交。不在 MQ {@code @Idempotent} 保护内：
+ * 只在主统计全部写库成功之后提交。不在 MQ 幂等保护内：
  * 主流程失败则不会入队；入队后的失败/丢弃只写「未知」地区行，不回补 PV。
  */
 @Slf4j

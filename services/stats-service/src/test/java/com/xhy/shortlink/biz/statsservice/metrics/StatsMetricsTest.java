@@ -36,6 +36,10 @@ class StatsMetricsTest {
 
         double count = registry.get("shortlink_mq_consume_success_total").counter().count();
         assertEquals(1.0, count, 0.0001);
+
+        metrics.recordConsumeSuccess(3, Duration.ofMillis(40));
+        count = registry.get("shortlink_mq_consume_success_total").counter().count();
+        assertEquals(4.0, count, 0.0001);
     }
 
     @Test
