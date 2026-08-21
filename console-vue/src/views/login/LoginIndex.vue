@@ -359,7 +359,7 @@ const changeLogin = () => {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(7, 11, 22, 0.28) 0%, rgba(7, 11, 22, 0.12) 42%, rgba(7, 11, 22, 0.45) 100%);
+  background: linear-gradient(180deg, rgba(7, 11, 22, 0.18) 0%, rgba(7, 11, 22, 0.06) 40%, rgba(7, 11, 22, 0.32) 100%);
   z-index: 0;
 }
 
