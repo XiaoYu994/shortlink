@@ -1,0 +1,34 @@
+{
+  "不存在短链" : {
+    "transaction" : "不存在短链",
+    "sampleCount" : 229652,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 4.599846724609372,
+    "medianResTime" : 5.0,
+    "minResTime" : 1.0,
+    "maxResTime" : 113.0,
+    "pct1ResTime" : 8.0,
+    "pct2ResTime" : 9.0,
+    "pct3ResTime" : 12.0,
+    "throughput" : 3894.5851069242117,
+    "receivedKBytesPerSec" : 612.3140114386013,
+    "sentKBytesPerSec" : 380.33057684806755
+  },
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 229652,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 4.599846724609372,
+    "medianResTime" : 5.0,
+    "minResTime" : 1.0,
+    "maxResTime" : 113.0,
+    "pct1ResTime" : 8.0,
+    "pct2ResTime" : 9.0,
+    "pct3ResTime" : 12.0,
+    "throughput" : 3894.5851069242117,
+    "receivedKBytesPerSec" : 612.3140114386013,
+    "sentKBytesPerSec" : 380.33057684806755
+  }
+}

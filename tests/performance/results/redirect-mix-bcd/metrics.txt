@@ -1,0 +1,93 @@
+=== metrics baseline 2026-08-21T10:10:09+08:00 ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 13175.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 11497.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 248048.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 249726.0
+access_logs 77652
+=== metrics after-warmup 2026-08-21T10:11:44+08:00 ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 21021.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 11497.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 249726.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 259250.0
+access_logs 81513
+=== metrics after-B ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 21497.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 11497.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 462914.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 472914.0
+access_logs 84216
+=== metrics after-restart (Caffeine empty, Redis still warm) ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 0.0
+=== metrics after-C ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 173599.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 173599.0
+=== metrics before-D ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 0.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 173599.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 173599.0
+access_logs 87921
+=== metrics after-D ===
+# HELP shortlink_cache_miss_total Total short-link cache misses
+# TYPE shortlink_cache_miss_total counter
+shortlink_cache_miss_total{application="shortlink-aggregation-service",} 229652.0
+# HELP shortlink_redirect_failure_total Total failed short-link redirects
+# TYPE shortlink_redirect_failure_total counter
+shortlink_redirect_failure_total{application="shortlink-aggregation-service",} 229652.0
+# HELP shortlink_cache_hit_total Total short-link cache hits
+# TYPE shortlink_cache_hit_total counter
+shortlink_cache_hit_total{application="shortlink-aggregation-service",} 173599.0
+# HELP shortlink_redirect_success_total Total successful short-link redirects
+# TYPE shortlink_redirect_success_total counter
+shortlink_redirect_success_total{application="shortlink-aggregation-service",} 173599.0
+access_logs 90454

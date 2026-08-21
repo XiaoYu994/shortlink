@@ -47,3 +47,12 @@ build/
 
 .runtime_logs/
 docker/.env
+
+# JMeter raw samples and generated HTML (keep REPORT.md / statistics.json / CSV)
+tests/performance/results/**/*.jtl
+tests/performance/results/**/*.log
+tests/performance/results/**/html/
+tests/performance/results/**/*-html/
+tests/performance/results/**/docker-stats.log
+tests/performance/data/full-urls.txt
+jmeter.log
