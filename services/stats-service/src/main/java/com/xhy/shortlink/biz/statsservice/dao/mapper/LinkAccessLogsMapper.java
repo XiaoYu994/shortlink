@@ -25,6 +25,7 @@ import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsAccessRecordGroupRe
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsGroupReqDTO;
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkUvTypeReqDTO;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -40,6 +41,19 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
 
     @Update("UPDATE t_link_access_logs SET locale = #{locale} WHERE id = #{id}")
     int updateLocale(@Param("id") Long id, @Param("locale") String locale);
+
+    @Insert("""
+            <script>
+            INSERT INTO t_link_access_logs
+            (full_short_url, user, browser, os, ip, network, device, locale, create_time, update_time, del_flag)
+            VALUES
+            <foreach collection='list' item='item' separator=','>
+            (#{item.fullShortUrl}, #{item.user}, #{item.browser}, #{item.os}, #{item.ip},
+             #{item.network}, #{item.device}, #{item.locale}, NOW(), NOW(), 0)
+            </foreach>
+            </script>
+            """)
+    int insertBatch(@Param("list") List<LinkAccessLogsDO> list);
 
     /**
      * 根据短链接查询 Top5 高频访问 IP

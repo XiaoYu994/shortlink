@@ -42,6 +42,18 @@ public interface LinkNetworkStatsMapper extends BaseMapper<LinkNetworkStatsDO> {
             """)
     void shortLinkNetworkState(@Param("linkNetworkStats") LinkNetworkStatsDO linkNetworkStatsDO);
 
+    @Insert("""
+            <script>
+            INSERT INTO t_link_network_stats (full_short_url, date, cnt, network, create_time, update_time, del_flag)
+            VALUES
+            <foreach collection='list' item='item' separator=','>
+            (#{item.fullShortUrl}, #{item.date}, #{item.cnt}, #{item.network}, NOW(), NOW(), 0)
+            </foreach>
+            ON DUPLICATE KEY UPDATE cnt = cnt + VALUES(cnt), update_time = NOW()
+            </script>
+            """)
+    void shortLinkNetworkStateBatch(@Param("list") List<LinkNetworkStatsDO> list);
+
     /**
      * 根据短链接查询指定日期范围内的网络类型统计
      */

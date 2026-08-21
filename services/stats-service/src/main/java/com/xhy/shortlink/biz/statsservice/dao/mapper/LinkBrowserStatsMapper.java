@@ -43,6 +43,18 @@ public interface LinkBrowserStatsMapper extends BaseMapper<LinkBrowserStatsDO> {
             """)
     void shortLinkBrowserState(@Param("linkBrowserStats") LinkBrowserStatsDO linkBrowserStatsDO);
 
+    @Insert("""
+            <script>
+            INSERT INTO t_link_browser_stats (full_short_url, date, cnt, browser, create_time, update_time, del_flag)
+            VALUES
+            <foreach collection='list' item='item' separator=','>
+            (#{item.fullShortUrl}, #{item.date}, #{item.cnt}, #{item.browser}, NOW(), NOW(), 0)
+            </foreach>
+            ON DUPLICATE KEY UPDATE cnt = cnt + VALUES(cnt), update_time = NOW()
+            </script>
+            """)
+    void shortLinkBrowserStateBatch(@Param("list") List<LinkBrowserStatsDO> list);
+
     /**
      * 根据短链接查询指定日期范围内的浏览器统计
      */
