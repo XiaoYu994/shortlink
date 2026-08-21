@@ -27,6 +27,7 @@ import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkStatsReqDTO;
 import com.xhy.shortlink.biz.api.stats.dto.req.ShortLinkUvTypeReqDTO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,9 @@ import java.util.Map;
  * 短链接访问日志持久层
  */
 public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
+
+    @Update("UPDATE t_link_access_logs SET locale = #{locale} WHERE id = #{id}")
+    int updateLocale(@Param("id") Long id, @Param("locale") String locale);
 
     /**
      * 根据短链接查询 Top5 高频访问 IP

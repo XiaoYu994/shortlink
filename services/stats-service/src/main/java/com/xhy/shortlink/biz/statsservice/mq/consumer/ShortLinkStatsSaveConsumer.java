@@ -19,16 +19,12 @@ package com.xhy.shortlink.biz.statsservice.mq.consumer;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.http.HttpUtil;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhy.shortlink.biz.statsservice.common.enums.OrderTagEnum;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessStatsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkBrowserStatsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkDeviceStatsDO;
-import com.xhy.shortlink.biz.statsservice.dao.entity.LinkLocaleStatsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkNetworkStatsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.LinkOsStatsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.ShortLinkGoToDO;
@@ -36,12 +32,14 @@ import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessLogsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkAccessStatsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkBrowserStatsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkDeviceStatsMapper;
-import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkLocaleStatsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkNetworkStatsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.LinkOsStatsMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkColdMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkGoToMapper;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.ShortLinkMapper;
+import com.xhy.shortlink.biz.statsservice.locale.AccessLocaleEnricher;
+import com.xhy.shortlink.biz.statsservice.locale.IpLocation;
+import com.xhy.shortlink.biz.statsservice.locale.IpLocationService;
 import com.xhy.shortlink.biz.statsservice.metrics.StatsMetrics;
 import com.xhy.shortlink.biz.statsservice.mq.event.ShortLinkStatsRecordEvent;
 import com.xhy.shortlink.framework.starter.idempotent.annotation.Idempotent;
@@ -54,21 +52,19 @@ import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Optional;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static com.xhy.shortlink.biz.statsservice.common.constant.RedisKeyConstant.*;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RocketMQConstant.STATS_RECORD_GROUP;
 import static com.xhy.shortlink.biz.statsservice.common.constant.RocketMQConstant.STATS_RECORD_TOPIC;
-import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConstant.*;
+import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConstant.TODAY_EXPIRETIME;
 
 /**
  * 短链接统计数据保存消费者
@@ -80,7 +76,6 @@ import static com.xhy.shortlink.biz.statsservice.common.constant.ShortLinkConsta
 public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkStatsRecordEvent> {
 
     private static final long REDIS_KEY_NOT_EXISTS = -1L;
-    private static final int AMAP_REQUEST_TIMEOUT_MILLIS = 3000;
 
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
@@ -88,16 +83,14 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
     private final ShortLinkGoToMapper shortLinkGoToMapper;
     private final ShortLinkColdMapper shortLinkColdMapper;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
-    private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final StatsMetrics statsMetrics;
-
-    @Value("${short-link.stats.locale.amap-key}")
-    private String statsLocaleAmapKey;
+    private final IpLocationService ipLocationService;
+    private final AccessLocaleEnricher accessLocaleEnricher;
 
     @Override
     @Idempotent(
@@ -195,38 +188,11 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         int weekday = DateUtil.dayOfWeekEnum(currentDate).getIso8601Value();
         String remoteAddr = statsRecord.getRemoteAddr();
 
-        // IP 地理位置解析
-        String actualProvince = LOCALE_UNKNOWN;
-        String actualCity = LOCALE_UNKNOWN;
-        String adcode = LOCALE_UNKNOWN;
-        Map<String, Object> localeParamMap = new HashMap<>();
-        localeParamMap.put("key", statsLocaleAmapKey);
-        localeParamMap.put("ip", remoteAddr);
-        try {
-            String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap, AMAP_REQUEST_TIMEOUT_MILLIS);
-            JSONObject localeResultObj = JSON.parseObject(localeResultStr);
-            if (AMAP_SUCCESS_CODE.equals(localeResultObj.getString("infocode"))) {
-                String province = localeResultObj.getString("province");
-                if (StrUtil.isNotBlank(province) && !AMAP_EMPTY_VALUE.equals(province)) {
-                    actualProvince = province;
-                }
-                String city = localeResultObj.getString("city");
-                if (StrUtil.isNotBlank(city) && !AMAP_EMPTY_VALUE.equals(city)) {
-                    actualCity = city;
-                }
-                String code = localeResultObj.getString("adcode");
-                if (StrUtil.isNotBlank(code) && !AMAP_EMPTY_VALUE.equals(code)) {
-                    adcode = code;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("IP解析失败或超时, IP: {}", remoteAddr, e);
+        Optional<IpLocation> peeked = ipLocationService.peekWithoutHttp(remoteAddr);
+        IpLocation syncLocation = peeked.orElse(IpLocation.unknown());
+        if (peeked.isPresent()) {
+            accessLocaleEnricher.persistLocale(fullShortUrl, currentDate, peeked.get());
         }
-
-        // 地区统计
-        linkLocaleStatsMapper.shortLinkLocaleState(LinkLocaleStatsDO.builder()
-                .fullShortUrl(fullShortUrl).province(actualProvince).city(actualCity)
-                .adcode(adcode).cnt(1).country(LOCALE_COUNTRY_CN).date(currentDate).build());
 
         // OS 统计
         linkOsStatsMapper.shortLinkOsState(LinkOsStatsDO.builder()
@@ -249,11 +215,15 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 .cnt(1).date(currentDate).build());
 
         // 访问日志
-        linkAccessLogsMapper.insert(LinkAccessLogsDO.builder()
+        LinkAccessLogsDO accessLog = LinkAccessLogsDO.builder()
                 .fullShortUrl(fullShortUrl).ip(remoteAddr).user(statsRecord.getUv())
                 .os(statsRecord.getOs()).browser(statsRecord.getBrowser())
                 .device(statsRecord.getDevice()).network(statsRecord.getNetwork())
-                .locale(StrUtil.join("-", LOCALE_COUNTRY_CN, actualProvince, actualCity)).build());
+                .locale(syncLocation.display()).build();
+        linkAccessLogsMapper.insert(accessLog);
+        if (peeked.isEmpty()) {
+            accessLocaleEnricher.enrich(fullShortUrl, currentDate, remoteAddr, accessLog.getId());
+        }
 
         // 基础访问统计
         linkAccessStatsMapper.shortLinkStats(Collections.singletonList(

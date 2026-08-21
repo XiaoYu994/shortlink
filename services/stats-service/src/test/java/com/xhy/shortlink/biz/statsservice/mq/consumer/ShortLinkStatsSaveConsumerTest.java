@@ -19,6 +19,9 @@ package com.xhy.shortlink.biz.statsservice.mq.consumer;
 
 import com.xhy.shortlink.biz.statsservice.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
+import com.xhy.shortlink.biz.statsservice.locale.AccessLocaleEnricher;
+import com.xhy.shortlink.biz.statsservice.locale.IpLocation;
+import com.xhy.shortlink.biz.statsservice.locale.IpLocationService;
 import com.xhy.shortlink.biz.statsservice.metrics.StatsMetrics;
 import com.xhy.shortlink.biz.statsservice.mq.event.ShortLinkStatsRecordEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,10 +36,9 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.HyperLogLogOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import java.time.Duration;
 import java.util.Date;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -60,8 +62,6 @@ class ShortLinkStatsSaveConsumerTest {
     @Mock
     private LinkAccessStatsMapper linkAccessStatsMapper;
     @Mock
-    private LinkLocaleStatsMapper linkLocaleStatsMapper;
-    @Mock
     private LinkOsStatsMapper linkOsStatsMapper;
     @Mock
     private LinkBrowserStatsMapper linkBrowserStatsMapper;
@@ -73,10 +73,14 @@ class ShortLinkStatsSaveConsumerTest {
     private LinkNetworkStatsMapper linkNetworkStatsMapper;
     @Mock
     private StatsMetrics statsMetrics;
+    @Mock
+    private IpLocationService ipLocationService;
+    @Mock
+    private AccessLocaleEnricher accessLocaleEnricher;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(consumer, "statsLocaleAmapKey", "test-amap-key");
+        lenient().when(ipLocationService.peekWithoutHttp(any())).thenReturn(Optional.of(IpLocation.unknown()));
     }
 
     @Test
@@ -120,7 +124,8 @@ class ShortLinkStatsSaveConsumerTest {
         verify(linkDeviceStatsMapper).shortLinkDeviceState(any());
         verify(linkNetworkStatsMapper).shortLinkNetworkState(any());
         verify(linkAccessLogsMapper).insert(any(com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO.class));
-        verify(linkLocaleStatsMapper).shortLinkLocaleState(any());
+        verify(accessLocaleEnricher).persistLocale(eq("test.cn/abc"), any(), any());
+        verify(accessLocaleEnricher, never()).enrich(any(), any(), any(), any());
         verify(shortLinkMapper).incrementStats(eq("g1"), eq("test.cn/abc"), eq(1), anyInt(), anyInt());
         verify(statsMetrics).recordConsumeSuccess(any(Duration.class));
     }
@@ -225,5 +230,47 @@ class ShortLinkStatsSaveConsumerTest {
         }
 
         verify(statsMetrics).recordConsumeFailure(any(Duration.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void onMessage_publicIp_defersAmapUntilAfterPersist() {
+        when(ipLocationService.peekWithoutHttp("114.114.114.114")).thenReturn(Optional.empty());
+        ShortLinkStatsRecordEvent event = ShortLinkStatsRecordEvent.builder()
+                .eventId("evt-5")
+                .fullShortUrl("test.cn/pub")
+                .gid("g1")
+                .remoteAddr("114.114.114.114")
+                .os("Windows")
+                .browser("Chrome")
+                .device("PC")
+                .network("WIFI")
+                .uv("uv-pub")
+                .currentDate(new Date())
+                .build();
+
+        RReadWriteLock rwLock = mock(RReadWriteLock.class);
+        RLock readLock = mock(RLock.class);
+        when(redissonClient.getReadWriteLock(anyString())).thenReturn(rwLock);
+        when(rwLock.readLock()).thenReturn(readLock);
+
+        ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(stringRedisTemplate.getExpire(anyString())).thenReturn(-1L);
+
+        HyperLogLogOperations<String, String> hllOps = mock(HyperLogLogOperations.class);
+        when(stringRedisTemplate.opsForHyperLogLog()).thenReturn(hllOps);
+        when(hllOps.add(anyString(), anyString())).thenReturn(1L);
+        when(hllOps.size(anyString())).thenReturn(1L);
+
+        when(shortLinkMapper.incrementStats(anyString(), anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(1);
+
+        consumer.onMessage(event);
+
+        verify(linkAccessLogsMapper).insert(any(com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO.class));
+        verify(accessLocaleEnricher, never()).persistLocale(any(), any(), any());
+        verify(accessLocaleEnricher).enrich(eq("test.cn/pub"), any(), eq("114.114.114.114"), any());
+        verify(statsMetrics).recordConsumeSuccess(any(Duration.class));
     }
 }
