@@ -44,5 +44,5 @@ public final class RedisKeyConstant {
     public static final String TOTAL_UIP_HLL_KEY = "short-link:stats:uip:hll:total:%s";
 
     /** IP 地理定位缓存 province|city|adcode */
-    public static final String LOCALE_IP_KEY = "short-link:locale:ip:%s";
+    public static final String LOCALE_IP_KEY = "short-link:locale:ip:%s:";
 }

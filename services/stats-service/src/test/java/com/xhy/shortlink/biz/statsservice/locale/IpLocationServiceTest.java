@@ -96,9 +96,33 @@ class IpLocationServiceTest {
     }
 
     @Test
-    void isPrivateOrLocal_coversRfc1918() {
+    void isPrivateOrLocal_coversRfc1918AndCgnat() {
         assertTrue(IpLocationService.isPrivateOrLocal("10.0.0.1"));
         assertTrue(IpLocationService.isPrivateOrLocal("192.168.1.1"));
+        assertTrue(IpLocationService.isPrivateOrLocal("172.16.0.1"));
+        assertTrue(IpLocationService.isPrivateOrLocal("100.64.1.1"));
+        assertTrue(IpLocationService.isPrivateOrLocal("::1"));
         assertTrue(IpLocationService.isPrivateOrLocal("not-an-ip"));
+        assertTrue(IpLocationService.isLiteralIpv4("8.8.8.8"));
+        assertTrue(!IpLocationService.isPrivateOrLocal("8.8.8.8"));
+    }
+
+    @Test
+    void peekWithoutHttp_malformedCache_empty() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn("only-one-part");
+        assertTrue(ipLocationService.peekWithoutHttp("8.8.8.8").isEmpty());
+    }
+
+    @Test
+    void parseAmapBody_successAndEmptyArray() {
+        IpLocation ok = IpLocationService.parseAmapBody(
+                "{\"infocode\":\"10000\",\"province\":\"湖南省\",\"city\":\"长沙市\",\"adcode\":\"430100\"}");
+        assertEquals("湖南省", ok.province());
+        assertEquals("长沙市", ok.city());
+        assertTrue(IpLocationService.parseAmapBody(
+                "{\"infocode\":\"10000\",\"province\":\"[]\",\"city\":\"[]\",\"adcode\":\"[]\"}").isUnknown());
+        assertTrue(IpLocationService.parseAmapBody("{\"infocode\":\"10021\"}").isUnknown());
+        assertTrue(IpLocationService.parseAmapBody(null).isUnknown());
     }
 }

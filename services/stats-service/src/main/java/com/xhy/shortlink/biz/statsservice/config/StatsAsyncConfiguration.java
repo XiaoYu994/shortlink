@@ -17,29 +17,29 @@
 
 package com.xhy.shortlink.biz.statsservice.config;
 
+import com.xhy.shortlink.biz.statsservice.metrics.StatsMetrics;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * 高德定位专用线程池。拒绝策略丢弃最旧任务，避免反压 RocketMQ 消费入库。
+ * 高德定位专用线程池。饱和时丢掉最旧任务并记未知地区，避免反压 RocketMQ 入库。
  */
 @Configuration
 @EnableAsync
 public class StatsAsyncConfiguration {
 
     @Bean("amapExecutor")
-    public Executor amapExecutor() {
+    public Executor amapExecutor(StatsMetrics statsMetrics) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(5000);
         executor.setThreadNamePrefix("Amap-Locale-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardOldestPolicy());
+        executor.setRejectedExecutionHandler(new AmapRejectedExecutionHandler(statsMetrics));
         executor.initialize();
         return executor;
     }

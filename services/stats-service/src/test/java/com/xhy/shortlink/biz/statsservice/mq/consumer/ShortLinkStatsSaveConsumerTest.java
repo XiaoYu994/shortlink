@@ -17,6 +17,7 @@
 
 package com.xhy.shortlink.biz.statsservice.mq.consumer;
 
+import com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO;
 import com.xhy.shortlink.biz.statsservice.dao.entity.ShortLinkGoToDO;
 import com.xhy.shortlink.biz.statsservice.dao.mapper.*;
 import com.xhy.shortlink.biz.statsservice.locale.AccessLocaleEnricher;
@@ -27,6 +28,8 @@ import com.xhy.shortlink.biz.statsservice.mq.event.ShortLinkStatsRecordEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +43,7 @@ import java.time.Duration;
 import java.util.Date;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -123,10 +127,13 @@ class ShortLinkStatsSaveConsumerTest {
         verify(linkBrowserStatsMapper).shortLinkBrowserState(any());
         verify(linkDeviceStatsMapper).shortLinkDeviceState(any());
         verify(linkNetworkStatsMapper).shortLinkNetworkState(any());
-        verify(linkAccessLogsMapper).insert(any(com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO.class));
-        verify(accessLocaleEnricher).persistLocale(eq("test.cn/abc"), any(), any());
-        verify(accessLocaleEnricher, never()).enrich(any(), any(), any(), any());
-        verify(shortLinkMapper).incrementStats(eq("g1"), eq("test.cn/abc"), eq(1), anyInt(), anyInt());
+        ArgumentCaptor<LinkAccessLogsDO> logCaptor = ArgumentCaptor.forClass(LinkAccessLogsDO.class);
+        verify(linkAccessLogsMapper).insert(logCaptor.capture());
+        assertEquals("中国-未知-未知", logCaptor.getValue().getLocale());
+        InOrder order = inOrder(shortLinkMapper, accessLocaleEnricher);
+        order.verify(shortLinkMapper).incrementStats(eq("g1"), eq("test.cn/abc"), eq(1), anyInt(), anyInt());
+        order.verify(accessLocaleEnricher).persistLocale(eq("test.cn/abc"), any(), any());
+        verify(accessLocaleEnricher, never()).submit(any(), any(), any(), any());
         verify(statsMetrics).recordConsumeSuccess(any(Duration.class));
     }
 
@@ -265,12 +272,65 @@ class ShortLinkStatsSaveConsumerTest {
 
         when(shortLinkMapper.incrementStats(anyString(), anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(1);
+        doAnswer(invocation -> {
+            LinkAccessLogsDO log = invocation.getArgument(0);
+            log.setId(99L);
+            return 1;
+        }).when(linkAccessLogsMapper).insert(any(LinkAccessLogsDO.class));
 
         consumer.onMessage(event);
 
-        verify(linkAccessLogsMapper).insert(any(com.xhy.shortlink.biz.statsservice.dao.entity.LinkAccessLogsDO.class));
+        ArgumentCaptor<LinkAccessLogsDO> logCaptor = ArgumentCaptor.forClass(LinkAccessLogsDO.class);
+        verify(linkAccessLogsMapper).insert(logCaptor.capture());
+        assertEquals("中国-未知-未知", logCaptor.getValue().getLocale());
+        InOrder order = inOrder(shortLinkMapper, accessLocaleEnricher);
+        order.verify(shortLinkMapper).incrementStats(eq("g1"), eq("test.cn/pub"), eq(1), anyInt(), anyInt());
+        order.verify(accessLocaleEnricher).submit(eq("test.cn/pub"), any(), eq("114.114.114.114"), eq(99L));
         verify(accessLocaleEnricher, never()).persistLocale(any(), any(), any());
-        verify(accessLocaleEnricher).enrich(eq("test.cn/pub"), any(), eq("114.114.114.114"), any());
         verify(statsMetrics).recordConsumeSuccess(any(Duration.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void onMessage_incrementStatsFails_doesNotSubmitLocaleEnrich() {
+        when(ipLocationService.peekWithoutHttp("114.114.114.114")).thenReturn(Optional.empty());
+        ShortLinkStatsRecordEvent event = ShortLinkStatsRecordEvent.builder()
+                .eventId("evt-6")
+                .fullShortUrl("test.cn/fail")
+                .gid("g1")
+                .remoteAddr("114.114.114.114")
+                .os("Windows")
+                .browser("Chrome")
+                .device("PC")
+                .network("WIFI")
+                .uv("uv-fail")
+                .currentDate(new Date())
+                .build();
+
+        RReadWriteLock rwLock = mock(RReadWriteLock.class);
+        RLock readLock = mock(RLock.class);
+        when(redissonClient.getReadWriteLock(anyString())).thenReturn(rwLock);
+        when(rwLock.readLock()).thenReturn(readLock);
+
+        ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(stringRedisTemplate.getExpire(anyString())).thenReturn(-1L);
+
+        HyperLogLogOperations<String, String> hllOps = mock(HyperLogLogOperations.class);
+        when(stringRedisTemplate.opsForHyperLogLog()).thenReturn(hllOps);
+        when(hllOps.add(anyString(), anyString())).thenReturn(1L);
+        when(hllOps.size(anyString())).thenReturn(1L);
+
+        when(shortLinkMapper.incrementStats(anyString(), anyString(), anyInt(), anyInt(), anyInt()))
+                .thenThrow(new RuntimeException("db down"));
+
+        try {
+            consumer.onMessage(event);
+        } catch (RuntimeException ignored) {
+        }
+
+        verify(accessLocaleEnricher, never()).submit(any(), any(), any(), any());
+        verify(accessLocaleEnricher, never()).persistLocale(any(), any(), any());
+        verify(statsMetrics).recordConsumeFailure(any(Duration.class));
     }
 }

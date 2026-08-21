@@ -92,6 +92,10 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
     private final IpLocationService ipLocationService;
     private final AccessLocaleEnricher accessLocaleEnricher;
 
+    /**
+     * 主统计入库受 MQ 幂等保护。地区补全在全部写库成功之后才入队，
+     * 不在幂等键内：丢弃/失败只落「未知」省份，不会回补 PV。
+     */
     @Override
     @Idempotent(
             type = IdempotentTypeEnum.SPEL,
@@ -190,9 +194,6 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
 
         Optional<IpLocation> peeked = ipLocationService.peekWithoutHttp(remoteAddr);
         IpLocation syncLocation = peeked.orElse(IpLocation.unknown());
-        if (peeked.isPresent()) {
-            accessLocaleEnricher.persistLocale(fullShortUrl, currentDate, peeked.get());
-        }
 
         // OS 统计
         linkOsStatsMapper.shortLinkOsState(LinkOsStatsDO.builder()
@@ -221,9 +222,6 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
                 .device(statsRecord.getDevice()).network(statsRecord.getNetwork())
                 .locale(syncLocation.display()).build();
         linkAccessLogsMapper.insert(accessLog);
-        if (peeked.isEmpty()) {
-            accessLocaleEnricher.enrich(fullShortUrl, currentDate, remoteAddr, accessLog.getId());
-        }
 
         // 基础访问统计
         linkAccessStatsMapper.shortLinkStats(Collections.singletonList(
@@ -239,6 +237,12 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<ShortLinkSta
         if (affected == 0) {
             shortLinkColdMapper.incrementStats(gid, fullShortUrl,
                     1, delta.totalNewUv() ? 1 : 0, delta.totalNewUip() ? 1 : 0);
+        }
+
+        if (peeked.isPresent()) {
+            accessLocaleEnricher.persistLocale(fullShortUrl, currentDate, peeked.get());
+        } else {
+            accessLocaleEnricher.submit(fullShortUrl, currentDate, remoteAddr, accessLog.getId());
         }
     }
 

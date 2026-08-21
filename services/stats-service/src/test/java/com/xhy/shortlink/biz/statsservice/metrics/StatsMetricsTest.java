@@ -59,4 +59,15 @@ class StatsMetricsTest {
         double count = registry.get("shortlink_mq_consume_latency").timer().count();
         assertEquals(1.0, count, 0.0001);
     }
+
+    @Test
+    void shouldIncrementLocaleEnrichDroppedCounter() {
+        MeterRegistry registry = new SimpleMeterRegistry();
+        StatsMetrics metrics = new StatsMetrics(registry);
+
+        metrics.recordLocaleEnrichDropped();
+
+        double count = registry.get("shortlink_locale_enrich_dropped_total").counter().count();
+        assertEquals(1.0, count, 0.0001);
+    }
 }

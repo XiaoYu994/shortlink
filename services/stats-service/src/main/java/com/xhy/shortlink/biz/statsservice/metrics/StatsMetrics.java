@@ -29,6 +29,7 @@ public class StatsMetrics {
 
     private final Counter consumeSuccessCounter;
     private final Counter consumeFailureCounter;
+    private final Counter localeEnrichDroppedCounter;
     private final Timer consumeLatencyTimer;
 
     public StatsMetrics(MeterRegistry meterRegistry) {
@@ -37,6 +38,9 @@ public class StatsMetrics {
                 .register(meterRegistry);
         this.consumeFailureCounter = Counter.builder("shortlink_mq_consume_failure_total")
                 .description("Total failed MQ consumptions")
+                .register(meterRegistry);
+        this.localeEnrichDroppedCounter = Counter.builder("shortlink_locale_enrich_dropped_total")
+                .description("Locale enrich tasks dropped when amap executor is saturated")
                 .register(meterRegistry);
         this.consumeLatencyTimer = Timer.builder("shortlink_mq_consume_latency")
                 .description("MQ consume latency")
@@ -52,5 +56,9 @@ public class StatsMetrics {
     public void recordConsumeFailure(Duration duration) {
         consumeFailureCounter.increment();
         consumeLatencyTimer.record(duration);
+    }
+
+    public void recordLocaleEnrichDropped() {
+        localeEnrichDroppedCounter.increment();
     }
 }
