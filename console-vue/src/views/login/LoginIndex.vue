@@ -86,6 +86,7 @@
           }}</el-button>
       </div>
     </div>
+    <div ref="vantaRef" class="vanta"></div>
   </div>
 
   <el-dialog v-model="isWC" title="人机验证" width="40%" :before-close="handleClose">
@@ -111,9 +112,11 @@
 
 <script setup>
 import {isUsableValue, setToken, setUsername} from '@/core/auth.js'
-import {getCurrentInstance, reactive, ref} from 'vue'
+import {getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
+import * as THREE from 'three'
+import WAVES from 'vanta/src/vanta.waves'
 
 const { proxy } = getCurrentInstance()
 const API = proxy.$API
@@ -275,6 +278,29 @@ const verificationLogin = (formEl) => {
 // --- 样式效果逻辑 ---
 
 const checked = ref(true)
+const vantaRef = ref()
+let vantaEffect = null
+
+onMounted(() => {
+  vantaEffect = WAVES({
+    el: vantaRef.value,
+    THREE: THREE,
+    mouseControls: true,
+    touchControls: true,
+    gyroControls: false,
+    minHeight: 200.0,
+    minWidth: 200.0,
+    scale: 1.0,
+    scaleMobile: 1.0
+  })
+})
+
+onBeforeUnmount(() => {
+  if (vantaEffect) {
+    vantaEffect.destroy()
+  }
+})
+
 const isLogin = ref(true)
 const moveRef = ref()
 
@@ -305,7 +331,7 @@ const changeLogin = () => {
   width: 700px;
   position: absolute;
   z-index: 999;
-  top: 56%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   box-sizing: border-box;
@@ -352,14 +378,14 @@ const changeLogin = () => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #070b16 url('@/assets/png/login-bg.jpg') center / cover no-repeat;
 }
 
-.login-page::before {
-  content: '';
+.vanta {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(7, 11, 22, 0.18) 0%, rgba(7, 11, 22, 0.06) 40%, rgba(7, 11, 22, 0.32) 100%);
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
   z-index: 0;
 }
 
@@ -397,7 +423,7 @@ const changeLogin = () => {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  top: 28px;
+  top: 12%;
   z-index: 999;
   text-align: center;
   color: #fff;
@@ -409,7 +435,6 @@ const changeLogin = () => {
   font-weight: 700;
   letter-spacing: 0.42em;
   text-indent: 0.42em;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
 }
 
 .subtitle {
@@ -417,7 +442,7 @@ const changeLogin = () => {
   font-size: 14px;
   letter-spacing: 0.38em;
   text-indent: 0.38em;
-  color: rgba(240, 217, 160, 0.9);
+  color: rgba(225, 238, 250, 0.9);
 }
 
 :deep(.el-input__suffix-inner) {
